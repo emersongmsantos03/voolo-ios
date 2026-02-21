@@ -1,0 +1,334 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    function lower(s) { return s == null ? '' : s.toLowerCase(); }
+
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    // Canonical admin-managed fields. Clients must not be able to self-upgrade,
+    // self-unblock, or grant themselves admin permissions.
+    function protectedUserKeys() {
+      return [
+        'premium',
+        'isPremium',
+        'premiumAtivo',
+        'plan',
+        'premiumUpdatedAt',
+        'premiumUpdatedBy',
+        'status',
+        'blocked',
+        'suspenso',
+        'active',
+        'isActive',
+        'admin',
+        'isAdmin',
+        'role',
+        'authDisabled',
+        'authDisabledAt',
+        'authDisabledBy',
+        'authDisabledReason'
+      ];
+    }
+
+    function isAdmin() {
+      return isSignedIn() &&
+        (
+          lower(request.auth.token.email) == 'admin@voolo.com' ||
+          request.auth.token.role == 'admin' ||
+          request.auth.token.role == 'super_admin' ||
+          request.auth.token.admin == true
+        );
+    }
+
+    function isOwner(userId) {
+      return request.auth != null &&
+        (
+          request.auth.uid == userId ||
+          request.auth.token.email == userId
+        );
+    }
+
+    function isSelfPath(userId) {
+      // Allow both canonical UID docs and legacy email-docs.
+      return request.auth != null &&
+        (
+          (userId.matches('.*@.*') && request.auth.token.email == userId) ||
+          (!userId.matches('.*@.*') && request.auth.uid == userId)
+        );
+    }
+
+    function isSafeUserCreate() {
+      // Allow clients to create their profile, but never with elevated flags.
+      // NOTE: Missing keys evaluate to null here (safe by default).
+      return
+        request.resource.data.premium != true &&
+        request.resource.data.isPremium != true &&
+        request.resource.data.premiumAtivo != true &&
+        request.resource.data.plan != 'premium' &&
+        request.resource.data.blocked != true &&
+        request.resource.data.suspenso != true &&
+        request.resource.data.authDisabled != true &&
+        request.resource.data.admin != true &&
+        request.resource.data.isAdmin != true &&
+        request.resource.data.role != 'admin' &&
+        request.resource.data.role != 'super_admin' &&
+        request.resource.data.role != 'support' &&
+        request.resource.data.status != 'Suspenso' &&
+        request.resource.data.status != 'suspenso' &&
+        request.resource.data.status != 'blocked' &&
+        request.resource.data.status != 'bloqueado';
+    }
+
+    function hasNoProtectedUserChanges() {
+      return !request.resource.data
+        .diff(resource.data)
+        .changedKeys()
+        .hasAny(protectedUserKeys());
+    }
+
+    function isValidMonth(value) {
+      return value is string && value.matches('^\\d{4}-\\d{2}$');
+    }
+
+    function isValidSourceApp(value) {
+      return value in ['flutter', 'web', 'admin'];
+    }
+
+    function getSourceApp() {
+      return ('sourceApp' in request.resource.data) ? request.resource.data.sourceApp : request.resource.data.origin;
+    }
+
+    function isValidTxType(value) {
+      return value in ['EXPENSE', 'INCOME', 'INVESTMENT', 'DEBT_PAYMENT'];
+    }
+
+    function isValidTxStatus(value) {
+      return value in ['PENDING', 'PAID'];
+    }
+
+    function isV2() {
+      return request.resource.data.schemaVersion == 2;
+    }
+
+    function hasAuditFields() {
+      return
+        request.resource.data.createdAt is timestamp &&
+        request.resource.data.updatedAt is timestamp &&
+        request.resource.data.createdBy is string &&
+        isValidSourceApp(getSourceApp());
+    }
+
+    function immutableIfPresent(fieldName) {
+      return !(fieldName in resource.data) || request.resource.data[fieldName] == resource.data[fieldName];
+    }
+
+    function isValidTxV2() {
+      return
+        isV2() &&
+        isValidTxType(request.resource.data.type) &&
+        request.resource.data.amount is number &&
+        request.resource.data.amount > 0 &&
+        request.resource.data.categoryKey is string &&
+        request.resource.data.categoryKey.size() > 0 &&
+        isValidMonth(request.resource.data.referenceMonth) &&
+        isValidTxStatus(request.resource.data.status) &&
+        (request.resource.data.type != 'EXPENSE' || request.resource.data.dueDate is timestamp) &&
+        (request.resource.data.status != 'PAID' || (('paidAt' in request.resource.data) && (request.resource.data.paidAt is timestamp || request.resource.data.paidAt == null))) &&
+        request.resource.data.isVariable is bool &&
+        hasAuditFields() &&
+        immutableIfPresent('createdAt') &&
+        immutableIfPresent('createdBy');
+    }
+
+    function isOwnerOnPath(userId) {
+      return isOwner(userId) && isSelfPath(userId);
+    }
+
+    function isValidIncomeV2() {
+      return
+        isV2() &&
+        request.resource.data.title is string &&
+        request.resource.data.title.size() > 0 &&
+        request.resource.data.amount is number &&
+        request.resource.data.amount >= 0 &&
+        request.resource.data.isActive is bool &&
+        (!('activeFrom' in request.resource.data) || request.resource.data.activeFrom == null || isValidMonth(request.resource.data.activeFrom)) &&
+        (!('activeUntil' in request.resource.data) || request.resource.data.activeUntil == null || isValidMonth(request.resource.data.activeUntil)) &&
+        (!('excludedMonths' in request.resource.data) || request.resource.data.excludedMonths is list) &&
+        hasAuditFields() &&
+        immutableIfPresent('createdAt') &&
+        immutableIfPresent('createdBy');
+    }
+
+    function isValidDebtStatus(value) {
+      return value in ['ACTIVE', 'NEGOTIATING', 'PAID'];
+    }
+
+    function isValidDebtV2() {
+      return
+        isV2() &&
+        request.resource.data.creditorName is string &&
+        request.resource.data.creditorName.size() > 0 &&
+        request.resource.data.totalAmount is number &&
+        request.resource.data.totalAmount > 0 &&
+        (!('interestRate' in request.resource.data) || request.resource.data.interestRate == null || request.resource.data.interestRate is number) &&
+        (!('minPayment' in request.resource.data) || request.resource.data.minPayment == null || request.resource.data.minPayment is number) &&
+        (!('lateSince' in request.resource.data) || request.resource.data.lateSince == null || request.resource.data.lateSince is timestamp) &&
+        (!('priority' in request.resource.data) || request.resource.data.priority is number) &&
+        isValidDebtStatus(request.resource.data.status) &&
+        hasAuditFields() &&
+        immutableIfPresent('createdAt') &&
+        immutableIfPresent('createdBy');
+    }
+
+    function isValidBudgetV2() {
+      return
+        isV2() &&
+        request.resource.data.categoryKey is string &&
+        request.resource.data.categoryKey.size() > 0 &&
+        request.resource.data.limitAmount is number &&
+        request.resource.data.limitAmount >= 0 &&
+        (request.resource.data.referenceMonth == '*' || isValidMonth(request.resource.data.referenceMonth)) &&
+        (!('suggestedAmount' in request.resource.data) || request.resource.data.suggestedAmount == null || request.resource.data.suggestedAmount is number) &&
+        hasAuditFields() &&
+        immutableIfPresent('createdAt') &&
+        immutableIfPresent('createdBy');
+    }
+
+    function isValidInsightSeverity(value) {
+      return value in ['INFO', 'WARNING', 'CRITICAL'];
+    }
+
+    function isValidInsightV2() {
+      return
+        isV2() &&
+        request.resource.data.code is string &&
+        request.resource.data.code.size() > 0 &&
+        request.resource.data.title is string &&
+        request.resource.data.title.size() > 0 &&
+        request.resource.data.message is string &&
+        request.resource.data.message.size() > 0 &&
+        isValidInsightSeverity(request.resource.data.severity) &&
+        (!('referenceMonth' in request.resource.data) || request.resource.data.referenceMonth == null || isValidMonth(request.resource.data.referenceMonth)) &&
+        request.resource.data.isRead is bool &&
+        hasAuditFields() &&
+        immutableIfPresent('createdAt') &&
+        immutableIfPresent('createdBy');
+    }
+
+    match /users/{userId} {
+      allow read: if isOwner(userId) || isAdmin();
+
+      allow create: if isAdmin() ||
+        (isOwner(userId) && isSelfPath(userId) && isSafeUserCreate());
+
+      allow update: if isAdmin() ||
+        (isOwner(userId) && isSelfPath(userId) && hasNoProtectedUserChanges());
+
+      allow delete: if isOwner(userId) || isAdmin();
+
+      match /transactions/{txId} {
+        allow read: if isOwner(userId) || isAdmin();
+        // Legacy-compatible: v1 docs are allowed. v2 docs must validate shape.
+        allow create: if (isAdmin() || isOwnerOnPath(userId)) &&
+          (!isV2() || (isValidTxV2() && (isAdmin() || request.resource.data.createdBy == request.auth.uid)));
+        allow update: if (isAdmin() || isOwnerOnPath(userId)) &&
+          (!isV2() || (isValidTxV2() && (isAdmin() || request.resource.data.createdBy == request.auth.uid)));
+        allow delete: if isOwner(userId) || isAdmin();
+      }
+
+      match /incomes/{incomeId} {
+        allow read: if isOwner(userId) || isAdmin();
+        allow create: if (isAdmin() || isOwnerOnPath(userId)) &&
+          (!isV2() || (isValidIncomeV2() && (isAdmin() || request.resource.data.createdBy == request.auth.uid)));
+        allow update: if (isAdmin() || isOwnerOnPath(userId)) &&
+          (!isV2() || (isValidIncomeV2() && (isAdmin() || request.resource.data.createdBy == request.auth.uid)));
+        allow delete: if isOwner(userId) || isAdmin();
+      }
+
+      match /debts/{debtId} {
+        allow read: if isOwner(userId) || isAdmin();
+        allow create: if (isAdmin() || isOwnerOnPath(userId)) &&
+          (!isV2() || (isValidDebtV2() && (isAdmin() || request.resource.data.createdBy == request.auth.uid)));
+        allow update: if (isAdmin() || isOwnerOnPath(userId)) &&
+          (!isV2() || (isValidDebtV2() && (isAdmin() || request.resource.data.createdBy == request.auth.uid)));
+        allow delete: if isOwner(userId) || isAdmin();
+      }
+
+      match /budgets/{budgetId} {
+        allow read: if isOwner(userId) || isAdmin();
+        allow create: if (isAdmin() || isOwnerOnPath(userId)) &&
+          (!isV2() || (isValidBudgetV2() && (isAdmin() || request.resource.data.createdBy == request.auth.uid)));
+        allow update: if (isAdmin() || isOwnerOnPath(userId)) &&
+          (!isV2() || (isValidBudgetV2() && (isAdmin() || request.resource.data.createdBy == request.auth.uid)));
+        allow delete: if isOwner(userId) || isAdmin();
+      }
+
+      match /insights/{insightId} {
+        allow read: if isOwner(userId) || isAdmin();
+        allow create: if (isAdmin() || isOwnerOnPath(userId)) &&
+          (!isV2() || (isValidInsightV2() && (isAdmin() || request.resource.data.createdBy == request.auth.uid)));
+        allow update: if (isAdmin() || isOwnerOnPath(userId)) &&
+          (!isV2() || (isValidInsightV2() && (isAdmin() || request.resource.data.createdBy == request.auth.uid)));
+        allow delete: if isOwner(userId) || isAdmin();
+      }
+
+      match /{document=**} {
+        allow read, write: if isOwner(userId) || isAdmin();
+      }
+    }
+
+    // Global missions catalog: public read (Web + Flutter), writable by admin only.
+    match /missions/{missionId} {
+      allow read: if true;
+      allow write: if isAdmin();
+    }
+
+    // Global admin data (LGPD-safe): only admin can read; clients cannot write.
+    match /admin/{docId} {
+      allow read: if isAdmin();
+      allow write: if false;
+
+      match /{document=**} {
+        allow read: if isAdmin();
+        allow write: if false;
+      }
+    }
+
+    match /admin/auditLogs/items/{logId} {
+      allow read: if isAdmin();
+      allow write: if false;
+    }
+
+    match /admin/users/items/{uid} {
+      allow read: if isAdmin();
+      allow write: if false;
+    }
+
+    // Legacy audit collection used by existing Cloud Functions.
+    match /audit_logs/{logId} {
+      allow read: if isAdmin();
+      allow write: if false;
+    }
+
+    // Password reset collection is server-only (Cloud Functions via Admin SDK).
+    match /password_resets/{docId} {
+      allow read, write: if false;
+    }
+
+    // Password reset link collections are server-only (Cloud Functions via Admin SDK).
+    match /password_reset_links/{docId} {
+      allow read, write: if false;
+    }
+
+    match /password_reset_link_requests/{docId} {
+      allow read, write: if false;
+    }
+
+    match /{document=**} {
+      allow read, write: if isAdmin();
+    }
+  }
+}

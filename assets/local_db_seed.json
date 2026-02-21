@@ -1,0 +1,81 @@
+{
+  "users": [
+    {
+      "firstName": "Emerson",
+      "lastName": "Moraes",
+      "email": "emerson@jetx.com",
+      "password": "123",
+      "birthDate": "2001-08-12T00:00:00.000",
+      "profession": "CS",
+      "monthlyIncome": 5000,
+      "gender": "Nao informado",
+      "photoPath": null,
+      "isPremium": false,
+      "isActive": true,
+      "plan": "free",
+      "status": "active",
+      "totalXp": 0,
+      "completedMissions": []
+    }
+  ],
+  "dashboards": [
+    {
+      "email": "emerson@jetx.com",
+      "month": 1,
+      "year": 2025,
+      "salary": 5000,
+      "expenses": [
+        {
+          "id": "exp-fixed-rent",
+          "name": "Aluguel",
+          "type": "fixed",
+          "category": "moradia",
+          "amount": 1800,
+          "date": "2025-01-05T00:00:00.000",
+          "dueDay": 5
+        },
+        {
+          "id": "exp-var-food",
+          "name": "Mercado",
+          "type": "variable",
+          "category": "alimentacao",
+          "amount": 650,
+          "date": "2025-01-12T00:00:00.000",
+          "dueDay": null
+        },
+        {
+          "id": "exp-var-ride",
+          "name": "Transporte",
+          "type": "variable",
+          "category": "transporte",
+          "amount": 240,
+          "date": "2025-01-18T00:00:00.000",
+          "dueDay": null
+        },
+        {
+          "id": "exp-invest",
+          "name": "Investimento",
+          "type": "investment",
+          "category": "outros",
+          "amount": 500,
+          "date": "2025-01-25T00:00:00.000",
+          "dueDay": null
+        }
+      ]
+    }
+  ],
+  "goals": [
+    {
+      "email": "emerson@jetx.com",
+      "id": "goal-emergency",
+      "title": "Reserva de emergência",
+      "type": "personal",
+      "targetYear": 2025,
+      "description": "Guardar 3 meses de despesas",
+      "completed": false
+    }
+  ],
+  "settings": {
+    "current_user_email": "emerson@jetx.com"
+  }
+}

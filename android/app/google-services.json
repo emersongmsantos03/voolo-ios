@@ -1,0 +1,63 @@
+{
+  "project_info": {
+    "project_number": "100666481363",
+    "project_id": "voolo-ad416",
+    "storage_bucket": "voolo-ad416.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:100666481363:android:f1e5d37da415fea4975226",
+        "android_client_info": {
+          "package_name": "com.voolo.app"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "100666481363-bdq5ru034rf0o6fqr78j7oi4507t9dlt.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.voolo.app",
+            "certificate_hash": "5982d2e185fc4dc7f850a05de1a367362e731dd2"
+          }
+        },
+        {
+          "client_id": "100666481363-cdffs4ojri1hbheterir7jfugv9rc66c.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.voolo.app",
+            "certificate_hash": "bb46cc0e138ee589f95d01a49e69b029fc1ec34a"
+          }
+        },
+        {
+          "client_id": "100666481363-n00k287bhj6dlufj7kpbsvlgtf895rev.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.voolo.app",
+            "certificate_hash": "8d812c989661bd21dcba8487ffb8515c590ad88c"
+          }
+        },
+        {
+          "client_id": "100666481363-oudvh15h83umb4gf4plfm1eilgihepab.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyA-DCmov4aHL7r4Tyz6yU6gZ4ZlbhJPl9o"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "100666481363-oudvh15h83umb4gf4plfm1eilgihepab.apps.googleusercontent.com",
+              "client_type": 3
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
