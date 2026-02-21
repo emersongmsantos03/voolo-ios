@@ -11,8 +11,9 @@ workflows:
       ios_signing:
         distribution_type: app_store
         bundle_identifier: com.voolo.jetx
-      integrations:
-        app_store_connect: app-store-connect
+
+    integrations:
+      app_store_connect: app-store-connect
 
     triggering:
       events:
