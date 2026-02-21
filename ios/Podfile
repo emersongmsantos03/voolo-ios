@@ -31,6 +31,7 @@ target 'Runner' do
   pod 'FirebaseCoreInternal', :modular_headers => true
   pod 'FirebaseAppCheckInterop', :modular_headers => true
   pod 'FirebaseAuthInterop', :modular_headers => true
+  pod 'FirebaseFirestoreInternal', :modular_headers => true
   pod 'GoogleUtilities', :modular_headers => true
   pod 'RecaptchaInterop', :modular_headers => true
   flutter_install_all_ios_pods File.dirname(File.realpath(__FILE__))
