@@ -30,7 +30,7 @@ workflows:
 
       - name: Set up iOS code signing
         script: |
-          xcode-project use-profiles --project ios/Runner.xcodeproj --target Runner
+          xcode-project use-profiles --project ios/Runner.xcodeproj
 
       - name: Build signed IPA
         script: |
