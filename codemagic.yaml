@@ -35,9 +35,17 @@ workflows:
           keychain initialize
           keychain add-certificates
 
+      - name: Apply provisioning profiles to Xcode project
+        script: |
+          xcode-project use-profiles --project ios/Runner.xcodeproj
+
+      - name: Verify signing settings
+        script: |
+          xcode-project show-build-settings --project ios/Runner.xcodeproj --scheme Runner | grep -E "CODE_SIGN_STYLE|DEVELOPMENT_TEAM|PROVISIONING_PROFILE_SPECIFIER|PRODUCT_BUNDLE_IDENTIFIER"
+
       - name: Build signed IPA
         script: |
-          flutter build ipa --release --export-method app-store
+          flutter build ipa --release --export-options-plist=/Users/builder/export_options.plist
 
     artifacts:
       - build/ios/ipa/*.ipa
