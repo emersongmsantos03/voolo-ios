@@ -123,10 +123,11 @@ workflows:
 
           mkdir -p build/ios/ipa
           cp "$IPA_PATH" build/ios/ipa/Runner.ipa
+          find build/ios/ipa -type f -name '*.ipa' ! -name 'Runner.ipa' -delete
           echo "IPA ready at build/ios/ipa/Runner.ipa"
 
     artifacts:
-      - build/ios/ipa/*.ipa
+      - build/ios/ipa/Runner.ipa
       - build/ios/archive/*.xcarchive
       - /tmp/xcodebuild_logs/*.log
       - flutter_drive.log
