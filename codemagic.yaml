@@ -35,7 +35,13 @@ workflows:
           app-store-connect fetch-signing-files "$BUNDLE_ID" --type IOS_APP_STORE --create
           keychain initialize
           keychain add-certificates
-          xcode-project use-profiles --project ios/Runner.xcodeproj
+
+      - name: Debug signing files
+        script: |
+          echo "Certificates in keychain:"
+          keychain list-certificates || true
+          echo "Provisioning profiles found:"
+          find ~/Library/MobileDevice/Provisioning\\ Profiles -type f -name "*.mobileprovision" -maxdepth 1 | sed 's|^| - |' || true
 
       - name: Verify signing settings
         script: |
