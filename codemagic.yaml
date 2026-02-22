@@ -47,6 +47,18 @@ workflows:
         script: |
           xcode-project show-build-settings --project ios/Runner.xcodeproj --scheme Runner | grep -E "CODE_SIGN_STYLE|DEVELOPMENT_TEAM|PROVISIONING_PROFILE_SPECIFIER|PRODUCT_BUNDLE_IDENTIFIER"
 
+      - name: Set unique iOS build number
+        script: |
+          set -e
+          BUILD_NO="${BUILD_NUMBER:-$CM_BUILD_ID}"
+          if [ -z "$BUILD_NO" ]; then
+            BUILD_NO="$(date +%s)"
+          fi
+          cd ios
+          agvtool new-version -all "$BUILD_NO"
+          cd ..
+          echo "Using iOS build number: $BUILD_NO"
+
       - name: Build signed IPA
         script: |
           set -e
