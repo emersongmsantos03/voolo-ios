@@ -32,8 +32,10 @@ workflows:
 
       - name: Set up keychain and certificates
         script: |
+          app-store-connect fetch-signing-files "$BUNDLE_ID" --type IOS_APP_STORE --create
           keychain initialize
           keychain add-certificates
+          xcode-project use-profiles --project ios/Runner.xcodeproj
 
       - name: Verify signing settings
         script: |
@@ -41,7 +43,7 @@ workflows:
 
       - name: Build signed IPA
         script: |
-          flutter build ipa --release --export-method app-store || true
+          flutter build ipa --release --export-method app-store-connect || true
 
       - name: Export IPA from xcarchive (fallback)
         script: |
@@ -58,7 +60,7 @@ workflows:
           <plist version="1.0">
           <dict>
             <key>method</key>
-            <string>app-store</string>
+            <string>app-store-connect</string>
             <key>signingStyle</key>
             <string>automatic</string>
             <key>stripSwiftSymbols</key>
