@@ -41,7 +41,7 @@ workflows:
           echo "Certificates in keychain:"
           keychain list-certificates || true
           echo "Provisioning profiles found:"
-          find "$HOME/Library/MobileDevice/Provisioning Profiles" "$HOME/Library/Developer/Xcode/UserData/Provisioning Profiles" -maxdepth 1 -type f -name "*.mobileprovision" 2>/dev/null | sed 's|^| - |' || true
+          find "$HOME/Library/MobileDevice/Provisioning Profiles" "$HOME/Library/Developer/Xcode/UserData/Provisioning Profiles" -maxdepth 1 -type f \( -name "*.mobileprovision" -o -name "*.provisionprofile" \) 2>/dev/null | sed 's|^| - |' || true
 
       - name: Verify signing settings
         script: |
@@ -63,13 +63,17 @@ workflows:
             exit 1
           fi
 
-          PROFILE_PATH="$(find "$HOME/Library/MobileDevice/Provisioning Profiles" "$HOME/Library/Developer/Xcode/UserData/Provisioning Profiles" -maxdepth 1 -type f -name '*.mobileprovision' 2>/dev/null | head -n 1)"
+          PROFILE_PATH="$(find "$HOME/Library/MobileDevice/Provisioning Profiles" "$HOME/Library/Developer/Xcode/UserData/Provisioning Profiles" -maxdepth 1 -type f \( -name '*.mobileprovision' -o -name '*.provisionprofile' \) -size +1c 2>/dev/null | head -n 1)"
           if [ -z "$PROFILE_PATH" ]; then
             echo "ERROR: No provisioning profile found in Codemagic machine."
+            echo "Checked paths:"
+            echo " - $HOME/Library/MobileDevice/Provisioning Profiles"
+            echo " - $HOME/Library/Developer/Xcode/UserData/Provisioning Profiles"
             exit 1
           fi
 
-          PROFILE_NAME="$(security cms -D -i "$PROFILE_PATH" | /usr/libexec/PlistBuddy -c 'Print :Name' /dev/stdin)"
+          security cms -D -i "$PROFILE_PATH" > /tmp/profile.plist
+          PROFILE_NAME="$(/usr/libexec/PlistBuddy -c 'Print :Name' /tmp/profile.plist)"
           if [ -z "$PROFILE_NAME" ]; then
             echo "ERROR: Could not read provisioning profile name."
             exit 1
