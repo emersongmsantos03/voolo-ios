@@ -20,7 +20,12 @@ final GlobalKey<NavigatorState> _navKey = GlobalKey<NavigatorState>();
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
-  await Firebase.initializeApp();
+  var firebaseReady = true;
+  try {
+    await Firebase.initializeApp();
+  } catch (_) {
+    firebaseReady = false;
+  }
   await DateUtilsJetx.init();
   await LocalDatabaseService.init();
   // Ensure init doesn't hang the app indefinitely
@@ -43,12 +48,14 @@ Future<void> main() async {
           ? AppRoutes.securityLock
           : (needsSetup ? AppRoutes.onboarding : AppRoutes.dashboard));
 
-  FirebaseAuth.instance.authStateChanges().listen((authUser) {
-    if (authUser != null) return;
-    final navigator = _navKey.currentState;
-    if (navigator == null) return;
-    navigator.pushNamedAndRemoveUntil(AppRoutes.login, (route) => false);
-  });
+  if (firebaseReady) {
+    FirebaseAuth.instance.authStateChanges().listen((authUser) {
+      if (authUser != null) return;
+      final navigator = _navKey.currentState;
+      if (navigator == null) return;
+      navigator.pushNamedAndRemoveUntil(AppRoutes.login, (route) => false);
+    });
+  }
 
   runApp(
     MultiProvider(
@@ -57,7 +64,9 @@ Future<void> main() async {
         ChangeNotifierProvider(create: (_) => LocaleState()),
         ChangeNotifierProvider(create: (_) => PrivacyState()),
       ],
-      child: JetxApp(initialRoute: initialRoute),
+      child: firebaseReady
+          ? JetxApp(initialRoute: initialRoute)
+          : const _StartupErrorApp(),
     ),
   );
 }
@@ -92,6 +101,52 @@ class JetxApp extends StatelessWidget {
         // ?. Rotas centralizadas
         onGenerateRoute: AppRoutes.onGenerateRoute,
         initialRoute: initialRoute,
+      ),
+    );
+  }
+}
+
+class _StartupErrorApp extends StatelessWidget {
+  const _StartupErrorApp();
+
+  @override
+  Widget build(BuildContext context) {
+    return MaterialApp(
+      title: 'Voolo',
+      debugShowCheckedModeBanner: false,
+      theme: AppTheme.lightTheme,
+      home: Scaffold(
+        body: SafeArea(
+          child: Center(
+            child: Padding(
+              padding: const EdgeInsets.all(24),
+              child: ConstrainedBox(
+                constraints: const BoxConstraints(maxWidth: 420),
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  crossAxisAlignment: CrossAxisAlignment.center,
+                  children: const [
+                    Icon(Icons.error_outline_rounded, size: 42),
+                    SizedBox(height: 12),
+                    Text(
+                      'Nao foi possivel iniciar o app.',
+                      textAlign: TextAlign.center,
+                      style: TextStyle(
+                        fontSize: 20,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                    SizedBox(height: 8),
+                    Text(
+                      'Verifique a configuracao do Firebase no iOS (GoogleService-Info.plist) e tente novamente.',
+                      textAlign: TextAlign.center,
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ),
+        ),
       ),
     );
   }

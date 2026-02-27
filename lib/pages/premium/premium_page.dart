@@ -3,7 +3,9 @@ import 'dart:async';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:in_app_purchase/in_app_purchase.dart';
+import 'package:url_launcher/url_launcher.dart';
 
+import '../../core/constants/auth_links.dart';
 import '../../core/localization/app_strings.dart';
 import '../../services/billing_service.dart';
 
@@ -226,13 +228,12 @@ class _PremiumPageState extends State<PremiumPage> {
   Widget _planTile({
     required String id,
     required String title,
-    required String fallbackPrice,
     required String subtitle,
   }) {
     final scheme = Theme.of(context).colorScheme;
     final selected = _selectedProductId == id;
     final product = _productsById[id];
-    final priceText = product?.price ?? fallbackPrice;
+    final priceText = product?.price ?? 'Preço indisponível no momento';
 
     return InkWell(
       onTap: () => setState(() => _selectedProductId = id),
@@ -290,6 +291,12 @@ class _PremiumPageState extends State<PremiumPage> {
     );
   }
 
+  Future<void> _openExternalUrl(String url) async {
+    final uri = Uri.tryParse(url);
+    if (uri == null || uri.scheme.isEmpty) return;
+    await launchUrl(uri, mode: LaunchMode.externalApplication);
+  }
+
   @override
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
@@ -332,21 +339,22 @@ class _PremiumPageState extends State<PremiumPage> {
                     _planTile(
                       id: _monthlySubscriptionId,
                       title: 'Plano mensal',
-                      fallbackPrice: 'R\$ 29,90 / mes',
                       subtitle: 'Renovacao automatica. Cancele quando quiser.',
                     ),
                     const SizedBox(height: 10),
                     _planTile(
                       id: _yearlySubscriptionId,
                       title: 'Plano anual',
-                      fallbackPrice: 'R\$ 299,90 / ano',
                       subtitle: 'Cobranca anual. Equivale a R\$ 24,99/mes.',
                     ),
                     const SizedBox(height: 14),
                     SizedBox(
                       height: 50,
                       child: ElevatedButton(
-                        onPressed: _working ? null : _buySelectedPlan,
+                        onPressed: _working ||
+                                !_productsById.containsKey(_selectedProductId)
+                            ? null
+                            : _buySelectedPlan,
                         child: _working
                             ? const SizedBox(
                                 height: 18,
@@ -367,9 +375,32 @@ class _PremiumPageState extends State<PremiumPage> {
                     ),
                     const SizedBox(height: 10),
                     Text(
+                      'Pagamento sera cobrado na sua conta Apple ID na confirmacao da compra. A assinatura renova automaticamente ate cancelamento nas configuracoes da App Store.',
+                      style: TextStyle(
+                        color: scheme.onSurfaceVariant,
+                        fontSize: 12,
+                      ),
+                    ),
+                    const SizedBox(height: 10),
+                    Text(
                       'No plano anual voce paga uma vez por ano e continua com acesso premium por todos os meses do periodo.',
                       style: TextStyle(
                           color: scheme.onSurfaceVariant, fontSize: 12),
+                    ),
+                    const SizedBox(height: 10),
+                    Wrap(
+                      spacing: 4,
+                      children: [
+                        TextButton(
+                          onPressed: () => _openExternalUrl(AuthLinks.termsUrl),
+                          child: const Text('Termos de Uso'),
+                        ),
+                        TextButton(
+                          onPressed: () =>
+                              _openExternalUrl(AuthLinks.privacyUrl),
+                          child: const Text('Politica de Privacidade'),
+                        ),
+                      ],
                     ),
                   ],
                 ],
