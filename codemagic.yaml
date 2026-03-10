@@ -9,11 +9,11 @@ workflows:
       xcode: latest
       cocoapods: default
       vars:
-        BUNDLE_ID: com.voolo.jetx
+        BUNDLE_ID: com.voolo.app
         FIREBASE_IOS_PLIST_PATH: ios/Runner/GoogleService-Info.plist
       ios_signing:
         distribution_type: app_store
-        bundle_identifier: com.voolo.jetx
+        bundle_identifier: com.voolo.app
 
     integrations:
       app_store_connect: app-store-connect
@@ -45,6 +45,21 @@ workflows:
             echo "ERROR: Firebase iOS plist BUNDLE_ID ($PLIST_BUNDLE_ID) does not match app bundle ($BUNDLE_ID)."
             exit 1
           fi
+
+      - name: Configure iOS URL scheme for Google Sign-In
+        script: |
+          set -e
+          REVERSED_CLIENT_ID="$(/usr/libexec/PlistBuddy -c "Print :REVERSED_CLIENT_ID" "$FIREBASE_IOS_PLIST_PATH")"
+          if [ -z "$REVERSED_CLIENT_ID" ]; then
+            echo "ERROR: REVERSED_CLIENT_ID not found in Firebase iOS plist."
+            exit 1
+          fi
+          /usr/libexec/PlistBuddy -c "Delete :CFBundleURLTypes" ios/Runner/Info.plist || true
+          /usr/libexec/PlistBuddy -c "Add :CFBundleURLTypes array" ios/Runner/Info.plist
+          /usr/libexec/PlistBuddy -c "Add :CFBundleURLTypes:0 dict" ios/Runner/Info.plist
+          /usr/libexec/PlistBuddy -c "Add :CFBundleURLTypes:0:CFBundleTypeRole string Editor" ios/Runner/Info.plist
+          /usr/libexec/PlistBuddy -c "Add :CFBundleURLTypes:0:CFBundleURLSchemes array" ios/Runner/Info.plist
+          /usr/libexec/PlistBuddy -c "Add :CFBundleURLTypes:0:CFBundleURLSchemes:0 string $REVERSED_CLIENT_ID" ios/Runner/Info.plist
 
       - name: Set up keychain and certificates
         script: |
@@ -120,7 +135,7 @@ workflows:
             <string>VYJN27MQ6V</string>
             <key>provisioningProfiles</key>
             <dict>
-              <key>com.voolo.jetx</key>
+              <key>${BUNDLE_ID}</key>
               <string>${PROFILE_NAME}</string>
             </dict>
             <key>stripSwiftSymbols</key>
@@ -234,6 +249,19 @@ workflows:
             echo "Firebase iOS plist configured for live preview."
           else
             echo "FIREBASE_IOS_PLIST_BASE64 not set. App Preview will run in screenshot mode."
+          fi
+
+      - name: Configure iOS URL scheme for Google Sign-In (optional)
+        script: |
+          set -e
+          if [ -n "$FIREBASE_IOS_PLIST_BASE64" ]; then
+            REVERSED_CLIENT_ID="$(/usr/libexec/PlistBuddy -c "Print :REVERSED_CLIENT_ID" ios/Runner/GoogleService-Info.plist)"
+            /usr/libexec/PlistBuddy -c "Delete :CFBundleURLTypes" ios/Runner/Info.plist || true
+            /usr/libexec/PlistBuddy -c "Add :CFBundleURLTypes array" ios/Runner/Info.plist
+            /usr/libexec/PlistBuddy -c "Add :CFBundleURLTypes:0 dict" ios/Runner/Info.plist
+            /usr/libexec/PlistBuddy -c "Add :CFBundleURLTypes:0:CFBundleTypeRole string Editor" ios/Runner/Info.plist
+            /usr/libexec/PlistBuddy -c "Add :CFBundleURLTypes:0:CFBundleURLSchemes array" ios/Runner/Info.plist
+            /usr/libexec/PlistBuddy -c "Add :CFBundleURLTypes:0:CFBundleURLSchemes:0 string $REVERSED_CLIENT_ID" ios/Runner/Info.plist
           fi
 
       - name: Build iOS simulator .app
