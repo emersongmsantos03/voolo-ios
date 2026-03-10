@@ -277,7 +277,12 @@ workflows:
           if [ -n "$FIREBASE_IOS_PLIST_BASE64" ]; then
             echo "$FIREBASE_IOS_PLIST_BASE64" | base64 --decode > ios/Runner/GoogleService-Info.plist
             /usr/libexec/PlistBuddy -c "Print :GOOGLE_APP_ID" ios/Runner/GoogleService-Info.plist >/dev/null
-            /usr/libexec/PlistBuddy -c "Print :BUNDLE_ID" ios/Runner/GoogleService-Info.plist >/dev/null
+            PREVIEW_PLIST_BUNDLE_ID="$(/usr/libexec/PlistBuddy -c "Print :BUNDLE_ID" ios/Runner/GoogleService-Info.plist)"
+            if [ "$PREVIEW_PLIST_BUNDLE_ID" != "com.voolo.app" ]; then
+              echo "ERROR: Firebase iOS plist BUNDLE_ID ($PREVIEW_PLIST_BUNDLE_ID) does not match com.voolo.app."
+              exit 1
+            fi
+            /usr/libexec/PlistBuddy -c "Print :REVERSED_CLIENT_ID" ios/Runner/GoogleService-Info.plist >/dev/null
             echo "Firebase iOS plist configured for live preview."
           else
             cat > ios/Runner/GoogleService-Info.plist <<'EOF'
