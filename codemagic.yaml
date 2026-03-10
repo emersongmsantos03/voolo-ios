@@ -240,20 +240,24 @@ workflows:
       - name: Resolve available iOS simulator
         script: |
           set -e
-          DEVICE="$(xcrun simctl list devices available | awk -v preferredDevice="$SIMULATOR_DEVICE" -v preferredRuntime="$SIMULATOR_RUNTIME" '
+          LINE="$(xcrun simctl list devices available | awk -v preferredDevice="$SIMULATOR_DEVICE" -v preferredRuntime="$SIMULATOR_RUNTIME" '
             /^-- iOS / { runtime=$0; gsub(/^-- /, "", runtime); gsub(/ --$/, "", runtime) }
-            index(runtime, preferredRuntime) > 0 && index($0, preferredDevice) > 0 { line=$0; gsub(/^[[:space:]]+/, "", line); sub(/[[:space:]]*\(.*$/, "", line); print line; exit }
+            index(runtime, preferredRuntime) > 0 && index($0, preferredDevice) > 0 { print; exit }
           ')"
-          if [ -z "$DEVICE" ]; then
-            DEVICE="$(xcrun simctl list devices available | grep -E 'iPhone [0-9]+' | head -n 1 | sed -E 's/^[[:space:]]*//; s/[[:space:]]*\(.*$//')"
+          if [ -z "$LINE" ]; then
+            LINE="$(xcrun simctl list devices available | grep -E 'iPhone [0-9]+' | head -n 1)"
           fi
-          if [ -z "$DEVICE" ]; then
+          if [ -z "$LINE" ]; then
             echo "ERROR: No available iPhone simulator found on this Codemagic machine."
             xcrun simctl list devices available
             exit 1
           fi
+          DEVICE="$(echo "$LINE" | sed -E 's/^[[:space:]]*//; s/[[:space:]]*\(.*$//')"
+          UDID="$(echo "$LINE" | sed -nE 's/.*\(([0-9A-F-]{36})\).*/\1/pI')"
           echo "Resolved simulator device: $DEVICE"
+          echo "Resolved simulator udid: $UDID"
           echo "CM_SIMULATOR_DEVICE=$DEVICE" >> "$CM_ENV"
+          echo "CM_SIMULATOR_UDID=$UDID" >> "$CM_ENV"
 
       - name: Boot iOS simulator
         script: |
@@ -352,15 +356,26 @@ workflows:
         script: |
           set -e
           xcrun simctl shutdown all || true
-          xcrun simctl boot "$CM_SIMULATOR_DEVICE" || true
-          xcrun simctl bootstatus "$CM_SIMULATOR_DEVICE" -b
+          xcrun simctl boot "$CM_SIMULATOR_UDID" || true
+          xcrun simctl bootstatus "$CM_SIMULATOR_UDID" -b
 
       - name: Build iOS simulator .app for App Preview
         script: |
           set -e
-          flutter build ios --simulator --debug --no-codesign \
-            --dart-define=PREVIEW_STABLE_MODE=true
-          find build/ios/iphonesimulator -type d -name "*.app" | sed 's|^| - |'
+          cd ios
+          xcodebuild -workspace Runner.xcworkspace \
+            -scheme Runner \
+            -configuration Debug \
+            -sdk iphonesimulator \
+            -destination "id=$CM_SIMULATOR_UDID" \
+            -derivedDataPath ../build/ios_preview \
+            CODE_SIGNING_ALLOWED=NO \
+            CODE_SIGNING_REQUIRED=NO \
+            ONLY_ACTIVE_ARCH=YES \
+            EXCLUDED_ARCHS="i386 x86_64" \
+            build
+          cd ..
+          find build/ios_preview/Build/Products/Debug-iphonesimulator -type d -name "*.app" | sed 's|^| - |'
 
     artifacts:
-      - build/ios/iphonesimulator/**/*.app
+      - build/ios_preview/Build/Products/Debug-iphonesimulator/**/*.app
