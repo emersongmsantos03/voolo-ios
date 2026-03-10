@@ -304,7 +304,7 @@ workflows:
       - name: Build iOS simulator .app
         script: |
           set -e
-          flutter build ios --simulator --debug --no-codesign \
+          flutter build ios --simulator --profile --no-codesign \
             --dart-define=PREVIEW_STABLE_MODE=true
           find build/ios/iphonesimulator -type d -name "*.app" | sed 's|^| - |'
 
