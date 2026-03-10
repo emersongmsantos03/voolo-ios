@@ -287,6 +287,18 @@ workflows:
         script: |
           flutter pub get
 
+      - name: Resolve available iOS simulator
+        script: |
+          set -e
+          DEVICE="$(xcrun simctl list devices available | grep -E 'iPhone [0-9]+' | head -n 1 | sed -E 's/^[[:space:]]*//; s/[[:space:]]*\(.*$//')"
+          if [ -z "$DEVICE" ]; then
+            echo "ERROR: No available iPhone simulator found on this Codemagic machine."
+            xcrun simctl list devices available
+            exit 1
+          fi
+          echo "Resolved simulator device: $DEVICE"
+          echo "CM_SIMULATOR_DEVICE=$DEVICE" >> "$CM_ENV"
+
       - name: Provision stub Firebase plist for preview stability
         script: |
           set -e
@@ -308,6 +320,22 @@ workflows:
           EOF
           echo "Preview uses screenshot mode (no live Firebase init)."
 
+      - name: Prepare Flutter iOS config and Pods
+        script: |
+          set -e
+          flutter build ios --simulator --debug --config-only --no-codesign \
+            --dart-define=PREVIEW_STABLE_MODE=true
+          cd ios
+          pod install
+          cd ..
+
+      - name: Boot iOS simulator
+        script: |
+          set -e
+          xcrun simctl shutdown all || true
+          xcrun simctl boot "$CM_SIMULATOR_DEVICE" || true
+          xcrun simctl bootstatus "$CM_SIMULATOR_DEVICE" -b
+
       - name: Build iOS simulator .app for App Preview
         script: |
           set -e
@@ -317,7 +345,9 @@ workflows:
             -scheme Runner \
             -sdk iphonesimulator \
             -configuration Debug \
-            -destination 'generic/platform=iOS Simulator' \
+            -destination "platform=iOS Simulator,name=$CM_SIMULATOR_DEVICE" \
+            ONLY_ACTIVE_ARCH=YES \
+            EXCLUDED_ARCHS='i386 x86_64' \
             CODE_SIGNING_ALLOWED=NO
           find /Users/builder/Library/Developer/Xcode/DerivedData -type d -name "Runner.app" | sed 's|^| - |'
 
