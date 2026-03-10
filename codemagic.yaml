@@ -203,6 +203,32 @@ workflows:
         script: |
           flutter pub get
 
+      - name: Provision Firebase iOS plist (optional for screenshot mode)
+        script: |
+          set -e
+          if [ -n "$FIREBASE_IOS_PLIST_BASE64" ]; then
+            echo "$FIREBASE_IOS_PLIST_BASE64" | base64 --decode > ios/Runner/GoogleService-Info.plist
+            echo "Using real Firebase iOS plist from secret."
+          else
+            cat > ios/Runner/GoogleService-Info.plist <<'EOF'
+          <?xml version="1.0" encoding="UTF-8"?>
+          <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+          <plist version="1.0">
+          <dict>
+            <key>BUNDLE_ID</key>
+            <string>com.voolo.app</string>
+            <key>GOOGLE_APP_ID</key>
+            <string>stub-google-app-id</string>
+            <key>PROJECT_ID</key>
+            <string>stub-project-id</string>
+            <key>REVERSED_CLIENT_ID</key>
+            <string>stub-reversed-client-id</string>
+          </dict>
+          </plist>
+          EOF
+            echo "Using stub Firebase plist for screenshot mode."
+          fi
+
       - name: Boot iOS simulator
         script: |
           set -e
@@ -254,6 +280,22 @@ workflows:
             /usr/libexec/PlistBuddy -c "Print :BUNDLE_ID" ios/Runner/GoogleService-Info.plist >/dev/null
             echo "Firebase iOS plist configured for live preview."
           else
+            cat > ios/Runner/GoogleService-Info.plist <<'EOF'
+          <?xml version="1.0" encoding="UTF-8"?>
+          <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+          <plist version="1.0">
+          <dict>
+            <key>BUNDLE_ID</key>
+            <string>com.voolo.app</string>
+            <key>GOOGLE_APP_ID</key>
+            <string>stub-google-app-id</string>
+            <key>PROJECT_ID</key>
+            <string>stub-project-id</string>
+            <key>REVERSED_CLIENT_ID</key>
+            <string>stub-reversed-client-id</string>
+          </dict>
+          </plist>
+          EOF
             echo "FIREBASE_IOS_PLIST_BASE64 not set. App Preview will run in screenshot mode."
           fi
 
