@@ -16,14 +16,24 @@ class LocalDatabaseService {
   static const _seedAssetPath = 'assets/local_db_seed.json';
 
   static bool _initialized = false;
+  static bool _volatileStorageMode = false;
   static File? _dbFile;
   static Map<String, dynamic> _data = {};
 
   static Future<void> init() async {
     if (_initialized) return;
-    final dir = await getApplicationDocumentsDirectory();
-    final path = join(dir.path, _dbFileName);
-    _dbFile = File(path);
+    try {
+      final dir = await getApplicationDocumentsDirectory();
+      final path = join(dir.path, _dbFileName);
+      _dbFile = File(path);
+    } catch (_) {
+      // Fallback for unstable environments (e.g. remote simulator preview),
+      // where path_provider channel may be unavailable.
+      final fallbackDir = Directory.systemTemp.createTempSync('jetx_local_');
+      final path = join(fallbackDir.path, _dbFileName);
+      _dbFile = File(path);
+      _volatileStorageMode = true;
+    }
 
     await _loadOrSeed();
     _initialized = true;
@@ -76,7 +86,12 @@ class LocalDatabaseService {
       throw StateError('LocalDatabaseService.init() must be called first.');
     }
     final raw = jsonEncode(_data);
-    await _dbFile!.writeAsString(raw);
+    try {
+      await _dbFile!.writeAsString(raw);
+    } catch (_) {
+      // Keep app functional even if file persistence is not available.
+      if (!_volatileStorageMode) rethrow;
+    }
   }
 
   static void _ensureInit() {
