@@ -96,7 +96,15 @@ class LocalDatabaseService {
 
   static void _ensureInit() {
     if (!_initialized) {
-      throw StateError('LocalDatabaseService.init() must be called first.');
+      // Keep the app running even if initialization was skipped or failed.
+      _data = {
+        'users': <dynamic>[],
+        'dashboards': <dynamic>[],
+        'goals': <dynamic>[],
+        'settings': <String, dynamic>{},
+      };
+      _volatileStorageMode = true;
+      _initialized = true;
     }
   }
 

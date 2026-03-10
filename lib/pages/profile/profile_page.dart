@@ -213,7 +213,12 @@ class _ProfilePageState extends State<ProfilePage> {
 
     if (_pendingPhotoPath != null && _pendingPhotoPath!.isNotEmpty) {
       try {
-        final dir = await getApplicationDocumentsDirectory();
+        Directory dir;
+        try {
+          dir = await getApplicationDocumentsDirectory();
+        } catch (_) {
+          dir = await Directory.systemTemp.createTemp('voolo_profile_');
+        }
         final fileName = 'profile_${DateTime.now().millisecondsSinceEpoch}.jpg';
         final localFile = File('${dir.path}/$fileName');
 
