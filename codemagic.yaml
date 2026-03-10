@@ -263,29 +263,16 @@ workflows:
       flutter: stable
       xcode: latest
       cocoapods: default
-      groups:
-        - firebase
 
     scripts:
       - name: Flutter pub get
         script: |
           flutter pub get
 
-      - name: Provision Firebase iOS plist (optional)
+      - name: Provision stub Firebase plist for preview stability
         script: |
           set -e
-          if [ -n "$FIREBASE_IOS_PLIST_BASE64" ]; then
-            echo "$FIREBASE_IOS_PLIST_BASE64" | base64 --decode > ios/Runner/GoogleService-Info.plist
-            /usr/libexec/PlistBuddy -c "Print :GOOGLE_APP_ID" ios/Runner/GoogleService-Info.plist >/dev/null
-            PREVIEW_PLIST_BUNDLE_ID="$(/usr/libexec/PlistBuddy -c "Print :BUNDLE_ID" ios/Runner/GoogleService-Info.plist)"
-            if [ "$PREVIEW_PLIST_BUNDLE_ID" != "com.voolo.app" ]; then
-              echo "ERROR: Firebase iOS plist BUNDLE_ID ($PREVIEW_PLIST_BUNDLE_ID) does not match com.voolo.app."
-              exit 1
-            fi
-            /usr/libexec/PlistBuddy -c "Print :REVERSED_CLIENT_ID" ios/Runner/GoogleService-Info.plist >/dev/null
-            echo "Firebase iOS plist configured for live preview."
-          else
-            cat > ios/Runner/GoogleService-Info.plist <<'EOF'
+          cat > ios/Runner/GoogleService-Info.plist <<'EOF'
           <?xml version="1.0" encoding="UTF-8"?>
           <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
           <plist version="1.0">
@@ -301,32 +288,14 @@ workflows:
           </dict>
           </plist>
           EOF
-            echo "FIREBASE_IOS_PLIST_BASE64 not set. App Preview will run in screenshot mode."
-          fi
-
-      - name: Configure iOS URL scheme for Google Sign-In (optional)
-        script: |
-          set -e
-          if [ -n "$FIREBASE_IOS_PLIST_BASE64" ]; then
-            REVERSED_CLIENT_ID="$(/usr/libexec/PlistBuddy -c "Print :REVERSED_CLIENT_ID" ios/Runner/GoogleService-Info.plist)"
-            /usr/libexec/PlistBuddy -c "Delete :CFBundleURLTypes" ios/Runner/Info.plist || true
-            /usr/libexec/PlistBuddy -c "Add :CFBundleURLTypes array" ios/Runner/Info.plist
-            /usr/libexec/PlistBuddy -c "Add :CFBundleURLTypes:0 dict" ios/Runner/Info.plist
-            /usr/libexec/PlistBuddy -c "Add :CFBundleURLTypes:0:CFBundleTypeRole string Editor" ios/Runner/Info.plist
-            /usr/libexec/PlistBuddy -c "Add :CFBundleURLTypes:0:CFBundleURLSchemes array" ios/Runner/Info.plist
-            /usr/libexec/PlistBuddy -c "Add :CFBundleURLTypes:0:CFBundleURLSchemes:0 string $REVERSED_CLIENT_ID" ios/Runner/Info.plist
-          fi
+          echo "Preview uses screenshot mode (no live Firebase init)."
 
       - name: Build iOS simulator .app
         script: |
           set -e
-          if [ -n "$FIREBASE_IOS_PLIST_BASE64" ]; then
-            flutter build ios --simulator --debug --no-codesign
-          else
-            flutter build ios --simulator --debug --no-codesign \
-              --dart-define=SCREENSHOT_MODE=true \
-              --dart-define=SCREENSHOT_INITIAL_ROUTE=/login
-          fi
+          flutter build ios --simulator --debug --no-codesign \
+            --dart-define=SCREENSHOT_MODE=true \
+            --dart-define=SCREENSHOT_INITIAL_ROUTE=/login
           find build/ios/iphonesimulator -type d -name "*.app" | sed 's|^| - |'
 
     artifacts:
