@@ -33,6 +33,13 @@ workflows:
         script: |
           flutter pub get
 
+      - name: Install CocoaPods dependencies
+        script: |
+          set -e
+          cd ios
+          pod install
+          cd ..
+
       - name: Provision Firebase iOS plist
         script: |
           set -e
