@@ -340,6 +340,8 @@ workflows:
       - name: Prepare Flutter iOS config and Pods
         script: |
           set -e
+          /usr/libexec/PlistBuddy -c "Delete :PREVIEW_STABLE_MODE" ios/Runner/Info.plist || true
+          /usr/libexec/PlistBuddy -c "Add :PREVIEW_STABLE_MODE bool true" ios/Runner/Info.plist
           flutter build ios --simulator --debug --config-only --no-codesign \
             --dart-define=PREVIEW_STABLE_MODE=true
           cd ios
@@ -356,18 +358,9 @@ workflows:
       - name: Build iOS simulator .app for App Preview
         script: |
           set -e
-          export DART_DEFINES="$(printf 'PREVIEW_STABLE_MODE=true' | base64 | tr -d '\n')"
-          xcodebuild build \
-            -workspace ios/Runner.xcworkspace \
-            -scheme Runner \
-            -sdk iphonesimulator \
-            -configuration Debug \
-            -destination "platform=iOS Simulator,name=$CM_SIMULATOR_DEVICE" \
-            ONLY_ACTIVE_ARCH=YES \
-            EXCLUDED_ARCHS='i386 x86_64' \
-            SWIFT_ACTIVE_COMPILATION_CONDITIONS='$(inherited) PREVIEW_STABLE' \
-            CODE_SIGNING_ALLOWED=NO
-          find /Users/builder/Library/Developer/Xcode/DerivedData -type d -name "Runner.app" | sed 's|^| - |'
+          flutter build ios --simulator --debug --no-codesign \
+            --dart-define=PREVIEW_STABLE_MODE=true
+          find build/ios/iphonesimulator -type d -name "*.app" | sed 's|^| - |'
 
     artifacts:
-      - /Users/builder/Library/Developer/Xcode/DerivedData/**/Build/Products/Debug-iphonesimulator/*.app
+      - build/ios/iphonesimulator/**/*.app
