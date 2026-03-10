@@ -195,7 +195,6 @@ workflows:
       groups:
         - firebase
       vars:
-        SIMULATOR_DEVICE: "iPhone 15 Pro Max"
         SCREENSHOTS_DIR: "build/screenshots/iphone_69"
 
     scripts:
@@ -229,12 +228,24 @@ workflows:
             echo "Using stub Firebase plist for screenshot mode."
           fi
 
+      - name: Resolve available iOS simulator
+        script: |
+          set -e
+          DEVICE="$(xcrun simctl list devices available | grep -E 'iPhone [0-9]+' | head -n 1 | sed -E 's/^[[:space:]]*//; s/[[:space:]]*\(.*$//')"
+          if [ -z "$DEVICE" ]; then
+            echo "ERROR: No available iPhone simulator found on this Codemagic machine."
+            xcrun simctl list devices available
+            exit 1
+          fi
+          echo "Resolved simulator device: $DEVICE"
+          echo "CM_SIMULATOR_DEVICE=$DEVICE" >> "$CM_ENV"
+
       - name: Boot iOS simulator
         script: |
           set -e
           xcrun simctl shutdown all || true
-          xcrun simctl boot "$SIMULATOR_DEVICE" || true
-          xcrun simctl bootstatus "$SIMULATOR_DEVICE" -b
+          xcrun simctl boot "$CM_SIMULATOR_DEVICE" || true
+          xcrun simctl bootstatus "$CM_SIMULATOR_DEVICE" -b
 
       - name: Generate screenshots
         script: |
@@ -243,7 +254,7 @@ workflows:
           flutter drive \
             --driver=test_driver/integration_test.dart \
             --target=integration_test/app_store_screenshots_test.dart \
-            -d "$SIMULATOR_DEVICE" \
+            -d "$CM_SIMULATOR_DEVICE" \
             --dart-define=SCREENSHOT_MODE=true
 
       - name: List generated screenshots
