@@ -260,14 +260,10 @@ class _LoginPageState extends State<LoginPage> {
                             height: 52,
                             child: OutlinedButton.icon(
                               onPressed: _loading ? null : _loginWithGoogle,
-                              icon: Image.network(
-                                'https://upload.wikimedia.org/wikipedia/commons/c/c1/Google_%22G%22_logo.svg',
-                                height: 18,
-                                errorBuilder: (_, __, ___) => Icon(
-                                  Icons.g_mobiledata,
-                                  size: 26,
-                                  color: scheme.onSurfaceVariant,
-                                ),
+                              icon: Icon(
+                                Icons.g_mobiledata,
+                                size: 26,
+                                color: scheme.onSurfaceVariant,
                               ),
                               label:
                                   Text(AppStrings.t(context, 'login_google')),

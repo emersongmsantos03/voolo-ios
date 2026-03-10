@@ -149,3 +149,70 @@ workflows:
         auth: integration
         submit_to_testflight: true
         submit_to_app_store: false
+
+  ios-screenshots:
+    name: iOS Screenshots
+    instance_type: mac_mini_m2
+    max_build_duration: 120
+
+    environment:
+      flutter: stable
+      xcode: latest
+      cocoapods: default
+      vars:
+        SIMULATOR_DEVICE: "iPhone 15 Pro Max"
+        SCREENSHOTS_DIR: "build/screenshots/iphone_69"
+
+    scripts:
+      - name: Flutter pub get
+        script: |
+          flutter pub get
+
+      - name: Boot iOS simulator
+        script: |
+          set -e
+          xcrun simctl shutdown all || true
+          xcrun simctl boot "$SIMULATOR_DEVICE" || true
+          xcrun simctl bootstatus "$SIMULATOR_DEVICE" -b
+
+      - name: Generate screenshots
+        script: |
+          set -e
+          mkdir -p "$SCREENSHOTS_DIR"
+          flutter drive \
+            --driver=test_driver/integration_test.dart \
+            --target=integration_test/app_store_screenshots_test.dart \
+            -d "$SIMULATOR_DEVICE" \
+            --dart-define=SCREENSHOT_MODE=true
+
+      - name: List generated screenshots
+        script: |
+          set -e
+          find build/screenshots -type f -name "*.png" | sed 's|^| - |'
+
+    artifacts:
+      - build/screenshots/**/*.png
+
+  ios-app-preview:
+    name: iOS App Preview
+    instance_type: mac_mini_m2
+    max_build_duration: 60
+
+    environment:
+      flutter: stable
+      xcode: latest
+      cocoapods: default
+
+    scripts:
+      - name: Flutter pub get
+        script: |
+          flutter pub get
+
+      - name: Build iOS simulator .app
+        script: |
+          set -e
+          flutter build ios --simulator --debug --no-codesign
+          find build/ios/iphonesimulator -type d -name "*.app" | sed 's|^| - |'
+
+    artifacts:
+      - build/ios/iphonesimulator/*.app

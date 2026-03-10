@@ -1,8 +1,8 @@
-﻿import 'package:flutter/material.dart';
+import 'package:firebase_auth/firebase_auth.dart';
+import 'package:firebase_core/firebase_core.dart';
+import 'package:flutter/material.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:provider/provider.dart';
-import 'package:firebase_core/firebase_core.dart';
-import 'package:firebase_auth/firebase_auth.dart';
 
 import 'core/localization/app_strings.dart';
 import 'core/theme/app_theme.dart';
@@ -20,35 +20,76 @@ final GlobalKey<NavigatorState> _navKey = GlobalKey<NavigatorState>();
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
-  var firebaseReady = true;
+  const screenshotMode =
+      bool.fromEnvironment('SCREENSHOT_MODE', defaultValue: false);
+  const screenshotInitialRoute = String.fromEnvironment(
+    'SCREENSHOT_INITIAL_ROUTE',
+    defaultValue: '',
+  );
+
+  if (screenshotMode) {
+    final initialRoute = screenshotInitialRoute.isEmpty
+        ? AppRoutes.login
+        : screenshotInitialRoute;
+    runApp(
+      MultiProvider(
+        providers: [
+          ChangeNotifierProvider(create: (_) => ThemeState()),
+          ChangeNotifierProvider(create: (_) => LocaleState()),
+          ChangeNotifierProvider(create: (_) => PrivacyState()),
+        ],
+        child: JetxApp(initialRoute: initialRoute),
+      ),
+    );
+    return;
+  }
+
+  var firebaseReady = false;
+  var initialRoute = AppRoutes.login;
+
   try {
-    await Firebase.initializeApp();
+    await Firebase.initializeApp().timeout(const Duration(seconds: 8));
+    firebaseReady = true;
   } catch (_) {
     firebaseReady = false;
   }
-  await DateUtilsJetx.init();
-  await LocalDatabaseService.init();
-  // Ensure init doesn't hang the app indefinitely
-  await LocalStorageService.init().timeout(const Duration(seconds: 3), onTimeout: () => null);
 
-  // If we are logged in, wait a bit for the remote sync to avoid showing onboarding unnecessarily
-  if (LocalStorageService.currentUserId != null) {
-    await LocalStorageService.waitForSync(timeoutSeconds: 2);
-  }
+  try {
+    await DateUtilsJetx.init().timeout(const Duration(seconds: 2));
+  } catch (_) {}
 
-  final user = LocalStorageService.getUserProfile();
-  final needsSetup = user != null &&
-      (!user.setupCompleted ||
-          user.profession.trim().isEmpty ||
-          user.monthlyIncome <= 0 ||
-          user.objectives.isEmpty);
-  final initialRoute = user == null
-      ? AppRoutes.login
-      : (await SecurityLockService.requiresUnlockForCurrentUser()
-          ? AppRoutes.securityLock
-          : (needsSetup ? AppRoutes.onboarding : AppRoutes.dashboard));
+  try {
+    await LocalDatabaseService.init().timeout(const Duration(seconds: 3));
+  } catch (_) {}
 
+  // Firebase-dependent initialization must never block app startup.
   if (firebaseReady) {
+    try {
+      await LocalStorageService.init().timeout(
+        const Duration(seconds: 3),
+        onTimeout: () => null,
+      );
+
+      if (LocalStorageService.currentUserId != null) {
+        await LocalStorageService.waitForSync(timeoutSeconds: 2);
+      }
+
+      final user = LocalStorageService.getUserProfile();
+      final needsSetup = user != null &&
+          (!user.setupCompleted ||
+              user.profession.trim().isEmpty ||
+              user.monthlyIncome <= 0 ||
+              user.objectives.isEmpty);
+
+      initialRoute = user == null
+          ? AppRoutes.login
+          : (await SecurityLockService.requiresUnlockForCurrentUser()
+              ? AppRoutes.securityLock
+              : (needsSetup ? AppRoutes.onboarding : AppRoutes.dashboard));
+    } catch (_) {
+      initialRoute = AppRoutes.login;
+    }
+
     FirebaseAuth.instance.authStateChanges().listen((authUser) {
       if (authUser != null) return;
       final navigator = _navKey.currentState;
@@ -93,12 +134,9 @@ class JetxApp extends StatelessWidget {
           GlobalWidgetsLocalizations.delegate,
           GlobalCupertinoLocalizations.delegate,
         ],
-
         builder: (context, child) => OfflineBanner(
           child: child ?? const SizedBox.shrink(),
         ),
-
-        // ?. Rotas centralizadas
         onGenerateRoute: AppRoutes.onGenerateRoute,
         initialRoute: initialRoute,
       ),
@@ -138,7 +176,7 @@ class _StartupErrorApp extends StatelessWidget {
                     ),
                     SizedBox(height: 8),
                     Text(
-                      'Verifique a configuracao do Firebase no iOS (GoogleService-Info.plist) e tente novamente.',
+                      'A configuracao do Firebase para iOS nao foi carregada (GoogleService-Info.plist). Verifique o build de release e tente novamente.',
                       textAlign: TextAlign.center,
                     ),
                   ],
