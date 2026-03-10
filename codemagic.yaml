@@ -301,12 +301,18 @@ workflows:
           EOF
           echo "Preview uses screenshot mode (no live Firebase init)."
 
-      - name: Build iOS simulator .app
+      - name: Build iOS simulator .app for App Preview
         script: |
           set -e
-          flutter build ios --simulator --debug --no-codesign \
-            --dart-define=PREVIEW_STABLE_MODE=true
-          find build/ios/iphonesimulator -type d -name "*.app" | sed 's|^| - |'
+          export DART_DEFINES="$(printf 'PREVIEW_STABLE_MODE=true' | base64 | tr -d '\n')"
+          xcodebuild build \
+            -workspace ios/Runner.xcworkspace \
+            -scheme Runner \
+            -sdk iphonesimulator \
+            -configuration Debug \
+            -destination 'generic/platform=iOS Simulator' \
+            CODE_SIGNING_ALLOWED=NO
+          find /Users/builder/Library/Developer/Xcode/DerivedData -type d -name "Runner.app" | sed 's|^| - |'
 
     artifacts:
-      - build/ios/iphonesimulator/**/*.app
+      - /Users/builder/Library/Developer/Xcode/DerivedData/**/Build/Products/Debug-iphonesimulator/*.app
