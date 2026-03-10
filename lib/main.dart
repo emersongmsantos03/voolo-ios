@@ -1,3 +1,6 @@
+import 'dart:async';
+import 'dart:ui';
+
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/material.dart';
@@ -17,9 +20,60 @@ import 'state/theme_state.dart';
 import 'widgets/offline_banner.dart';
 
 final GlobalKey<NavigatorState> _navKey = GlobalKey<NavigatorState>();
+final ValueNotifier<_RuntimeErrorState?> _runtimeErrorNotifier =
+    ValueNotifier<_RuntimeErrorState?>(null);
+
+class _RuntimeErrorState {
+  final Object error;
+  final StackTrace stackTrace;
+
+  const _RuntimeErrorState({required this.error, required this.stackTrace});
+}
+
+void _reportFatalError(Object error, StackTrace stackTrace) {
+  debugPrint('Fatal runtime error: $error');
+  debugPrint('$stackTrace');
+  _runtimeErrorNotifier.value =
+      _RuntimeErrorState(error: error, stackTrace: stackTrace);
+}
+
+void _runGuardedApp(Widget app) {
+  runApp(
+    ValueListenableBuilder<_RuntimeErrorState?>(
+      valueListenable: _runtimeErrorNotifier,
+      builder: (context, runtimeError, _) {
+        if (runtimeError != null) {
+          return _RuntimeErrorApp(runtimeError: runtimeError);
+        }
+        return app;
+      },
+    ),
+  );
+}
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
+  FlutterError.onError = (details) {
+    FlutterError.presentError(details);
+    _reportFatalError(
+      details.exception,
+      details.stack ?? StackTrace.current,
+    );
+  };
+  PlatformDispatcher.instance.onError = (error, stackTrace) {
+    _reportFatalError(error, stackTrace);
+    return true;
+  };
+
+  await runZonedGuarded<Future<void>>(
+    () async {
+      await _bootstrapApp();
+    },
+    _reportFatalError,
+  );
+}
+
+Future<void> _bootstrapApp() async {
   const screenshotMode =
       bool.fromEnvironment('SCREENSHOT_MODE', defaultValue: false);
   const screenshotInitialRoute = String.fromEnvironment(
@@ -31,7 +85,7 @@ Future<void> main() async {
     final initialRoute = screenshotInitialRoute.isEmpty
         ? AppRoutes.login
         : screenshotInitialRoute;
-    runApp(
+    _runGuardedApp(
       MultiProvider(
         providers: [
           ChangeNotifierProvider(create: (_) => ThemeState()),
@@ -98,7 +152,7 @@ Future<void> main() async {
     });
   }
 
-  runApp(
+  _runGuardedApp(
     MultiProvider(
       providers: [
         ChangeNotifierProvider(create: (_) => ThemeState()),
@@ -178,6 +232,59 @@ class _StartupErrorApp extends StatelessWidget {
                     Text(
                       'A configuracao do Firebase para iOS nao foi carregada (GoogleService-Info.plist). Verifique o build de release e tente novamente.',
                       textAlign: TextAlign.center,
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _RuntimeErrorApp extends StatelessWidget {
+  final _RuntimeErrorState runtimeError;
+
+  const _RuntimeErrorApp({required this.runtimeError});
+
+  @override
+  Widget build(BuildContext context) {
+    return MaterialApp(
+      title: 'Voolo',
+      debugShowCheckedModeBanner: false,
+      theme: AppTheme.lightTheme,
+      home: Scaffold(
+        body: SafeArea(
+          child: Center(
+            child: Padding(
+              padding: const EdgeInsets.all(24),
+              child: ConstrainedBox(
+                constraints: const BoxConstraints(maxWidth: 460),
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    const Icon(Icons.warning_amber_rounded, size: 44),
+                    const SizedBox(height: 12),
+                    const Text(
+                      'O app encontrou um erro inesperado.',
+                      textAlign: TextAlign.center,
+                      style: TextStyle(
+                        fontSize: 20,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    const Text(
+                      'Tente reabrir. Se continuar, envie o log desta execucao para suporte.',
+                      textAlign: TextAlign.center,
+                    ),
+                    const SizedBox(height: 16),
+                    SelectableText(
+                      runtimeError.error.toString(),
+                      textAlign: TextAlign.center,
+                      style: const TextStyle(fontSize: 12),
                     ),
                   ],
                 ),
