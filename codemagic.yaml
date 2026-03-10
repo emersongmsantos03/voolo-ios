@@ -8,6 +8,8 @@ workflows:
       flutter: stable
       xcode: latest
       cocoapods: default
+      groups:
+        - firebase
       vars:
         BUNDLE_ID: com.voolo.app
         FIREBASE_IOS_PLIST_PATH: ios/Runner/GoogleService-Info.plist
@@ -190,6 +192,8 @@ workflows:
       flutter: stable
       xcode: latest
       cocoapods: default
+      groups:
+        - firebase
       vars:
         SIMULATOR_DEVICE: "iPhone 15 Pro Max"
         SCREENSHOTS_DIR: "build/screenshots/iphone_69"
@@ -233,6 +237,8 @@ workflows:
       flutter: stable
       xcode: latest
       cocoapods: default
+      groups:
+        - firebase
 
     scripts:
       - name: Flutter pub get
