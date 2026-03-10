@@ -202,6 +202,8 @@ workflows:
       groups:
         - firebase
       vars:
+        SIMULATOR_DEVICE: "iPhone 14 Pro"
+        SIMULATOR_RUNTIME: "iOS 16.2"
         SCREENSHOTS_DIR: "build/screenshots/iphone_69"
 
     scripts:
@@ -238,7 +240,13 @@ workflows:
       - name: Resolve available iOS simulator
         script: |
           set -e
-          DEVICE="$(xcrun simctl list devices available | grep -E 'iPhone [0-9]+' | head -n 1 | sed -E 's/^[[:space:]]*//; s/[[:space:]]*\(.*$//')"
+          DEVICE="$(xcrun simctl list devices available | awk -v preferredDevice="$SIMULATOR_DEVICE" -v preferredRuntime="$SIMULATOR_RUNTIME" '
+            /^-- iOS / { runtime=$0; gsub(/^-- /, "", runtime); gsub(/ --$/, "", runtime) }
+            index(runtime, preferredRuntime) > 0 && index($0, preferredDevice) > 0 { line=$0; gsub(/^[[:space:]]+/, "", line); sub(/[[:space:]]*\(.*$/, "", line); print line; exit }
+          ')"
+          if [ -z "$DEVICE" ]; then
+            DEVICE="$(xcrun simctl list devices available | grep -E 'iPhone [0-9]+' | head -n 1 | sed -E 's/^[[:space:]]*//; s/[[:space:]]*\(.*$//')"
+          fi
           if [ -z "$DEVICE" ]; then
             echo "ERROR: No available iPhone simulator found on this Codemagic machine."
             xcrun simctl list devices available
@@ -281,6 +289,9 @@ workflows:
       flutter: stable
       xcode: latest
       cocoapods: default
+      vars:
+        SIMULATOR_DEVICE: "iPhone 14 Pro"
+        SIMULATOR_RUNTIME: "iOS 16.2"
 
     scripts:
       - name: Flutter pub get
@@ -290,7 +301,13 @@ workflows:
       - name: Resolve available iOS simulator
         script: |
           set -e
-          DEVICE="$(xcrun simctl list devices available | grep -E 'iPhone [0-9]+' | head -n 1 | sed -E 's/^[[:space:]]*//; s/[[:space:]]*\(.*$//')"
+          DEVICE="$(xcrun simctl list devices available | awk -v preferredDevice="$SIMULATOR_DEVICE" -v preferredRuntime="$SIMULATOR_RUNTIME" '
+            /^-- iOS / { runtime=$0; gsub(/^-- /, "", runtime); gsub(/ --$/, "", runtime) }
+            index(runtime, preferredRuntime) > 0 && index($0, preferredDevice) > 0 { line=$0; gsub(/^[[:space:]]+/, "", line); sub(/[[:space:]]*\(.*$/, "", line); print line; exit }
+          ')"
+          if [ -z "$DEVICE" ]; then
+            DEVICE="$(xcrun simctl list devices available | grep -E 'iPhone [0-9]+' | head -n 1 | sed -E 's/^[[:space:]]*//; s/[[:space:]]*\(.*$//')"
+          fi
           if [ -z "$DEVICE" ]; then
             echo "ERROR: No available iPhone simulator found on this Codemagic machine."
             xcrun simctl list devices available
