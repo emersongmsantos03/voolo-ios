@@ -348,6 +348,7 @@ workflows:
             -destination "platform=iOS Simulator,name=$CM_SIMULATOR_DEVICE" \
             ONLY_ACTIVE_ARCH=YES \
             EXCLUDED_ARCHS='i386 x86_64' \
+            SWIFT_ACTIVE_COMPILATION_CONDITIONS='$(inherited) PREVIEW_STABLE' \
             CODE_SIGNING_ALLOWED=NO
           find /Users/builder/Library/Developer/Xcode/DerivedData -type d -name "Runner.app" | sed 's|^| - |'
 
