@@ -74,12 +74,19 @@ Future<void> main() async {
 }
 
 Future<void> _bootstrapApp() async {
+  const previewStableMode =
+      bool.fromEnvironment('PREVIEW_STABLE_MODE', defaultValue: false);
   const screenshotMode =
       bool.fromEnvironment('SCREENSHOT_MODE', defaultValue: false);
   const screenshotInitialRoute = String.fromEnvironment(
     'SCREENSHOT_INITIAL_ROUTE',
     defaultValue: '',
   );
+
+  if (previewStableMode) {
+    _runGuardedApp(const _PreviewStableApp());
+    return;
+  }
 
   if (screenshotMode) {
     final initialRoute = screenshotInitialRoute.isEmpty
@@ -285,6 +292,56 @@ class _RuntimeErrorApp extends StatelessWidget {
                       runtimeError.error.toString(),
                       textAlign: TextAlign.center,
                       style: const TextStyle(fontSize: 12),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _PreviewStableApp extends StatelessWidget {
+  const _PreviewStableApp();
+
+  @override
+  Widget build(BuildContext context) {
+    return MaterialApp(
+      title: 'Voolo Preview',
+      debugShowCheckedModeBanner: false,
+      theme: AppTheme.lightTheme,
+      home: Scaffold(
+        body: SafeArea(
+          child: Center(
+            child: Padding(
+              padding: const EdgeInsets.all(24),
+              child: ConstrainedBox(
+                constraints: const BoxConstraints(maxWidth: 420),
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    const Icon(Icons.phone_iphone_rounded, size: 46),
+                    const SizedBox(height: 12),
+                    const Text(
+                      'Voolo App Preview',
+                      textAlign: TextAlign.center,
+                      style: TextStyle(
+                        fontSize: 22,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                    const SizedBox(height: 10),
+                    const Text(
+                      'Modo de visualizacao estavel ativo.\nUse ios-appstore para validacao completa com Firebase.',
+                      textAlign: TextAlign.center,
+                    ),
+                    const SizedBox(height: 20),
+                    ElevatedButton(
+                      onPressed: () {},
+                      child: const Text('Preview ativo'),
                     ),
                   ],
                 ),

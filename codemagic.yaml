@@ -294,9 +294,8 @@ workflows:
         script: |
           set -e
           flutter build ios --simulator --debug --no-codesign \
-            --dart-define=SCREENSHOT_MODE=true \
-            --dart-define=SCREENSHOT_INITIAL_ROUTE=/login
+            --dart-define=PREVIEW_STABLE_MODE=true
           find build/ios/iphonesimulator -type d -name "*.app" | sed 's|^| - |'
 
     artifacts:
-      - build/ios/iphonesimulator/*.app
+      - build/ios/iphonesimulator/**/*.app
