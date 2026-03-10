@@ -3,6 +3,7 @@
 ## Available workflows
 - `ios-screenshots`: automatic screenshot generation (artifact `.png`).
 - `ios-app-preview`: builds simulator `.app` so you can use Codemagic **Quick Launch** in browser.
+- `ios-appstore`: release IPA publish flow (now requires Firebase iOS plist secret).
 
 ## Workflow
 - Use the workflow: `ios-screenshots`
@@ -30,6 +31,17 @@
 2. Open build artifacts and click **Quick Launch** next to the generated `.app`.
 3. Test and navigate the app in-browser on iOS simulator.
 4. Use this mainly for validation/demo; for App Store upload prefer PNGs from `ios-screenshots`.
+
+## Firebase setup in Codemagic (required for real login)
+1. Open Codemagic > App > `Environment variables`.
+2. Create secret variable `FIREBASE_IOS_PLIST_BASE64`.
+3. Put the base64 of your production `GoogleService-Info.plist`.
+4. Re-run workflow `ios-appstore` (or `ios-app-preview` for live login test).
+
+Example to generate base64 locally:
+```bash
+base64 -i GoogleService-Info.plist | pbcopy
+```
 
 ## Notes
 - The app runs with `SCREENSHOT_MODE=true` during screenshot generation.

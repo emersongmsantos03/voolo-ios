@@ -10,6 +10,7 @@ workflows:
       cocoapods: default
       vars:
         BUNDLE_ID: com.voolo.jetx
+        FIREBASE_IOS_PLIST_PATH: ios/Runner/GoogleService-Info.plist
       ios_signing:
         distribution_type: app_store
         bundle_identifier: com.voolo.jetx
@@ -29,6 +30,21 @@ workflows:
       - name: Flutter pub get
         script: |
           flutter pub get
+
+      - name: Provision Firebase iOS plist
+        script: |
+          set -e
+          if [ -z "$FIREBASE_IOS_PLIST_BASE64" ]; then
+            echo "ERROR: FIREBASE_IOS_PLIST_BASE64 is not set in Codemagic environment variables."
+            exit 1
+          fi
+          echo "$FIREBASE_IOS_PLIST_BASE64" | base64 --decode > "$FIREBASE_IOS_PLIST_PATH"
+          /usr/libexec/PlistBuddy -c "Print :GOOGLE_APP_ID" "$FIREBASE_IOS_PLIST_PATH" >/dev/null
+          PLIST_BUNDLE_ID="$(/usr/libexec/PlistBuddy -c "Print :BUNDLE_ID" "$FIREBASE_IOS_PLIST_PATH")"
+          if [ "$PLIST_BUNDLE_ID" != "$BUNDLE_ID" ]; then
+            echo "ERROR: Firebase iOS plist BUNDLE_ID ($PLIST_BUNDLE_ID) does not match app bundle ($BUNDLE_ID)."
+            exit 1
+          fi
 
       - name: Set up keychain and certificates
         script: |
@@ -208,12 +224,28 @@ workflows:
         script: |
           flutter pub get
 
+      - name: Provision Firebase iOS plist (optional)
+        script: |
+          set -e
+          if [ -n "$FIREBASE_IOS_PLIST_BASE64" ]; then
+            echo "$FIREBASE_IOS_PLIST_BASE64" | base64 --decode > ios/Runner/GoogleService-Info.plist
+            /usr/libexec/PlistBuddy -c "Print :GOOGLE_APP_ID" ios/Runner/GoogleService-Info.plist >/dev/null
+            /usr/libexec/PlistBuddy -c "Print :BUNDLE_ID" ios/Runner/GoogleService-Info.plist >/dev/null
+            echo "Firebase iOS plist configured for live preview."
+          else
+            echo "FIREBASE_IOS_PLIST_BASE64 not set. App Preview will run in screenshot mode."
+          fi
+
       - name: Build iOS simulator .app
         script: |
           set -e
-          flutter build ios --simulator --debug --no-codesign \
-            --dart-define=SCREENSHOT_MODE=true \
-            --dart-define=SCREENSHOT_INITIAL_ROUTE=/login
+          if [ -n "$FIREBASE_IOS_PLIST_BASE64" ]; then
+            flutter build ios --simulator --debug --no-codesign
+          else
+            flutter build ios --simulator --debug --no-codesign \
+              --dart-define=SCREENSHOT_MODE=true \
+              --dart-define=SCREENSHOT_INITIAL_ROUTE=/login
+          fi
           find build/ios/iphonesimulator -type d -name "*.app" | sed 's|^| - |'
 
     artifacts:
