@@ -381,5 +381,43 @@ workflows:
           cd ..
           find build/ios_preview/Build/Products/Debug-iphonesimulator -type d -name "*.app" | sed 's|^| - |'
 
+      - name: Collect app startup runtime logs
+        script: |
+          set -e
+          TARGET="$CM_SIMULATOR_UDID"
+          if [ -z "$TARGET" ]; then
+            TARGET="$CM_SIMULATOR_DEVICE"
+          fi
+          APP_PATH="$(find build/ios_preview/Build/Products/Debug-iphonesimulator -type d -name 'Runner.app' | head -n 1)"
+          if [ -z "$APP_PATH" ]; then
+            echo "ERROR: Runner.app not found."
+            exit 1
+          fi
+
+          mkdir -p build
+          xcrun simctl shutdown all || true
+          xcrun simctl boot "$TARGET" || true
+          xcrun simctl bootstatus "$TARGET" -b
+
+          xcrun simctl uninstall "$TARGET" com.voolo.app || true
+          xcrun simctl install "$TARGET" "$APP_PATH"
+
+          (xcrun simctl spawn "$TARGET" log stream --style compact --level debug --predicate 'process == "Runner"' > build/preview_runtime.log 2>&1) &
+          LOG_PID=$!
+          sleep 2
+
+          xcrun simctl launch "$TARGET" com.voolo.app > build/preview_launch.log 2>&1 || true
+          sleep 15
+
+          kill "$LOG_PID" || true
+          wait "$LOG_PID" || true
+
+          echo "=== preview_launch.log ==="
+          cat build/preview_launch.log || true
+          echo "=== preview_runtime.log (tail) ==="
+          tail -n 200 build/preview_runtime.log || true
+
     artifacts:
       - build/ios_preview/Build/Products/Debug-iphonesimulator/**/*.app
+      - build/preview_runtime.log
+      - build/preview_launch.log
