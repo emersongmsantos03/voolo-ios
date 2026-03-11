@@ -356,24 +356,15 @@ workflows:
           pod install
           cd ..
 
-      - name: Boot iOS simulator
-        script: |
-          set -e
-          xcrun simctl shutdown all || true
-          TARGET="$CM_SIMULATOR_UDID"
-          if [ -z "$TARGET" ]; then
-            TARGET="$CM_SIMULATOR_DEVICE"
-          fi
-          xcrun simctl boot "$TARGET" || true
-          xcrun simctl bootstatus "$TARGET" -b
-
       - name: Build iOS simulator .app for App Preview
         script: |
           set -e
           if [ -n "$CM_SIMULATOR_UDID" ]; then
             DESTINATION="id=$CM_SIMULATOR_UDID"
-          else
+          elif [ -n "$CM_SIMULATOR_DEVICE" ]; then
             DESTINATION="platform=iOS Simulator,name=$CM_SIMULATOR_DEVICE"
+          else
+            DESTINATION="generic/platform=iOS Simulator"
           fi
           cd ios
           xcodebuild -workspace Runner.xcworkspace \
