@@ -5,6 +5,7 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
+import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 
 import 'core/localization/app_strings.dart';
@@ -74,8 +75,7 @@ Future<void> main() async {
 }
 
 Future<void> _bootstrapApp() async {
-  const previewStableMode =
-      bool.fromEnvironment('PREVIEW_STABLE_MODE', defaultValue: false);
+  final previewStableMode = await _resolvePreviewStableMode();
   const screenshotMode =
       bool.fromEnvironment('SCREENSHOT_MODE', defaultValue: false);
   const screenshotInitialRoute = String.fromEnvironment(
@@ -171,6 +171,22 @@ Future<void> _bootstrapApp() async {
           : const _StartupErrorApp(),
     ),
   );
+}
+
+Future<bool> _resolvePreviewStableMode() async {
+  const compileTimeFlag =
+      bool.fromEnvironment('PREVIEW_STABLE_MODE', defaultValue: false);
+  if (compileTimeFlag) return true;
+
+  try {
+    const channel = MethodChannel('voolo/bootstrap');
+    final nativeFlag = await channel
+        .invokeMethod<bool>('isPreviewStableMode')
+        .timeout(const Duration(seconds: 2));
+    return nativeFlag ?? false;
+  } catch (_) {
+    return false;
+  }
 }
 
 class JetxApp extends StatelessWidget {
