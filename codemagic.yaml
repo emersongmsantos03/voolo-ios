@@ -13,9 +13,6 @@ workflows:
       vars:
         BUNDLE_ID: com.voolo.app
         FIREBASE_IOS_PLIST_PATH: ios/Runner/GoogleService-Info.plist
-      ios_signing:
-        distribution_type: app_store
-        bundle_identifier: com.voolo.app
 
     integrations:
       app_store_connect: app-store-connect
@@ -350,8 +347,6 @@ workflows:
           set -e
           /usr/libexec/PlistBuddy -c "Delete :PREVIEW_STABLE_MODE" ios/Runner/Info.plist || true
           /usr/libexec/PlistBuddy -c "Add :PREVIEW_STABLE_MODE bool true" ios/Runner/Info.plist
-          flutter build ios --simulator --debug --config-only --no-codesign \
-            --dart-define=PREVIEW_STABLE_MODE=true
           cd ios
           pod install
           cd ..
@@ -359,27 +354,9 @@ workflows:
       - name: Build iOS simulator .app for App Preview
         script: |
           set -e
-          if [ -n "$CM_SIMULATOR_UDID" ]; then
-            DESTINATION="id=$CM_SIMULATOR_UDID"
-          elif [ -n "$CM_SIMULATOR_DEVICE" ]; then
-            DESTINATION="platform=iOS Simulator,name=$CM_SIMULATOR_DEVICE"
-          else
-            DESTINATION="generic/platform=iOS Simulator"
-          fi
-          cd ios
-          xcodebuild -workspace Runner.xcworkspace \
-            -scheme Runner \
-            -configuration Debug \
-            -sdk iphonesimulator \
-            -destination "$DESTINATION" \
-            -derivedDataPath ../build/ios_preview \
-            CODE_SIGNING_ALLOWED=NO \
-            CODE_SIGNING_REQUIRED=NO \
-            ONLY_ACTIVE_ARCH=YES \
-            EXCLUDED_ARCHS="i386 x86_64" \
-            build
-          cd ..
-          find build/ios_preview/Build/Products/Debug-iphonesimulator -type d -name "*.app" | sed 's|^| - |'
+          flutter build ios --simulator --debug --no-codesign \
+            --dart-define=PREVIEW_STABLE_MODE=true
+          find build/ios/iphonesimulator -type d -name "*.app" | sed 's|^| - |'
 
       - name: Collect app startup runtime logs
         script: |
@@ -388,7 +365,7 @@ workflows:
           if [ -z "$TARGET" ]; then
             TARGET="$CM_SIMULATOR_DEVICE"
           fi
-          APP_PATH="$(find build/ios_preview/Build/Products/Debug-iphonesimulator -type d -name 'Runner.app' | head -n 1)"
+          APP_PATH="$(find build/ios/iphonesimulator -type d -name 'Runner.app' | head -n 1)"
           if [ -z "$APP_PATH" ]; then
             echo "ERROR: Runner.app not found."
             exit 1
@@ -406,8 +383,17 @@ workflows:
           LOG_PID=$!
           sleep 2
 
-          xcrun simctl launch "$TARGET" com.voolo.app > build/preview_launch.log 2>&1 || true
+          xcrun simctl launch "$TARGET" com.voolo.app > build/preview_launch.log 2>&1
           sleep 15
+
+          if ! xcrun simctl spawn "$TARGET" launchctl list | grep -F "com.voolo.app" >/dev/null; then
+            echo "ERROR: Preview app exited right after launch."
+            echo "=== preview_launch.log ==="
+            cat build/preview_launch.log || true
+            echo "=== preview_runtime.log (tail) ==="
+            tail -n 200 build/preview_runtime.log || true
+            exit 1
+          fi
 
           kill "$LOG_PID" || true
           wait "$LOG_PID" || true
@@ -418,6 +404,6 @@ workflows:
           tail -n 200 build/preview_runtime.log || true
 
     artifacts:
-      - build/ios_preview/Build/Products/Debug-iphonesimulator/**/*.app
+      - build/ios/iphonesimulator/**/*.app
       - build/preview_runtime.log
       - build/preview_launch.log
