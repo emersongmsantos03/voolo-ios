@@ -227,14 +227,20 @@ workflows:
           <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
           <plist version="1.0">
           <dict>
+            <key>API_KEY</key>
+            <string>stub-api-key</string>
             <key>BUNDLE_ID</key>
             <string>com.voolo.app</string>
+            <key>GCM_SENDER_ID</key>
+            <string>1234567890</string>
             <key>GOOGLE_APP_ID</key>
-            <string>stub-google-app-id</string>
+            <string>1:1234567890:ios:1234567890abcdef123456</string>
             <key>PROJECT_ID</key>
             <string>stub-project-id</string>
             <key>REVERSED_CLIENT_ID</key>
-            <string>stub-reversed-client-id</string>
+            <string>com.googleusercontent.apps.1234567890-abcdef</string>
+            <key>STORAGE_BUCKET</key>
+            <string>stub-project-id.appspot.com</string>
           </dict>
           </plist>
           EOF
@@ -340,14 +346,20 @@ workflows:
           <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
           <plist version="1.0">
           <dict>
+            <key>API_KEY</key>
+            <string>stub-api-key</string>
             <key>BUNDLE_ID</key>
             <string>com.voolo.app</string>
+            <key>GCM_SENDER_ID</key>
+            <string>1234567890</string>
             <key>GOOGLE_APP_ID</key>
-            <string>stub-google-app-id</string>
+            <string>1:1234567890:ios:1234567890abcdef123456</string>
             <key>PROJECT_ID</key>
             <string>stub-project-id</string>
             <key>REVERSED_CLIENT_ID</key>
-            <string>stub-reversed-client-id</string>
+            <string>com.googleusercontent.apps.1234567890-abcdef</string>
+            <key>STORAGE_BUCKET</key>
+            <string>stub-project-id.appspot.com</string>
           </dict>
           </plist>
           EOF

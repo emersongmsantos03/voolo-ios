@@ -36,11 +36,13 @@ import UIKit
     _ application: UIApplication,
     didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey: Any]?
   ) -> Bool {
-    GeneratedPluginRegistrant.register(with: self)
     let didFinishLaunching = super.application(
       application,
       didFinishLaunchingWithOptions: launchOptions
     )
+    if !isPreviewStableMode {
+      GeneratedPluginRegistrant.register(with: self)
+    }
     configureBootstrapChannel()
     return didFinishLaunching
   }
