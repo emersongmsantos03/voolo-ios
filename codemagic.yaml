@@ -381,6 +381,16 @@ workflows:
             --dart-define=PREVIEW_STABLE_MODE=true
           find build/ios/iphonesimulator -type d -name "*.app" | sed 's|^| - |'
 
+      - name: Verify preview flag in compiled app
+        script: |
+          set -e
+          APP_PATH="$(find build/ios/iphonesimulator -type d -name 'Runner.app' | head -n 1)"
+          if [ -z "$APP_PATH" ]; then
+            echo "ERROR: Runner.app not found after build."
+            exit 1
+          fi
+          /usr/libexec/PlistBuddy -c "Print :PREVIEW_STABLE_MODE" "$APP_PATH/Info.plist"
+
       - name: Collect app startup runtime logs
         script: |
           set -e
