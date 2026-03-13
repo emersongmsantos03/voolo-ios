@@ -30,6 +30,10 @@ workflows:
         script: |
           flutter pub get
 
+      - name: Validate iOS release configuration
+        script: |
+          sh scripts/validate_ios_release.sh
+
       - name: Install CocoaPods dependencies
         script: |
           set -e
@@ -91,15 +95,14 @@ workflows:
           if [ -z "$BUILD_NO" ]; then
             BUILD_NO="$(date +%s)"
           fi
-          cd ios
-          agvtool new-version -all "$BUILD_NO"
-          cd ..
+          echo "CM_FLUTTER_BUILD_NUMBER=$BUILD_NO" >> "$CM_ENV"
           echo "Using iOS build number: $BUILD_NO"
 
       - name: Build signed IPA
         script: |
           set -e
-          flutter build ipa --release --no-codesign
+          flutter build ipa --release --no-codesign \
+            --build-number="$CM_FLUTTER_BUILD_NUMBER"
 
       - name: Export signed IPA with App Store profile
         script: |
@@ -208,6 +211,10 @@ workflows:
         script: |
           flutter pub get
 
+      - name: Validate iOS release configuration
+        script: |
+          sh scripts/validate_ios_release.sh
+
       - name: Provision Firebase iOS plist (optional for screenshot mode)
         script: |
           set -e
@@ -298,6 +305,10 @@ workflows:
       - name: Flutter pub get
         script: |
           flutter pub get
+
+      - name: Validate iOS release configuration
+        script: |
+          sh scripts/validate_ios_release.sh
 
       - name: Resolve available iOS simulator
         script: |

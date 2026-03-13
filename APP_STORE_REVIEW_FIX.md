@@ -18,7 +18,12 @@
 - Evitar imagens de metadata com conteudo sensivel/violento/enganoso.
 - Revisar texto da descricao para nao prometer funcionalidade que nao existe no build atual.
 
-## 4) Texto sugerido para responder ao App Review
+## 4) Conta e privacidade
+- Como o app permite criar conta, manter a opcao de exclusao dentro do proprio app autenticado.
+- Validar `ios/Runner/PrivacyInfo.xcprivacy` e os privacy labels no App Store Connect antes do envio.
+- Confirmar que os links de `Termos de Uso` e `Politica de Privacidade` abrem em HTTPS.
+
+## 5) Texto sugerido para responder ao App Review
 Hello App Review Team,
 
 We fixed the issues related to App Completeness and Metadata Accuracy:
@@ -26,6 +31,7 @@ We fixed the issues related to App Completeness and Metadata Accuracy:
 1. App Completeness (2.1): we validated the production iOS build with all required runtime services enabled (including Firebase configuration and backend availability). We also provided a valid review account and clear test steps in App Review Information.
 2. Metadata Accuracy (2.3.3): screenshots were replaced with real in-app flows showing actual app usage.
 3. Metadata Accuracy (2.3.8): metadata and app visuals were aligned and reviewed to ensure they are appropriate for all audiences and consistent with the app name/icons/features.
+4. Account & Privacy: the app includes in-app account deletion for authenticated users, privacy links in the subscription flow, and an updated iOS privacy manifest.
 
 Additionally, the subscription screen now uses store-fetched pricing (no hardcoded pricing fallback) and includes direct links to Terms of Use and Privacy Policy.
 
