@@ -378,7 +378,7 @@ workflows:
         script: |
           set -e
           flutter build ios --simulator --debug --no-codesign \
-            --dart-define=PREVIEW_STABLE_MODE=true
+            --target=lib/main_preview.dart
           find build/ios/iphonesimulator -type d -name "*.app" | sed 's|^| - |'
 
       - name: Verify preview flag in compiled app
