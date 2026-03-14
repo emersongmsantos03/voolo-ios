@@ -63,6 +63,11 @@ class _DashboardPageState extends State<DashboardPage> {
   List<String> _timeline = [];
   StreamSubscription<List<Expense>>? _transactionsSubscription;
   StreamSubscription<List<DebtV2>>? _debtsSubscription;
+  String? _debtsSubscriptionUid;
+  String? _transactionsSubscriptionUid;
+  int? _transactionsSubscriptionMonth;
+  int? _transactionsSubscriptionYear;
+  String? _lastReminderSyncKey;
   bool _hasOpenDebts = false;
   bool _essentialGuideHandledInSession = false;
 
@@ -103,51 +108,166 @@ class _DashboardPageState extends State<DashboardPage> {
     super.dispose();
   }
 
-  void _load() {
-    _user = LocalStorageService.getUserProfile();
+  void _cancelRealtimeSubscriptions() {
+    _transactionsSubscription?.cancel();
+    _transactionsSubscription = null;
+    _transactionsSubscriptionUid = null;
+    _transactionsSubscriptionMonth = null;
+    _transactionsSubscriptionYear = null;
 
-    if (_user == null) {
-      setState(() {
-        _dashboard = null;
-      });
-      _wasPremium = false;
+    _debtsSubscription?.cancel();
+    _debtsSubscription = null;
+    _debtsSubscriptionUid = null;
+  }
+
+  void _recomputeDerivedState() {
+    final user = _user;
+    final dashboard = _dashboard;
+    if (user == null || dashboard == null) {
+      _insights = [];
+      _score = 0;
+      _scoreStatus = 'critical';
+      _scoreResult = null;
+      _timeline = [];
       return;
     }
 
-    _checkPremiumActivation(_user!);
+    final plan = UserPlan.fromProfile(user);
+    final goals = LocalStorageService.getGoals();
+    _insights = _insightService.generateInsights(dashboard, goals, plan);
+
+    final housing = dashboard.expenses
+        .where((e) => e.category == ExpenseCategory.moradia && !e.isInvestment)
+        .fold(0.0, (sum, e) => sum + e.amount);
+
+    final result = FinanceScoreUtils.computeFinancialHealthScore(
+      income: dashboard.salary,
+      fixed: dashboard.fixedExpensesTotal,
+      variable: dashboard.variableExpensesTotal,
+      investContribution: dashboard.investmentsTotal,
+      hasOpenDebts: _hasOpenDebts,
+      housing: housing,
+      propertyValue: user.propertyValue,
+      investBalance: user.investBalance,
+    );
+    _score = result.score;
+    _scoreStatus = result.status;
+    _scoreResult = result;
+    _timeline = _getTimelineItems(dashboard);
+  }
+
+  void _ensureDebtsSubscription(String? uid) {
+    final normalizedUid = uid?.trim();
+    if (normalizedUid == _debtsSubscriptionUid) {
+      return;
+    }
+
+    _debtsSubscription?.cancel();
+    _debtsSubscription = null;
+    _debtsSubscriptionUid = normalizedUid;
+
+    if (normalizedUid == null || normalizedUid.isEmpty) {
+      _hasOpenDebts = false;
+      return;
+    }
+
+    _debtsSubscription = FirestoreService.watchDebts(normalizedUid).listen((
+      debts,
+    ) {
+      final hasOpen = debts.any(
+        (d) => d.status == 'ACTIVE' || d.status == 'NEGOTIATING',
+      );
+      if (!mounted || hasOpen == _hasOpenDebts) {
+        return;
+      }
+      setState(() {
+        _hasOpenDebts = hasOpen;
+        _recomputeDerivedState();
+      });
+    });
+  }
+
+  void _ensureTransactionsSubscription({
+    required String? uid,
+    required int month,
+    required int year,
+  }) {
+    final normalizedUid = uid?.trim();
+    if (_transactionsSubscriptionUid == normalizedUid &&
+        _transactionsSubscriptionMonth == month &&
+        _transactionsSubscriptionYear == year) {
+      return;
+    }
+
+    _transactionsSubscription?.cancel();
+    _transactionsSubscription = null;
+    _transactionsSubscriptionUid = normalizedUid;
+    _transactionsSubscriptionMonth = month;
+    _transactionsSubscriptionYear = year;
+
+    _transactionsSubscription = LocalStorageService.watchTransactions(
+      month,
+      year,
+    ).listen((txs) {
+      if (!mounted) return;
+      setState(() {
+        final dashboard = _dashboard;
+        if (dashboard == null) {
+          return;
+        }
+        _dashboard = dashboard.copyWith(expenses: txs);
+        _recomputeDerivedState();
+      });
+    });
+  }
+
+  String _buildReminderSyncKey(UserProfile user, MonthlyDashboard? dashboard) {
+    final cardsKey = user.creditCards
+        .map((card) => '${card.id}:${card.dueDay}')
+        .join('|');
+    final expensesKey = dashboard == null
+        ? ''
+        : dashboard.expenses
+            .where(
+              (expense) =>
+                  expense.isFixed &&
+                  !expense.isCreditCard &&
+                  expense.dueDay != null,
+            )
+            .map(
+              (expense) =>
+                  '${expense.id}:${expense.dueDay}:${expense.date.year}-${expense.date.month}',
+            )
+            .join('|');
+    return '${LocalStorageService.currentUserId}|'
+        '${_currentMonth.year}-${_currentMonth.month}|'
+        '$cardsKey|$expensesKey';
+  }
+
+  void _load() {
+    final nextUser = LocalStorageService.getUserProfile();
+
+    if (nextUser == null) {
+      _cancelRealtimeSubscriptions();
+      setState(() {
+        _user = null;
+        _dashboard = null;
+        _insights = [];
+        _timeline = [];
+        _score = 0;
+        _scoreResult = null;
+        _hasOpenDebts = false;
+      });
+      _wasPremium = false;
+      _lastReminderSyncKey = null;
+      return;
+    }
+
+    _user = nextUser;
+    _checkPremiumActivation(nextUser);
 
     final uid = LocalStorageService.currentUserId;
-    _debtsSubscription?.cancel();
-    if (uid != null && uid.isNotEmpty) {
-      _debtsSubscription = FirestoreService.watchDebts(uid).listen((debts) {
-        final hasOpen = debts.any(
-          (d) => d.status == 'ACTIVE' || d.status == 'NEGOTIATING',
-        );
-        if (!mounted) return;
-        if (hasOpen == _hasOpenDebts) return;
-        setState(() {
-          _hasOpenDebts = hasOpen;
-          if (_dashboard == null || _user == null) return;
-          final housing = _dashboard!.expenses
-              .where((e) =>
-                  e.category == ExpenseCategory.moradia && !e.isInvestment)
-              .fold(0.0, (sum, e) => sum + e.amount);
-          final result = FinanceScoreUtils.computeFinancialHealthScore(
-            income: _dashboard!.salary,
-            fixed: _dashboard!.fixedExpensesTotal,
-            variable: _dashboard!.variableExpensesTotal,
-            investContribution: _dashboard!.investmentsTotal,
-            hasOpenDebts: _hasOpenDebts,
-            housing: housing,
-            propertyValue: _user?.propertyValue ?? 0.0,
-            investBalance: _user?.investBalance,
-          );
-          _score = result.score;
-          _scoreStatus = result.status;
-          _scoreResult = result;
-        });
-      });
-    }
+    _ensureDebtsSubscription(uid);
 
     final existing = LocalStorageService.getDashboard(
       _currentMonth.month,
@@ -182,65 +302,19 @@ class _DashboardPageState extends State<DashboardPage> {
       LocalStorageService.saveDashboard(_dashboard!);
     }
 
-    // Subscribe to transactions for real-time updates
-    _transactionsSubscription?.cancel();
-    _transactionsSubscription = LocalStorageService.watchTransactions(
-      _currentMonth.month,
-      _currentMonth.year,
-    ).listen((txs) {
-      if (!mounted) return;
-      setState(() {
-        _dashboard = _dashboard!.copyWith(expenses: txs);
-
-        final plan = UserPlan.fromProfile(_user);
-        final goals = LocalStorageService.getGoals();
-        _insights = _insightService.generateInsights(_dashboard!, goals, plan);
-
-        final housing = _dashboard!.expenses
-            .where(
-                (e) => e.category == ExpenseCategory.moradia && !e.isInvestment)
-            .fold(0.0, (sum, e) => sum + e.amount);
-
-        final result = FinanceScoreUtils.computeFinancialHealthScore(
-          income: _dashboard!.salary,
-          fixed: _dashboard!.fixedExpensesTotal,
-          variable: _dashboard!.variableExpensesTotal,
-          investContribution: _dashboard!.investmentsTotal,
-          hasOpenDebts: _hasOpenDebts,
-          housing: housing,
-          propertyValue: _user?.propertyValue ?? 0.0,
-          investBalance: _user?.investBalance,
-        );
-        _score = result.score;
-        _scoreStatus = result.status;
-        _scoreResult = result;
-        _timeline = _getTimelineItems(_dashboard!);
-      });
-    });
-
-    final plan = UserPlan.fromProfile(_user);
-    final goals = LocalStorageService.getGoals();
-    _insights = _insightService.generateInsights(_dashboard!, goals, plan);
-
-    final housingInit = _dashboard!.expenses
-        .where((e) => e.category == ExpenseCategory.moradia && !e.isInvestment)
-        .fold(0.0, (sum, e) => sum + e.amount);
-
-    final result = FinanceScoreUtils.computeFinancialHealthScore(
-      income: _dashboard!.salary,
-      fixed: _dashboard!.fixedExpensesTotal,
-      variable: _dashboard!.variableExpensesTotal,
-      investContribution: _dashboard!.investmentsTotal,
-      hasOpenDebts: _hasOpenDebts,
-      housing: housingInit,
-      propertyValue: _user?.propertyValue ?? 0.0,
-      investBalance: _user?.investBalance,
+    _ensureTransactionsSubscription(
+      uid: uid,
+      month: _currentMonth.month,
+      year: _currentMonth.year,
     );
-    _score = result.score;
-    _scoreStatus = result.status;
-    _scoreResult = result;
-    _timeline = _getTimelineItems(_dashboard!);
-    unawaited(_syncDueReminders());
+
+    _recomputeDerivedState();
+
+    final reminderKey = _buildReminderSyncKey(nextUser, _dashboard);
+    if (_lastReminderSyncKey != reminderKey) {
+      _lastReminderSyncKey = reminderKey;
+      unawaited(_syncDueReminders());
+    }
 
     setState(() {});
     if (!_essentialGuideHandledInSession) {
