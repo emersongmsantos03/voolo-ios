@@ -908,12 +908,12 @@ class LocalStorageService {
   static Future<bool> saveDashboard(MonthlyDashboard dashboard) async {
     _lastLoginError = null;
 
-    // Despesas vivem na subcoleÃ§Ã£o /transactions. NÃ£o salvar embutidas no dashboard.
+    // Despesas vivem na subcoleção /transactions. Não salvar embutidas no dashboard.
     final dashboardToSave = MonthlyDashboard(
       month: dashboard.month,
       year: dashboard.year,
       salary: dashboard.salary,
-      expenses: const [], // Sempre vazio no documento de sumÃ¡rio
+      expenses: const [], // Sempre vazio no documento de sumário
       creditCardPayments: dashboard.creditCardPayments,
       fixedExclusions: dashboard.fixedExclusions,
     );
@@ -1875,7 +1875,7 @@ class LocalStorageService {
       _lastSyncError = null;
     } else {
       _lastSyncError =
-          'Tivemos um problema ao sincronizar agora, mas nÃ£o se preocupe: seus dados continuam salvos no seu celular.';
+          'Tivemos um problema ao sincronizar agora, mas não se preocupe: seus dados continuam salvos no seu celular.';
     }
   }
 }
