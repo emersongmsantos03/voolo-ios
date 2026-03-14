@@ -976,20 +976,6 @@ class FirestoreService {
     return _legacyUserDoc(email).collection('goals');
   }
 
-  static Future<bool?> userExists(String email) async {
-    try {
-      final normalized = email.trim().toLowerCase();
-      final snapshot = await _db
-          .collection('users')
-          .where('email', isEqualTo: normalized)
-          .limit(1)
-          .get();
-      return snapshot.docs.isNotEmpty;
-    } on FirebaseException {
-      return null;
-    }
-  }
-
   static Future<UserProfile?> getUserByUid(String uid) async {
     try {
       final doc = await _userDoc(uid).get();
@@ -1473,7 +1459,8 @@ class FirestoreService {
     }
 
     final normalizedEmail = email?.trim().toLowerCase() ?? '';
-    if (normalizedEmail.isEmpty || normalizedEmail == uid.trim().toLowerCase()) {
+    if (normalizedEmail.isEmpty ||
+        normalizedEmail == uid.trim().toLowerCase()) {
       return;
     }
 

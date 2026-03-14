@@ -31,6 +31,10 @@
 			</array>
 		</dict>
 	</array>
+	<key>GIDClientID</key>
+	<string>100666481363-r1nvlcji3h8nc72i3abnfjhkmin2s5ed.apps.googleusercontent.com</string>
+	<key>GIDServerClientID</key>
+	<string>100666481363-oudvh15h83umb4gf4plfm1eilgihepab.apps.googleusercontent.com</string>
 	<key>CFBundleVersion</key>
 	<string>$(CURRENT_PROJECT_VERSION)</string>
 	<key>ITSAppUsesNonExemptEncryption</key>

@@ -63,10 +63,21 @@ workflows:
       - name: Configure iOS URL scheme for Google Sign-In
         script: |
           set -e
+          CLIENT_ID="$(/usr/libexec/PlistBuddy -c "Print :CLIENT_ID" "$FIREBASE_IOS_PLIST_PATH")"
           REVERSED_CLIENT_ID="$(/usr/libexec/PlistBuddy -c "Print :REVERSED_CLIENT_ID" "$FIREBASE_IOS_PLIST_PATH")"
+          if [ -z "$CLIENT_ID" ]; then
+            echo "ERROR: CLIENT_ID not found in Firebase iOS plist."
+            exit 1
+          fi
           if [ -z "$REVERSED_CLIENT_ID" ]; then
             echo "ERROR: REVERSED_CLIENT_ID not found in Firebase iOS plist."
             exit 1
+          fi
+          /usr/libexec/PlistBuddy -c "Delete :GIDClientID" ios/Runner/Info.plist || true
+          /usr/libexec/PlistBuddy -c "Add :GIDClientID string $CLIENT_ID" ios/Runner/Info.plist
+          if [ -n "${GOOGLE_WEB_CLIENT_ID:-}" ]; then
+            /usr/libexec/PlistBuddy -c "Delete :GIDServerClientID" ios/Runner/Info.plist || true
+            /usr/libexec/PlistBuddy -c "Add :GIDServerClientID string $GOOGLE_WEB_CLIENT_ID" ios/Runner/Info.plist
           fi
           /usr/libexec/PlistBuddy -c "Delete :CFBundleURLTypes" ios/Runner/Info.plist || true
           /usr/libexec/PlistBuddy -c "Add :CFBundleURLTypes array" ios/Runner/Info.plist
@@ -346,10 +357,21 @@ workflows:
       - name: Configure iOS URL scheme for Google Sign-In
         script: |
           set -e
+          CLIENT_ID="$(/usr/libexec/PlistBuddy -c "Print :CLIENT_ID" "$FIREBASE_IOS_PLIST_PATH")"
           REVERSED_CLIENT_ID="$(/usr/libexec/PlistBuddy -c "Print :REVERSED_CLIENT_ID" "$FIREBASE_IOS_PLIST_PATH")"
+          if [ -z "$CLIENT_ID" ]; then
+            echo "ERROR: CLIENT_ID not found in Firebase iOS plist."
+            exit 1
+          fi
           if [ -z "$REVERSED_CLIENT_ID" ]; then
             echo "ERROR: REVERSED_CLIENT_ID not found in Firebase iOS plist."
             exit 1
+          fi
+          /usr/libexec/PlistBuddy -c "Delete :GIDClientID" ios/Runner/Info.plist || true
+          /usr/libexec/PlistBuddy -c "Add :GIDClientID string $CLIENT_ID" ios/Runner/Info.plist
+          if [ -n "${GOOGLE_WEB_CLIENT_ID:-}" ]; then
+            /usr/libexec/PlistBuddy -c "Delete :GIDServerClientID" ios/Runner/Info.plist || true
+            /usr/libexec/PlistBuddy -c "Add :GIDServerClientID string $GOOGLE_WEB_CLIENT_ID" ios/Runner/Info.plist
           fi
           /usr/libexec/PlistBuddy -c "Delete :CFBundleURLTypes" ios/Runner/Info.plist || true
           /usr/libexec/PlistBuddy -c "Add :CFBundleURLTypes array" ios/Runner/Info.plist
@@ -395,6 +417,42 @@ workflows:
             --dart-define=PREVIEW_FORCE_LOGIN=true
           find build/ios/iphonesimulator -type d -name "*.app" | sed 's|^| - |'
 
+      - name: Validate bundled Firebase config in preview app
+        script: |
+          set -e
+          APP_PATH="$(find build/ios/iphonesimulator -type d -name 'Runner.app' | head -n 1)"
+          if [ -z "$APP_PATH" ]; then
+            echo "ERROR: Runner.app not found after simulator build."
+            exit 1
+          fi
+
+          PLIST_PATH="$APP_PATH/GoogleService-Info.plist"
+          if [ ! -f "$PLIST_PATH" ]; then
+            echo "ERROR: GoogleService-Info.plist was not bundled into Runner.app."
+            find "$APP_PATH" -maxdepth 2 -type f | sed 's|^| - |'
+            exit 1
+          fi
+
+          APP_BUNDLE_ID="$(/usr/libexec/PlistBuddy -c 'Print :CFBundleIdentifier' "$APP_PATH/Info.plist")"
+          APP_GID_CLIENT_ID="$(/usr/libexec/PlistBuddy -c 'Print :GIDClientID' "$APP_PATH/Info.plist")"
+          FIREBASE_BUNDLE_ID="$(/usr/libexec/PlistBuddy -c 'Print :BUNDLE_ID' "$PLIST_PATH")"
+          FIREBASE_CLIENT_ID="$(/usr/libexec/PlistBuddy -c 'Print :CLIENT_ID' "$PLIST_PATH")"
+          FIREBASE_APP_ID="$(/usr/libexec/PlistBuddy -c 'Print :GOOGLE_APP_ID' "$PLIST_PATH")"
+          echo "Preview app bundle id: $APP_BUNDLE_ID"
+          echo "Preview app GID client id: $APP_GID_CLIENT_ID"
+          echo "Bundled Firebase bundle id: $FIREBASE_BUNDLE_ID"
+          echo "Bundled Firebase client id: $FIREBASE_CLIENT_ID"
+          echo "Bundled Firebase app id: $FIREBASE_APP_ID"
+
+          if [ "$APP_BUNDLE_ID" != "$FIREBASE_BUNDLE_ID" ]; then
+            echo "ERROR: Bundled Firebase plist does not match preview app bundle."
+            exit 1
+          fi
+          if [ "$APP_GID_CLIENT_ID" != "$FIREBASE_CLIENT_ID" ]; then
+            echo "ERROR: GIDClientID in Info.plist does not match Firebase CLIENT_ID."
+            exit 1
+          fi
+
       - name: Collect app startup runtime logs
         script: |
           set -e
@@ -422,7 +480,7 @@ workflows:
           sleep 2
 
           xcrun simctl launch "$TARGET" com.voolo.jetx > build/preview_launch.log 2>&1
-          sleep 15
+          sleep 20
 
           if ! xcrun simctl spawn "$TARGET" launchctl list | grep -F "com.voolo.jetx" >/dev/null; then
             echo "ERROR: Preview app exited right after launch."

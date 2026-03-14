@@ -59,7 +59,7 @@ class _LoginPageState extends State<LoginPage> {
       user = await LocalStorageService.login(email: email, password: password);
     } catch (_) {
       if (!mounted) return;
-      _snack(AppStrings.t(context, 'error_connect_server'));
+      _snack(_loginFeedbackMessage('error_connect_server'));
       setState(() => _loading = false);
       return;
     }
@@ -67,9 +67,9 @@ class _LoginPageState extends State<LoginPage> {
     if (user == null) {
       final loginError = LocalStorageService.lastLoginError;
       if (loginError != null) {
-        _snack(AppStrings.t(context, loginError));
+        _snack(_loginFeedbackMessage(loginError));
       } else {
-        _snack(AppStrings.t(context, 'login_invalid_credentials'));
+        _snack(_loginFeedbackMessage('login_invalid_credentials'));
       }
       setState(() => _loading = false);
       return;
@@ -89,6 +89,15 @@ class _LoginPageState extends State<LoginPage> {
     messenger.showSnackBar(SnackBar(content: Text(msg)));
   }
 
+  String _loginFeedbackMessage(String fallbackKey) {
+    final base = AppStrings.t(context, fallbackKey);
+    final diagnostic = LocalStorageService.lastAuthDiagnostic;
+    if (diagnostic == null || diagnostic.trim().isEmpty) {
+      return base;
+    }
+    return '$base [$diagnostic]';
+  }
+
   Future<void> _loginWithGoogle() async {
     setState(() => _loading = true);
     UserProfile? user;
@@ -96,7 +105,7 @@ class _LoginPageState extends State<LoginPage> {
       user = await LocalStorageService.loginWithGoogle();
     } catch (_) {
       if (!mounted) return;
-      _snack(AppStrings.t(context, 'login_failed_try_again'));
+      _snack(_loginFeedbackMessage('login_failed_try_again'));
       setState(() => _loading = false);
       return;
     }
@@ -104,9 +113,9 @@ class _LoginPageState extends State<LoginPage> {
     if (user == null) {
       final loginError = LocalStorageService.lastLoginError;
       if (loginError != null) {
-        _snack(AppStrings.t(context, loginError));
+        _snack(_loginFeedbackMessage(loginError));
       } else {
-        _snack(AppStrings.t(context, 'login_failed_try_again'));
+        _snack(_loginFeedbackMessage('login_failed_try_again'));
       }
       setState(() => _loading = false);
       return;

@@ -13,6 +13,7 @@ import '../models/expense.dart';
 import '../models/fixed_series.dart';
 import '../models/v2/enums.dart';
 import '../core/plans/user_plan.dart';
+import '../firebase_options.dart';
 import 'habits_service.dart';
 import 'local_database_service.dart';
 import 'firestore_service.dart';
@@ -62,14 +63,26 @@ class LocalStorageService {
   static StreamSubscription<List<MonthlyDashboard>>? _dashboardsSubscription;
   static String? _lastSyncError;
   static String? _lastLoginError;
+  static String? _lastAuthDiagnostic;
   static final List<MonthlyDashboard> _dashboards = [];
   static final List<Goal> _goals = [];
   static final List<IncomeSource> _incomes = [];
   static GoogleSignIn? _googleSignIn;
 
+  static String? _googleClientIdForCurrentPlatform() {
+    if (kIsWeb) return null;
+    switch (defaultTargetPlatform) {
+      case TargetPlatform.iOS:
+        return DefaultFirebaseOptions.ios.iosClientId;
+      default:
+        return null;
+    }
+  }
+
   static GoogleSignIn _googleSignInClient() {
     return _googleSignIn ??= GoogleSignIn(
       scopes: const ['email', 'profile'],
+      clientId: _googleClientIdForCurrentPlatform(),
       serverClientId:
           _googleServerClientId.isEmpty ? null : _googleServerClientId,
     );
@@ -184,6 +197,7 @@ class LocalStorageService {
   static String? get currentUserId => _currentUserId;
   static String? get lastSyncError => _lastSyncError;
   static String? get lastLoginError => _lastLoginError;
+  static String? get lastAuthDiagnostic => _lastAuthDiagnostic;
   static bool get currentUserUsesPasswordProvider =>
       _auth.currentUser?.providerData.any((p) => p.providerId == 'password') ??
       false;
@@ -211,6 +225,7 @@ class LocalStorageService {
   }) async {
     await _ensureInit();
     _lastLoginError = null;
+    _lastAuthDiagnostic = null;
     final normalizedEmail = email.trim().toLowerCase();
     if (normalizedEmail.isEmpty) return null;
 
@@ -223,6 +238,8 @@ class LocalStorageService {
       debugPrint('LocalStorageService: Login successful for $normalizedEmail');
     } on FirebaseAuthException catch (e) {
       debugPrint('LocalStorageService: Login error: ${e.code} - ${e.message}');
+      _lastAuthDiagnostic =
+          '${e.code}${e.message == null ? '' : ' - ${e.message}'}';
       if (e.code == 'user-disabled') {
         _lastLoginError = 'login_blocked';
       } else if (e.code == 'invalid-email') {
@@ -240,6 +257,7 @@ class LocalStorageService {
       return null;
     } catch (e) {
       debugPrint('LocalStorageService: Unexpected login error: $e');
+      _lastAuthDiagnostic = e.toString();
       _lastLoginError = 'login_failed_try_again';
       return null;
     }
@@ -248,17 +266,28 @@ class LocalStorageService {
     if (authUser == null) return null;
     _currentUserId = authUser.uid;
     _currentUserEmail = authUser.email ?? normalizedEmail;
+    try {
+      final user = await _ensureUserProfile();
+      if (user == null) {
+        _lastAuthDiagnostic = 'authenticated-but-profile-missing';
+        _lastLoginError = 'login_failed_try_again';
+        return null;
+      }
 
-    final user = await _ensureUserProfile();
-    if (user == null) return null;
-
-    await setCurrentUser(email);
-    return user;
+      await setCurrentUser(email);
+      return user;
+    } catch (e) {
+      debugPrint('LocalStorageService: Post-login sync error: $e');
+      _lastAuthDiagnostic = e.toString();
+      _lastLoginError = 'login_failed_try_again';
+      return null;
+    }
   }
 
   static Future<UserProfile?> loginWithGoogle() async {
     await _ensureInit();
     _lastLoginError = null;
+    _lastAuthDiagnostic = null;
     syncNotifier.value = false;
     try {
       if (kIsWeb) {
@@ -268,6 +297,11 @@ class LocalStorageService {
         await _auth.signInWithPopup(provider);
       } else {
         final googleSignIn = _googleSignInClient();
+        debugPrint(
+          'LocalStorageService: GoogleSignIn config '
+          'clientId=${_googleClientIdForCurrentPlatform() ?? 'auto'} '
+          'serverClientId=${_googleServerClientId.isEmpty ? 'none' : _googleServerClientId}',
+        );
 
         // Avoid silently reusing a stale session and make account selection more predictable.
         try {
@@ -300,6 +334,8 @@ class LocalStorageService {
       debugPrint(
         'LocalStorageService: Google login FirebaseAuthException: ${e.code} - ${e.message}',
       );
+      _lastAuthDiagnostic =
+          '${e.code}${e.message == null ? '' : ' - ${e.message}'}';
       if (e.code == 'network-request-failed') {
         _lastLoginError = 'no_connection';
       } else if (e.code == 'popup-closed-by-user' ||
@@ -317,6 +353,8 @@ class LocalStorageService {
       debugPrint(
         'LocalStorageService: Google login PlatformException: ${e.code} - ${e.message}',
       );
+      _lastAuthDiagnostic =
+          '${e.code}${e.message == null ? '' : ' - ${e.message}'}';
       if (e.code == 'network_error') {
         _lastLoginError = 'no_connection';
       } else if (e.code == 'sign_in_canceled' ||
@@ -329,6 +367,7 @@ class LocalStorageService {
       return null;
     } catch (e) {
       debugPrint('LocalStorageService: Unexpected Google login error: $e');
+      _lastAuthDiagnostic = e.toString();
       _lastLoginError = 'login_failed_try_again';
       return null;
     }
@@ -339,39 +378,46 @@ class LocalStorageService {
     _currentUserId = authUser.uid;
     _currentUserEmail = authUser.email ?? '';
     _loggedOut = false;
+    try {
+      var user = await FirestoreService.getUserByUid(_currentUserId!);
+      if (user == null) {
+        final displayName = authUser.displayName ?? '';
+        final parts =
+            displayName.trim().split(' ').where((p) => p.isNotEmpty).toList();
+        final firstName = parts.isNotEmpty ? parts.first : 'Usuario';
+        final lastName = parts.length > 1 ? parts.sublist(1).join(' ') : '';
+        user = UserProfile(
+          firstName: firstName,
+          lastName: lastName,
+          email: (_currentUserEmail ?? '').trim().toLowerCase(),
+          birthDate: DateTime(2000, 1, 1),
+          profession: '',
+          monthlyIncome: 0,
+          gender: 'Nao informado',
+          photoPath: authUser.photoURL,
+          objectives: const [],
+          setupCompleted: false,
+          isPremium: false,
+          isActive: true,
+          totalXp: 0,
+        );
+        await FirestoreService.upsertUser(user);
+      }
 
-    var user = await FirestoreService.getUserByUid(_currentUserId!);
-    if (user == null) {
-      final displayName = authUser.displayName ?? '';
-      final parts =
-          displayName.trim().split(' ').where((p) => p.isNotEmpty).toList();
-      final firstName = parts.isNotEmpty ? parts.first : 'Usuario';
-      final lastName = parts.length > 1 ? parts.sublist(1).join(' ') : '';
-      user = UserProfile(
-        firstName: firstName,
-        lastName: lastName,
-        email: (_currentUserEmail ?? '').trim().toLowerCase(),
-        birthDate: DateTime(2000, 1, 1),
-        profession: '',
-        monthlyIncome: 0,
-        gender: 'Nao informado',
-        photoPath: authUser.photoURL,
-        objectives: const [],
-        setupCompleted: false,
-        isPremium: false,
-        isActive: true,
-        totalXp: 0,
-      );
-      await FirestoreService.upsertUser(user);
+      await setCurrentUser(_currentUserEmail ?? '');
+      return getUserProfile();
+    } catch (e) {
+      debugPrint('LocalStorageService: Post-Google-login sync error: $e');
+      _lastAuthDiagnostic = e.toString();
+      _lastLoginError = 'login_failed_try_again';
+      return null;
     }
-
-    await setCurrentUser(_currentUserEmail ?? '');
-    return getUserProfile();
   }
 
   static Future<void> setCurrentUser(String email) async {
     await _ensureInit();
     _lastLoginError = null;
+    _lastAuthDiagnostic = null;
     final authUser = _auth.currentUser;
     _currentUserEmail = authUser?.email ?? email.trim();
     _currentUserId = authUser?.uid;
@@ -394,9 +440,8 @@ class LocalStorageService {
   static Future<bool> createAccount(UserProfile profile) async {
     await _ensureInit();
     _lastLoginError = null;
+    _lastAuthDiagnostic = null;
     profile.isPremium = false;
-    final existsRemote = await FirestoreService.userExists(profile.email);
-    if (existsRemote == true) return false;
     try {
       final credential = await _auth.createUserWithEmailAndPassword(
         email: profile.email.trim(),
@@ -408,14 +453,24 @@ class LocalStorageService {
         _currentUserEmail = createdUser.email ?? profile.email.trim();
         _loggedOut = false;
       }
-    } on FirebaseAuthException {
+    } on FirebaseAuthException catch (e) {
+      _lastAuthDiagnostic =
+          '${e.code}${e.message == null ? '' : ' - ${e.message}'}';
+      rethrow;
+    } catch (e) {
+      _lastAuthDiagnostic = e.toString();
       rethrow;
     }
 
     final ok = await FirestoreService.upsertUser(profile);
     _setSyncError(ok);
     _accounts.add(profile);
-    await setCurrentUser(profile.email);
+    try {
+      await setCurrentUser(profile.email);
+    } catch (e) {
+      debugPrint('LocalStorageService: Post-signup sync error: $e');
+      _lastAuthDiagnostic = e.toString();
+    }
     return true;
   }
 
@@ -460,17 +515,18 @@ class LocalStorageService {
   }) async {
     await _ensureInit();
     _lastLoginError = null;
+    _lastAuthDiagnostic = null;
     final prevEmail = previous.email.toLowerCase();
     final newEmail = updated.email.toLowerCase();
 
     if (newEmail != prevEmail) {
-      final conflict = await FirestoreService.userExists(updated.email);
-      if (conflict == true) return false;
       final authUser = _auth.currentUser;
       if (authUser != null && authUser.email?.toLowerCase() == prevEmail) {
         try {
           await authUser.updateEmail(updated.email);
-        } on FirebaseAuthException {
+        } on FirebaseAuthException catch (e) {
+          _lastAuthDiagnostic =
+              '${e.code}${e.message == null ? '' : ' - ${e.message}'}';
           return false;
         }
       }
@@ -1426,11 +1482,7 @@ class LocalStorageService {
       totalXp: 0,
     );
     _accounts.add(fallback);
-
-    final existsRemote = await FirestoreService.userExists(normalizedEmail);
-    if (existsRemote == false) {
-      await FirestoreService.upsertUser(fallback);
-    }
+    await FirestoreService.upsertUser(fallback);
     return fallback;
   }
 

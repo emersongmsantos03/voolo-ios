@@ -11,6 +11,7 @@ import 'package:provider/provider.dart';
 import 'core/localization/app_strings.dart';
 import 'core/theme/app_theme.dart';
 import 'core/utils/date_utils.dart';
+import 'firebase_options.dart';
 import 'routes/app_routes.dart';
 import 'services/local_database_service.dart';
 import 'services/local_storage_service.dart';
@@ -29,6 +30,22 @@ class _RuntimeErrorState {
   final StackTrace stackTrace;
 
   const _RuntimeErrorState({required this.error, required this.stackTrace});
+}
+
+class _FirebaseBootstrapException implements Exception {
+  final Object explicitError;
+  final Object fallbackError;
+
+  const _FirebaseBootstrapException({
+    required this.explicitError,
+    required this.fallbackError,
+  });
+
+  @override
+  String toString() {
+    return 'Firebase init failed with explicit options: '
+        '$explicitError | fallback bundled config failed: $fallbackError';
+  }
 }
 
 void _reportFatalError(Object error, StackTrace stackTrace) {
@@ -107,13 +124,17 @@ Future<void> _bootstrapApp() async {
   }
 
   var firebaseReady = false;
+  Object? firebaseInitError;
   var initialRoute = AppRoutes.login;
 
   try {
-    await Firebase.initializeApp().timeout(const Duration(seconds: 8));
+    await _initializeFirebase().timeout(const Duration(seconds: 8));
     firebaseReady = true;
-  } catch (_) {
+  } catch (error, stackTrace) {
     firebaseReady = false;
+    firebaseInitError = error;
+    debugPrint('Firebase bootstrap failed: $error');
+    debugPrint('$stackTrace');
   }
 
   if (firebaseReady && previewForceLogin) {
@@ -152,10 +173,10 @@ Future<void> _bootstrapApp() async {
       initialRoute = previewForceLogin
           ? AppRoutes.login
           : user == null
-          ? AppRoutes.login
-          : (await SecurityLockService.requiresUnlockForCurrentUser()
-              ? AppRoutes.securityLock
-              : (needsSetup ? AppRoutes.onboarding : AppRoutes.dashboard));
+              ? AppRoutes.login
+              : (await SecurityLockService.requiresUnlockForCurrentUser()
+                  ? AppRoutes.securityLock
+                  : (needsSetup ? AppRoutes.onboarding : AppRoutes.dashboard));
     } catch (_) {
       initialRoute = AppRoutes.login;
     }
@@ -177,9 +198,40 @@ Future<void> _bootstrapApp() async {
       ],
       child: firebaseReady
           ? JetxApp(initialRoute: initialRoute)
-          : const _StartupErrorApp(),
+          : _StartupErrorApp(details: firebaseInitError?.toString()),
     ),
   );
+}
+
+Future<void> _initializeFirebase() async {
+  if (Firebase.apps.isNotEmpty) {
+    return;
+  }
+
+  late final Object explicitError;
+  try {
+    await Firebase.initializeApp(
+      options: DefaultFirebaseOptions.currentPlatform,
+    );
+    debugPrint('Firebase initialized with explicit mobile options.');
+    return;
+  } catch (error, stackTrace) {
+    explicitError = error;
+    debugPrint('Firebase explicit init failed: $error');
+    debugPrint('$stackTrace');
+  }
+
+  try {
+    await Firebase.initializeApp();
+    debugPrint('Firebase initialized with bundled platform config.');
+  } catch (error, stackTrace) {
+    debugPrint('Firebase bundled-config init failed: $error');
+    debugPrint('$stackTrace');
+    throw _FirebaseBootstrapException(
+      explicitError: explicitError,
+      fallbackError: error,
+    );
+  }
 }
 
 Future<bool> _resolvePreviewStableMode() async {
@@ -231,7 +283,9 @@ class JetxApp extends StatelessWidget {
 }
 
 class _StartupErrorApp extends StatelessWidget {
-  const _StartupErrorApp();
+  final String? details;
+
+  const _StartupErrorApp({this.details});
 
   @override
   Widget build(BuildContext context) {
@@ -249,10 +303,10 @@ class _StartupErrorApp extends StatelessWidget {
                 child: Column(
                   mainAxisAlignment: MainAxisAlignment.center,
                   crossAxisAlignment: CrossAxisAlignment.center,
-                  children: const [
-                    Icon(Icons.error_outline_rounded, size: 42),
-                    SizedBox(height: 12),
-                    Text(
+                  children: [
+                    const Icon(Icons.error_outline_rounded, size: 42),
+                    const SizedBox(height: 12),
+                    const Text(
                       'Nao foi possivel iniciar o app.',
                       textAlign: TextAlign.center,
                       style: TextStyle(
@@ -260,11 +314,19 @@ class _StartupErrorApp extends StatelessWidget {
                         fontWeight: FontWeight.w700,
                       ),
                     ),
-                    SizedBox(height: 8),
-                    Text(
+                    const SizedBox(height: 8),
+                    const Text(
                       'A configuracao do Firebase para iOS nao foi carregada (GoogleService-Info.plist). Verifique o build de release e tente novamente.',
                       textAlign: TextAlign.center,
                     ),
+                    if (details != null && details!.trim().isNotEmpty) ...[
+                      const SizedBox(height: 12),
+                      SelectableText(
+                        details!,
+                        textAlign: TextAlign.center,
+                        style: const TextStyle(fontSize: 12),
+                      ),
+                    ],
                   ],
                 ),
               ),

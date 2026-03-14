@@ -63,6 +63,14 @@ class _RegisterPageState extends State<RegisterPage> {
     );
   }
 
+  String _registerFeedback(String base) {
+    final diagnostic = LocalStorageService.lastAuthDiagnostic;
+    if (diagnostic == null || diagnostic.trim().isEmpty) {
+      return base;
+    }
+    return '$base [$diagnostic]';
+  }
+
   bool _isValidEmail(String email) {
     return RegExp(r'^[^\s@]+@[^\s@]+\.[^\s@]+$').hasMatch(email);
   }
@@ -143,31 +151,36 @@ class _RegisterPageState extends State<RegisterPage> {
     } on FirebaseAuthException catch (e) {
       if (!mounted) return;
       if (e.code == 'email-already-in-use') {
-        _snack(AppStrings.t(context, 'register_email_in_use'));
+        _snack(
+            _registerFeedback(AppStrings.t(context, 'register_email_in_use')));
       } else if (e.code == 'invalid-email') {
-        _snack('Digite um e-mail no formato nome@dominio.com');
+        _snack(
+            _registerFeedback('Digite um e-mail no formato nome@dominio.com'));
       } else if (e.code == 'weak-password') {
-        _snack(AppStrings.t(context, 'register_weak_password'));
+        _snack(
+            _registerFeedback(AppStrings.t(context, 'register_weak_password')));
       } else if (e.code == 'operation-not-allowed') {
-        _snack(AppStrings.t(context, 'register_email_not_enabled'));
+        _snack(_registerFeedback(
+            AppStrings.t(context, 'register_email_not_enabled')));
       } else if (e.code == 'network-request-failed') {
-        _snack(AppStrings.t(context, 'no_connection'));
+        _snack(_registerFeedback(AppStrings.t(context, 'no_connection')));
       } else {
-        _snack(AppStrings.tr(
-            context, 'register_error_with_code', {'code': e.code}));
+        _snack(_registerFeedback(
+          AppStrings.tr(context, 'register_error_with_code', {'code': e.code}),
+        ));
       }
       setState(() => _loading = false);
       return;
     } catch (_) {
       if (!mounted) return;
-      _snack(AppStrings.t(context, 'error_connect_server'));
+      _snack(_registerFeedback(AppStrings.t(context, 'error_connect_server')));
       setState(() => _loading = false);
       return;
     }
 
     if (!mounted) return;
     if (!created) {
-      _snack(AppStrings.t(context, 'register_email_in_use'));
+      _snack(_registerFeedback(AppStrings.t(context, 'register_email_in_use')));
       setState(() => _loading = false);
       return;
     }
