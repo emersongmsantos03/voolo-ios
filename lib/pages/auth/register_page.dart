@@ -205,173 +205,382 @@ class _RegisterPageState extends State<RegisterPage> {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final scheme = theme.colorScheme;
+    final isDark = theme.brightness == Brightness.dark;
     final birthText = birthDate == null
         ? 'Selecionar'
         : '${birthDate!.day.toString().padLeft(2, '0')}/${birthDate!.month.toString().padLeft(2, '0')}/${birthDate!.year}';
 
     return Scaffold(
-      appBar: AppBar(title: Text(AppStrings.t(context, 'register'))),
-      body: Padding(
-        padding: Responsive.pagePadding(context),
-        child: ListView(
-          children: [
-            Text(
-              _step == 0
-                  ? 'Passo 1 de 2: Seus dados basicos'
-                  : 'Passo 2 de 2: Seguranca da conta',
-              style: TextStyle(color: AppTheme.textSecondary(context)),
+      body: Stack(
+        children: [
+          _RegisterBackdrop(isDark: isDark),
+          SafeArea(
+            child: Center(
+              child: SingleChildScrollView(
+                padding: Responsive.pagePadding(context),
+                child: ConstrainedBox(
+                  constraints: const BoxConstraints(maxWidth: 468),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      Row(
+                        children: [
+                          IconButton(
+                            onPressed: () => Navigator.pop(context),
+                            icon: const Icon(Icons.arrow_back_ios_new_rounded),
+                          ),
+                          const SizedBox(width: 4),
+                          Expanded(
+                            child: Text(
+                              'Criar conta',
+                              style: theme.textTheme.titleMedium,
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 10),
+                      Container(
+                        decoration: AppTheme.panelDecoration(context),
+                        padding: const EdgeInsets.fromLTRB(22, 22, 22, 18),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Container(
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 12,
+                                vertical: 8,
+                              ),
+                              decoration: BoxDecoration(
+                                color:
+                                    scheme.primary.withValues(alpha: 0.12),
+                                borderRadius: BorderRadius.circular(999),
+                              ),
+                              child: Text(
+                                _step == 0 ? 'Passo 1 de 2' : 'Passo 2 de 2',
+                                style: theme.textTheme.labelMedium?.copyWith(
+                                  color: scheme.primary,
+                                  fontWeight: FontWeight.w800,
+                                ),
+                              ),
+                            ),
+                            const SizedBox(height: 16),
+                            Text(
+                              _step == 0
+                                  ? 'Vamos montar seu perfil inicial'
+                                  : 'Proteja sua conta com uma senha forte',
+                              style: theme.textTheme.titleLarge,
+                            ),
+                            const SizedBox(height: 8),
+                            Text(
+                              _step == 0
+                                  ? 'Coletamos só o essencial para personalizar metas, relatórios e missões.'
+                                  : 'Mais segurança agora, menos atrito depois.',
+                              style: theme.textTheme.bodyMedium,
+                            ),
+                            const SizedBox(height: 18),
+                            ClipRRect(
+                              borderRadius: BorderRadius.circular(999),
+                              child: LinearProgressIndicator(
+                                value: _step == 0 ? 0.5 : 1,
+                                minHeight: 10,
+                                backgroundColor:
+                                    scheme.outline.withValues(alpha: 0.18),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      const SizedBox(height: 22),
+                      Container(
+                        decoration:
+                            AppTheme.panelDecoration(context, highlighted: true),
+                        padding: EdgeInsets.all(
+                          Responsive.isCompactPhone(context) ? 18 : 24,
+                        ),
+                        child: Column(
+                          children: [
+                            if (_step == 0) ...[
+                              _LabeledField(
+                                label: AppStrings.t(context, 'first_name'),
+                                child: TextField(
+                                  controller: firstNameController,
+                                  decoration: const InputDecoration(
+                                    hintText: 'Ex: Joao',
+                                  ),
+                                ),
+                              ),
+                              const SizedBox(height: 14),
+                              _LabeledField(
+                                label: AppStrings.t(context, 'last_name'),
+                                child: TextField(
+                                  controller: lastNameController,
+                                  decoration: const InputDecoration(
+                                    hintText: 'Ex: Silva',
+                                  ),
+                                ),
+                              ),
+                              const SizedBox(height: 14),
+                              _LabeledField(
+                                label: AppStrings.t(context, 'email'),
+                                child: TextField(
+                                  controller: emailController,
+                                  keyboardType: TextInputType.emailAddress,
+                                  decoration: const InputDecoration(
+                                    hintText: 'nome@dominio.com',
+                                  ),
+                                ),
+                              ),
+                              const SizedBox(height: 14),
+                              Container(
+                                decoration: BoxDecoration(
+                                  color: scheme.surface.withValues(alpha: 0.78),
+                                  borderRadius: BorderRadius.circular(20),
+                                  border: Border.all(
+                                    color:
+                                        scheme.outline.withValues(alpha: 0.45),
+                                  ),
+                                ),
+                                child: ListTile(
+                                  contentPadding: const EdgeInsets.symmetric(
+                                    horizontal: 16,
+                                    vertical: 4,
+                                  ),
+                                  title: Text(AppStrings.t(context, 'birth_date')),
+                                  subtitle: Text(
+                                    birthText,
+                                    style: TextStyle(
+                                      color: AppTheme.textSecondary(context),
+                                      fontWeight: FontWeight.w600,
+                                    ),
+                                  ),
+                                  trailing: Icon(
+                                    Icons.calendar_month_rounded,
+                                    color: scheme.primary,
+                                  ),
+                                  onTap: _pickBirthDate,
+                                ),
+                              ),
+                              const SizedBox(height: 14),
+                              DropdownButtonFormField<String>(
+                                initialValue: _genderOptions.contains(gender)
+                                    ? gender
+                                    : _genderOptions.first,
+                                decoration: InputDecoration(
+                                  labelText: AppStrings.t(context, 'gender'),
+                                ),
+                                items: _genderOptions
+                                    .map(
+                                      (value) => DropdownMenuItem(
+                                        value: value,
+                                        child: Text(
+                                          AppStrings.t(
+                                            context,
+                                            'gender_$value',
+                                          ),
+                                        ),
+                                      ),
+                                    )
+                                    .toList(),
+                                onChanged: (v) => setState(
+                                  () => gender = v ?? _genderOptions.first,
+                                ),
+                              ),
+                              const SizedBox(height: 24),
+                              ElevatedButton(
+                                onPressed: () {
+                                  if (_validateStepOne()) {
+                                    setState(() => _step = 1);
+                                  }
+                                },
+                                child: const Text('Continuar'),
+                              ),
+                            ] else ...[
+                              _LabeledField(
+                                label: AppStrings.t(context, 'password'),
+                                child: TextField(
+                                  controller: passwordController,
+                                  obscureText: _obscurePassword,
+                                  decoration: InputDecoration(
+                                    hintText: 'Crie uma senha forte',
+                                    suffixIcon: IconButton(
+                                      onPressed: () {
+                                        setState(() {
+                                          _obscurePassword = !_obscurePassword;
+                                        });
+                                      },
+                                      icon: Icon(
+                                        _obscurePassword
+                                            ? Icons.visibility_rounded
+                                            : Icons.visibility_off_rounded,
+                                      ),
+                                    ),
+                                  ),
+                                ),
+                              ),
+                              const SizedBox(height: 14),
+                              _LabeledField(
+                                label: AppStrings.t(context, 'confirm_password'),
+                                child: TextField(
+                                  controller: confirmPasswordController,
+                                  obscureText: _obscureConfirmPassword,
+                                  decoration: InputDecoration(
+                                    hintText: 'Repita a senha',
+                                    suffixIcon: IconButton(
+                                      onPressed: () {
+                                        setState(() {
+                                          _obscureConfirmPassword =
+                                              !_obscureConfirmPassword;
+                                        });
+                                      },
+                                      icon: Icon(
+                                        _obscureConfirmPassword
+                                            ? Icons.visibility_rounded
+                                            : Icons.visibility_off_rounded,
+                                      ),
+                                    ),
+                                  ),
+                                ),
+                              ),
+                              const SizedBox(height: 12),
+                              Container(
+                                decoration: BoxDecoration(
+                                  color: scheme.surface.withValues(alpha: 0.72),
+                                  borderRadius: BorderRadius.circular(20),
+                                  border: Border.all(
+                                    color:
+                                        scheme.outline.withValues(alpha: 0.4),
+                                  ),
+                                ),
+                                child: CheckboxListTile(
+                                  value: acceptedTerms,
+                                  onChanged: (v) => setState(
+                                    () => acceptedTerms = v ?? false,
+                                  ),
+                                  title: Text(
+                                    AppStrings.t(
+                                      context,
+                                      'register_terms_text',
+                                    ),
+                                  ),
+                                  controlAffinity:
+                                      ListTileControlAffinity.leading,
+                                  contentPadding: const EdgeInsets.symmetric(
+                                    horizontal: 12,
+                                  ),
+                                ),
+                              ),
+                              const SizedBox(height: 20),
+                              Row(
+                                children: [
+                                  Expanded(
+                                    child: OutlinedButton(
+                                      onPressed: _loading
+                                          ? null
+                                          : () {
+                                              setState(() => _step = 0);
+                                            },
+                                      child: const Text('Voltar'),
+                                    ),
+                                  ),
+                                  const SizedBox(width: 12),
+                                  Expanded(
+                                    child: ElevatedButton(
+                                      onPressed: _loading ? null : _register,
+                                      child: _loading
+                                          ? const SizedBox(
+                                              height: 18,
+                                              width: 18,
+                                              child: CircularProgressIndicator(
+                                                strokeWidth: 2,
+                                              ),
+                                            )
+                                          : Text(
+                                              AppStrings.t(
+                                                context,
+                                                'register_action',
+                                              ),
+                                            ),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ],
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
             ),
-            const SizedBox(height: 8),
-            LinearProgressIndicator(value: _step == 0 ? 0.5 : 1),
-            const SizedBox(height: 18),
-            if (_step == 0) ...[
-              _LabeledField(
-                label: AppStrings.t(context, 'first_name'),
-                child: TextField(
-                  controller: firstNameController,
-                  decoration: const InputDecoration(hintText: 'Ex: Joao'),
-                ),
-              ),
-              const SizedBox(height: 14),
-              _LabeledField(
-                label: AppStrings.t(context, 'last_name'),
-                child: TextField(
-                  controller: lastNameController,
-                  decoration: const InputDecoration(hintText: 'Ex: Silva'),
-                ),
-              ),
-              const SizedBox(height: 14),
-              _LabeledField(
-                label: AppStrings.t(context, 'email'),
-                child: TextField(
-                  controller: emailController,
-                  keyboardType: TextInputType.emailAddress,
-                  decoration:
-                      const InputDecoration(hintText: 'nome@dominio.com'),
-                ),
-              ),
-              const SizedBox(height: 8),
-              ListTile(
-                contentPadding: EdgeInsets.zero,
-                title: Text(AppStrings.t(context, 'birth_date')),
-                subtitle: Text(
-                  birthText,
-                  style: TextStyle(color: AppTheme.textSecondary(context)),
-                ),
-                trailing: const Icon(Icons.calendar_month, color: Colors.amber),
-                onTap: _pickBirthDate,
-              ),
-              const SizedBox(height: 8),
-              DropdownButtonFormField<String>(
-                initialValue: _genderOptions.contains(gender)
-                    ? gender
-                    : _genderOptions.first,
-                decoration:
-                    InputDecoration(labelText: AppStrings.t(context, 'gender')),
-                items: _genderOptions
-                    .map(
-                      (value) => DropdownMenuItem(
-                        value: value,
-                        child: Text(AppStrings.t(context, 'gender_$value')),
-                      ),
-                    )
-                    .toList(),
-                onChanged: (v) =>
-                    setState(() => gender = v ?? _genderOptions.first),
-              ),
-              const SizedBox(height: 24),
-              SizedBox(
-                width: double.infinity,
-                child: ElevatedButton(
-                  onPressed: () {
-                    if (_validateStepOne()) {
-                      setState(() => _step = 1);
-                    }
-                  },
-                  child: const Text('Continuar'),
-                ),
-              ),
-            ] else ...[
-              _LabeledField(
-                label: AppStrings.t(context, 'password'),
-                child: TextField(
-                  controller: passwordController,
-                  obscureText: _obscurePassword,
-                  decoration: InputDecoration(
-                    hintText: 'Crie uma senha forte',
-                    suffixIcon: IconButton(
-                      onPressed: () {
-                        setState(() => _obscurePassword = !_obscurePassword);
-                      },
-                      icon: Icon(
-                        _obscurePassword
-                            ? Icons.visibility_rounded
-                            : Icons.visibility_off_rounded,
-                      ),
-                    ),
-                  ),
-                ),
-              ),
-              const SizedBox(height: 14),
-              _LabeledField(
-                label: AppStrings.t(context, 'confirm_password'),
-                child: TextField(
-                  controller: confirmPasswordController,
-                  obscureText: _obscureConfirmPassword,
-                  decoration: InputDecoration(
-                    hintText: 'Repita a senha',
-                    suffixIcon: IconButton(
-                      onPressed: () {
-                        setState(() =>
-                            _obscureConfirmPassword = !_obscureConfirmPassword);
-                      },
-                      icon: Icon(
-                        _obscureConfirmPassword
-                            ? Icons.visibility_rounded
-                            : Icons.visibility_off_rounded,
-                      ),
-                    ),
-                  ),
-                ),
-              ),
-              const SizedBox(height: 12),
-              CheckboxListTile(
-                value: acceptedTerms,
-                onChanged: (v) => setState(() => acceptedTerms = v ?? false),
-                title: Text(AppStrings.t(context, 'register_terms_text')),
-                controlAffinity: ListTileControlAffinity.leading,
-                contentPadding: EdgeInsets.zero,
-              ),
-              const SizedBox(height: 20),
-              Row(
-                children: [
-                  Expanded(
-                    child: OutlinedButton(
-                      onPressed: _loading
-                          ? null
-                          : () {
-                              setState(() => _step = 0);
-                            },
-                      child: const Text('Voltar'),
-                    ),
-                  ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: ElevatedButton(
-                      onPressed: _loading ? null : _register,
-                      child: _loading
-                          ? const SizedBox(
-                              height: 18,
-                              width: 18,
-                              child: CircularProgressIndicator(strokeWidth: 2),
-                            )
-                          : Text(AppStrings.t(context, 'register_action')),
-                    ),
-                  ),
-                ],
-              ),
-            ],
-          ],
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _RegisterBackdrop extends StatelessWidget {
+  final bool isDark;
+
+  const _RegisterBackdrop({required this.isDark});
+
+  @override
+  Widget build(BuildContext context) {
+    return DecoratedBox(
+      decoration: BoxDecoration(gradient: AppTheme.authBackground(context)),
+      child: Stack(
+        children: [
+          Positioned(
+            top: -70,
+            left: -40,
+            child: _RegisterOrb(
+              size: 220,
+              color: AppTheme.gold.withValues(alpha: isDark ? 0.12 : 0.16),
+            ),
+          ),
+          Positioned(
+            right: -30,
+            top: 220,
+            child: _RegisterOrb(
+              size: 180,
+              color: AppTheme.yellow.withValues(alpha: isDark ? 0.09 : 0.13),
+            ),
+          ),
+          Positioned(
+            bottom: -60,
+            left: 30,
+            child: _RegisterOrb(
+              size: 190,
+              color: const Color(0xFFB98D1A)
+                  .withValues(alpha: isDark ? 0.12 : 0.09),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _RegisterOrb extends StatelessWidget {
+  final double size;
+  final Color color;
+
+  const _RegisterOrb({required this.size, required this.color});
+
+  @override
+  Widget build(BuildContext context) {
+    return IgnorePointer(
+      child: Container(
+        width: size,
+        height: size,
+        decoration: BoxDecoration(
+          shape: BoxShape.circle,
+          gradient: RadialGradient(
+            colors: [color, color.withValues(alpha: 0)],
+          ),
         ),
       ),
     );

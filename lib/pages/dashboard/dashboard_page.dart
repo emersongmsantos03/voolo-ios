@@ -1690,6 +1690,178 @@ class _DashboardPageState extends State<DashboardPage> {
     }
   }
 
+  Widget _overviewStatChip(
+    BuildContext context, {
+    required IconData icon,
+    required String label,
+    required String value,
+  }) {
+    final scheme = Theme.of(context).colorScheme;
+    return Expanded(
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+        decoration: BoxDecoration(
+          color: Colors.white.withValues(
+            alpha: Theme.of(context).brightness == Brightness.dark ? 0.06 : 0.7,
+          ),
+          borderRadius: BorderRadius.circular(18),
+          border: Border.all(color: Colors.white.withValues(alpha: 0.12)),
+        ),
+        child: Row(
+          children: [
+            Container(
+              width: 34,
+              height: 34,
+              decoration: BoxDecoration(
+                color: scheme.primary.withValues(alpha: 0.14),
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: Icon(icon, size: 18, color: scheme.primary),
+            ),
+            const SizedBox(width: 10),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    label,
+                    style: TextStyle(
+                      color: AppTheme.textMuted(context),
+                      fontSize: 11,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                  const SizedBox(height: 2),
+                  Text(
+                    value,
+                    style: TextStyle(
+                      color: AppTheme.textPrimary(context),
+                      fontSize: 13,
+                      fontWeight: FontWeight.w800,
+                    ),
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildOverviewHero(MonthlyDashboard d, String title) {
+    final scheme = Theme.of(context).colorScheme;
+    final isPremium = _user?.isPremium ?? false;
+
+    return Container(
+      padding: EdgeInsets.all(Responsive.isCompactPhone(context) ? 18 : 22),
+      decoration: AppTheme.panelDecoration(context, highlighted: true),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Container(
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                decoration: BoxDecoration(
+                  gradient: AppTheme.heroGradient,
+                  borderRadius: BorderRadius.circular(999),
+                ),
+                child: Text(
+                  title,
+                  style: const TextStyle(
+                    color: Colors.black,
+                    fontSize: 12,
+                    fontWeight: FontWeight.w900,
+                  ),
+                ),
+              ),
+              const Spacer(),
+              Container(
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                decoration: BoxDecoration(
+                  color: scheme.surface.withValues(alpha: 0.65),
+                  borderRadius: BorderRadius.circular(999),
+                  border: Border.all(
+                    color: scheme.outline.withValues(alpha: 0.35),
+                  ),
+                ),
+                child: Text(
+                  isPremium ? 'Premium' : 'Plano Free',
+                  style: TextStyle(
+                    color: AppTheme.textPrimary(context),
+                    fontWeight: FontWeight.w800,
+                    fontSize: 12,
+                  ),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 18),
+          Text(
+            AppStrings.t(context, 'month_salary'),
+            style: TextStyle(
+              color: AppTheme.textSecondary(context),
+              fontWeight: FontWeight.w700,
+            ),
+          ),
+          const SizedBox(height: 6),
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.end,
+            children: [
+              Expanded(
+                child: Text(
+                  SensitiveDisplay.money(context, d.salary),
+                  style: TextStyle(
+                    color: AppTheme.textPrimary(context),
+                    fontSize: Responsive.isCompactPhone(context) ? 28 : 34,
+                    fontWeight: FontWeight.w900,
+                    letterSpacing: -1.0,
+                  ),
+                ),
+              ),
+              const SizedBox(width: 12),
+              OutlinedButton.icon(
+                onPressed: _openIncomeEditorPopup,
+                icon: const Icon(Icons.edit_outlined, size: 18),
+                label: const Text('Editar'),
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
+          Text(
+            'Resumo rápido do que entrou, saiu e do espaço livre para agir neste mês.',
+            style: TextStyle(
+              color: AppTheme.textSecondary(context),
+              height: 1.4,
+            ),
+          ),
+          const SizedBox(height: 16),
+          Row(
+            children: [
+              _overviewStatChip(
+                context,
+                icon: Icons.account_balance_wallet_outlined,
+                label: AppStrings.t(context, 'summary_free'),
+                value: SensitiveDisplay.money(context, d.remainingSalary),
+              ),
+              const SizedBox(width: 10),
+              _overviewStatChip(
+                context,
+                icon: Icons.savings_outlined,
+                label: AppStrings.t(context, 'summary_invest'),
+                value: SensitiveDisplay.money(context, d.investmentsTotal),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
   Widget _insightList() {
     if (_insights.isEmpty) return const SizedBox.shrink();
 
@@ -3152,30 +3324,7 @@ class _DashboardPageState extends State<DashboardPage> {
           padding: Responsive.pagePadding(context),
           child: ListView(
             children: [
-              Text(
-                AppStrings.t(context, 'month_salary'),
-                style: TextStyle(color: AppTheme.textSecondary(context)),
-              ),
-              const SizedBox(height: 6),
-              Row(
-                children: [
-                  Expanded(
-                    child: Text(
-                      SensitiveDisplay.money(context, d.salary),
-                      style: const TextStyle(
-                        color: Colors.amber,
-                        fontSize: 26,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                  ),
-                  TextButton.icon(
-                    onPressed: _openIncomeEditorPopup,
-                    icon: const Icon(Icons.edit, size: 18),
-                    label: const Text('Editar'),
-                  ),
-                ],
-              ),
+              _buildOverviewHero(d, title),
               const SizedBox(height: 18),
               if (!_user!.isPremium) ...[
                 PremiumUpsellCard(
@@ -3210,25 +3359,7 @@ class _DashboardPageState extends State<DashboardPage> {
                   child: Container(
                     padding: EdgeInsets.all(
                         Responsive.isCompactPhone(context) ? 16 : 24),
-                    decoration: BoxDecoration(
-                      color: Theme.of(context).colorScheme.surface,
-                      borderRadius: BorderRadius.circular(24),
-                      border: Border.all(
-                        color: Theme.of(context)
-                            .colorScheme
-                            .outline
-                            .withValues(alpha: 0.2),
-                      ),
-                      boxShadow: [
-                        BoxShadow(
-                          color: Theme.of(context)
-                              .shadowColor
-                              .withValues(alpha: 0.08),
-                          blurRadius: 12,
-                          offset: const Offset(0, 6),
-                        ),
-                      ],
-                    ),
+                    decoration: AppTheme.panelDecoration(context),
                     child: Row(
                       children: [
                         Stack(
@@ -3305,20 +3436,16 @@ class _DashboardPageState extends State<DashboardPage> {
                   icon: Icons.shield_outlined,
                 ),
               const SizedBox(height: 18),
-              const SizedBox(height: 18),
-
-              Card(
-                color: Colors.transparent,
-                child: Padding(
-                  padding: const EdgeInsets.all(16),
-                  child: SizedBox(
-                    height: 220,
-                    child: PieChart(
-                      PieChartData(
-                        sectionsSpace: 2,
-                        centerSpaceRadius: 48,
-                        sections: _sections(d),
-                      ),
+              Container(
+                decoration: AppTheme.panelDecoration(context),
+                padding: const EdgeInsets.all(16),
+                child: SizedBox(
+                  height: 220,
+                  child: PieChart(
+                    PieChartData(
+                      sectionsSpace: 2,
+                      centerSpaceRadius: 48,
+                      sections: _sections(d),
                     ),
                   ),
                 ),
@@ -3894,35 +4021,44 @@ class _BottomActionRow extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return SizedBox(
-      width: 240,
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-        children: [
-          FloatingActionButton(
-            heroTag: 'goals',
-            mini: true,
-            backgroundColor: Theme.of(context).colorScheme.surface,
-            foregroundColor: AppTheme.textPrimary(context),
-            onPressed: onGoals,
-            child: const Icon(Icons.flag),
-          ),
-          FloatingActionButton(
-            heroTag: 'add',
-            backgroundColor: Theme.of(context).colorScheme.primary,
-            foregroundColor: Colors.black,
-            onPressed: onAdd,
-            child: const Icon(Icons.add),
-          ),
-          FloatingActionButton(
-            heroTag: 'calc',
-            mini: true,
-            backgroundColor: Theme.of(context).colorScheme.surface,
-            foregroundColor: AppTheme.textPrimary(context),
-            onPressed: onCalculator,
-            child: const Icon(Icons.calculate),
-          ),
-        ],
+    final scheme = Theme.of(context).colorScheme;
+
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+      decoration: AppTheme.panelDecoration(context),
+      child: SizedBox(
+        width: 236,
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            FloatingActionButton(
+              heroTag: 'goals',
+              mini: true,
+              backgroundColor: scheme.surface,
+              foregroundColor: AppTheme.textPrimary(context),
+              elevation: 0,
+              onPressed: onGoals,
+              child: const Icon(Icons.flag),
+            ),
+            FloatingActionButton(
+              heroTag: 'add',
+              backgroundColor: scheme.primary,
+              foregroundColor: Colors.black,
+              elevation: 0,
+              onPressed: onAdd,
+              child: const Icon(Icons.add),
+            ),
+            FloatingActionButton(
+              heroTag: 'calc',
+              mini: true,
+              backgroundColor: scheme.surface,
+              foregroundColor: AppTheme.textPrimary(context),
+              elevation: 0,
+              onPressed: onCalculator,
+              child: const Icon(Icons.calculate),
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -4089,11 +4225,7 @@ class _SummaryRow extends StatelessWidget {
         borderRadius: BorderRadius.circular(14),
         child: Container(
           padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 10),
-          decoration: BoxDecoration(
-            color: Theme.of(context).colorScheme.surface,
-            borderRadius: BorderRadius.circular(14),
-            border: Border.all(color: Colors.white10),
-          ),
+          decoration: AppTheme.panelDecoration(context, radius: 18),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
