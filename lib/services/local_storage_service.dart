@@ -31,12 +31,16 @@ class AccountDeletionException implements Exception {
 class LocalStorageService {
   LocalStorageService._();
 
-  /// Web client ID (OAuth 2.0) from Google Cloud / Firebase project.
-  /// Used on Android to request an ID token when needed.
+  /// Web OAuth client for the current Firebase project.
   ///
-  /// Provide via: `--dart-define=GOOGLE_WEB_CLIENT_ID=...`
-  static const String _googleServerClientId =
-      String.fromEnvironment('GOOGLE_WEB_CLIENT_ID', defaultValue: '');
+  /// It can still be overridden via `--dart-define=GOOGLE_WEB_CLIENT_ID=...`,
+  /// but keeping a project fallback avoids preview/login regressions when the
+  /// build pipeline forgets to inject the value.
+  static const String _googleServerClientId = String.fromEnvironment(
+    'GOOGLE_WEB_CLIENT_ID',
+    defaultValue:
+        '100666481363-oudvh15h83umb4gf4plfm1eilgihepab.apps.googleusercontent.com',
+  );
 
   static bool _initialized = false;
   static final ValueNotifier<UserProfile?> userNotifier =
@@ -184,7 +188,8 @@ class LocalStorageService {
       _auth.currentUser?.providerData.any((p) => p.providerId == 'password') ??
       false;
   static bool get currentUserUsesGoogleProvider =>
-      _auth.currentUser?.providerData.any((p) => p.providerId == 'google.com') ??
+      _auth.currentUser?.providerData
+          .any((p) => p.providerId == 'google.com') ??
       false;
   static UserProfile? getUserProfile() {
     if (_loggedOut) return null;
@@ -224,7 +229,10 @@ class LocalStorageService {
         _lastLoginError = 'login_invalid_email';
       } else if (e.code == 'network-request-failed') {
         _lastLoginError = 'no_connection';
-      } else if (e.code == 'user-not-found' || e.code == 'wrong-password') {
+      } else if (e.code == 'user-not-found' ||
+          e.code == 'wrong-password' ||
+          e.code == 'invalid-credential' ||
+          e.code == 'invalid-login-credentials') {
         _lastLoginError = 'login_invalid_credentials';
       } else {
         _lastLoginError = 'login_failed_try_again';
@@ -297,6 +305,10 @@ class LocalStorageService {
       } else if (e.code == 'popup-closed-by-user' ||
           e.code == 'cancelled-popup-request') {
         _lastLoginError = 'login_cancelled';
+      } else if (e.code == 'operation-not-allowed' ||
+          e.code == 'invalid-credential' ||
+          e.code == 'invalid-idp-response') {
+        _lastLoginError = 'login_google_not_ready';
       } else {
         _lastLoginError = 'login_failed_try_again';
       }
