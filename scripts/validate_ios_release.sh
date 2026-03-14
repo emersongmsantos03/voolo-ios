@@ -13,7 +13,7 @@ require_file() {
 require_match() {
   pattern="$1"
   file="$2"
-  if ! grep -F "$pattern" "$file" >/dev/null 2>&1; then
+  if ! grep -F -- "$pattern" "$file" >/dev/null 2>&1; then
     echo "ERROR: Expected pattern not found in $file"
     echo "Pattern: $pattern"
     exit 1
