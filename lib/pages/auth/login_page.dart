@@ -95,6 +95,12 @@ class _LoginPageState extends State<LoginPage> {
     if (diagnostic == null || diagnostic.trim().isEmpty) {
       return base;
     }
+    final lower = diagnostic.toLowerCase();
+    if (lower.contains('keychain')) {
+      return 'O iPhone nao conseguiu acessar o Keychain para salvar a sessao. '
+          'Isso costuma indicar problema de signing/entitlements no build iOS. '
+          '[$diagnostic]';
+    }
     return '$base [$diagnostic]';
   }
 
