@@ -303,7 +303,11 @@ workflows:
       flutter: stable
       xcode: latest
       cocoapods: default
+      groups:
+        - firebase
       vars:
+        BUNDLE_ID: com.voolo.app
+        FIREBASE_IOS_PLIST_PATH: ios/Runner/GoogleService-Info.plist
         SIMULATOR_DEVICE: "iPhone 14 Pro"
         SIMULATOR_RUNTIME: "iOS 16.2"
 
@@ -315,6 +319,36 @@ workflows:
       - name: Validate iOS release configuration
         script: |
           sh scripts/validate_ios_release.sh
+
+      - name: Provision Firebase iOS plist
+        script: |
+          set -e
+          if [ -z "$FIREBASE_IOS_PLIST_BASE64" ]; then
+            echo "ERROR: FIREBASE_IOS_PLIST_BASE64 is not set in Codemagic environment variables."
+            exit 1
+          fi
+          echo "$FIREBASE_IOS_PLIST_BASE64" | base64 --decode > "$FIREBASE_IOS_PLIST_PATH"
+          /usr/libexec/PlistBuddy -c "Print :GOOGLE_APP_ID" "$FIREBASE_IOS_PLIST_PATH" >/dev/null
+          PLIST_BUNDLE_ID="$(/usr/libexec/PlistBuddy -c "Print :BUNDLE_ID" "$FIREBASE_IOS_PLIST_PATH")"
+          if [ "$PLIST_BUNDLE_ID" != "$BUNDLE_ID" ]; then
+            echo "ERROR: Firebase iOS plist BUNDLE_ID ($PLIST_BUNDLE_ID) does not match app bundle ($BUNDLE_ID)."
+            exit 1
+          fi
+
+      - name: Configure iOS URL scheme for Google Sign-In
+        script: |
+          set -e
+          REVERSED_CLIENT_ID="$(/usr/libexec/PlistBuddy -c "Print :REVERSED_CLIENT_ID" "$FIREBASE_IOS_PLIST_PATH")"
+          if [ -z "$REVERSED_CLIENT_ID" ]; then
+            echo "ERROR: REVERSED_CLIENT_ID not found in Firebase iOS plist."
+            exit 1
+          fi
+          /usr/libexec/PlistBuddy -c "Delete :CFBundleURLTypes" ios/Runner/Info.plist || true
+          /usr/libexec/PlistBuddy -c "Add :CFBundleURLTypes array" ios/Runner/Info.plist
+          /usr/libexec/PlistBuddy -c "Add :CFBundleURLTypes:0 dict" ios/Runner/Info.plist
+          /usr/libexec/PlistBuddy -c "Add :CFBundleURLTypes:0:CFBundleTypeRole string Editor" ios/Runner/Info.plist
+          /usr/libexec/PlistBuddy -c "Add :CFBundleURLTypes:0:CFBundleURLSchemes array" ios/Runner/Info.plist
+          /usr/libexec/PlistBuddy -c "Add :CFBundleURLTypes:0:CFBundleURLSchemes:0 string $REVERSED_CLIENT_ID" ios/Runner/Info.plist
 
       - name: Resolve available iOS simulator
         script: |
@@ -338,38 +372,10 @@ workflows:
           echo "CM_SIMULATOR_DEVICE=$DEVICE" >> "$CM_ENV"
           echo "CM_SIMULATOR_UDID=$UDID" >> "$CM_ENV"
 
-      - name: Provision stub Firebase plist for preview stability
-        script: |
-          set -e
-          cat > ios/Runner/GoogleService-Info.plist <<'EOF'
-          <?xml version="1.0" encoding="UTF-8"?>
-          <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
-          <plist version="1.0">
-          <dict>
-            <key>API_KEY</key>
-            <string>stub-api-key</string>
-            <key>BUNDLE_ID</key>
-            <string>com.voolo.app</string>
-            <key>GCM_SENDER_ID</key>
-            <string>1234567890</string>
-            <key>GOOGLE_APP_ID</key>
-            <string>1:1234567890:ios:1234567890abcdef123456</string>
-            <key>PROJECT_ID</key>
-            <string>stub-project-id</string>
-            <key>REVERSED_CLIENT_ID</key>
-            <string>com.googleusercontent.apps.1234567890-abcdef</string>
-            <key>STORAGE_BUCKET</key>
-            <string>stub-project-id.appspot.com</string>
-          </dict>
-          </plist>
-          EOF
-          echo "Preview uses screenshot mode (no live Firebase init)."
-
       - name: Prepare Flutter iOS config and Pods
         script: |
           set -e
           /usr/libexec/PlistBuddy -c "Delete :PREVIEW_STABLE_MODE" ios/Runner/Info.plist || true
-          /usr/libexec/PlistBuddy -c "Add :PREVIEW_STABLE_MODE bool true" ios/Runner/Info.plist
           cd ios
           pod install
           cd ..
@@ -378,18 +384,8 @@ workflows:
         script: |
           set -e
           flutter build ios --simulator --debug --no-codesign \
-            --target=lib/main_preview.dart
+            --dart-define=PREVIEW_FORCE_LOGIN=true
           find build/ios/iphonesimulator -type d -name "*.app" | sed 's|^| - |'
-
-      - name: Verify preview flag in compiled app
-        script: |
-          set -e
-          APP_PATH="$(find build/ios/iphonesimulator -type d -name 'Runner.app' | head -n 1)"
-          if [ -z "$APP_PATH" ]; then
-            echo "ERROR: Runner.app not found after build."
-            exit 1
-          fi
-          /usr/libexec/PlistBuddy -c "Print :PREVIEW_STABLE_MODE" "$APP_PATH/Info.plist"
 
       - name: Collect app startup runtime logs
         script: |
@@ -406,6 +402,7 @@ workflows:
 
           mkdir -p build
           xcrun simctl shutdown all || true
+          xcrun simctl erase "$TARGET" || true
           xcrun simctl boot "$TARGET" || true
           xcrun simctl bootstatus "$TARGET" -b
 

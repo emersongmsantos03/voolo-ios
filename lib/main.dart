@@ -78,6 +78,8 @@ Future<void> _bootstrapApp() async {
   final previewStableMode = await _resolvePreviewStableMode();
   const screenshotMode =
       bool.fromEnvironment('SCREENSHOT_MODE', defaultValue: false);
+  const previewForceLogin =
+      bool.fromEnvironment('PREVIEW_FORCE_LOGIN', defaultValue: false);
   const screenshotInitialRoute = String.fromEnvironment(
     'SCREENSHOT_INITIAL_ROUTE',
     defaultValue: '',
@@ -115,6 +117,12 @@ Future<void> _bootstrapApp() async {
     firebaseReady = false;
   }
 
+  if (firebaseReady && previewForceLogin) {
+    try {
+      await FirebaseAuth.instance.signOut().timeout(const Duration(seconds: 3));
+    } catch (_) {}
+  }
+
   try {
     await DateUtilsJetx.init().timeout(const Duration(seconds: 2));
   } catch (_) {}
@@ -142,7 +150,9 @@ Future<void> _bootstrapApp() async {
               user.monthlyIncome <= 0 ||
               user.objectives.isEmpty);
 
-      initialRoute = user == null
+      initialRoute = previewForceLogin
+          ? AppRoutes.login
+          : user == null
           ? AppRoutes.login
           : (await SecurityLockService.requiresUnlockForCurrentUser()
               ? AppRoutes.securityLock

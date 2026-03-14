@@ -24,7 +24,6 @@ require_file "ios/Runner/Info.plist"
 require_file "ios/Runner/PrivacyInfo.xcprivacy"
 require_file "ios/Runner.xcodeproj/project.pbxproj"
 require_file "codemagic.yaml"
-require_file "lib/main_preview.dart"
 
 require_match "<key>NSPhotoLibraryUsageDescription</key>" "ios/Runner/Info.plist"
 require_match "<key>NSFaceIDUsageDescription</key>" "ios/Runner/Info.plist"
@@ -39,7 +38,8 @@ require_match "Restaurar compras" "lib/pages/premium/premium_page.dart"
 require_match "Excluir minha conta" "lib/pages/profile/profile_page.dart"
 require_match "deleteCurrentAccount" "lib/services/local_storage_service.dart"
 require_match "deleteUserAccount" "lib/services/firestore_service.dart"
-require_match "--target=lib/main_preview.dart" "codemagic.yaml"
+require_match "FIREBASE_IOS_PLIST_BASE64" "codemagic.yaml"
+require_match "--dart-define=PREVIEW_FORCE_LOGIN=true" "codemagic.yaml"
 
 if grep -F "<key>NSCameraUsageDescription</key>" ios/Runner/Info.plist >/dev/null 2>&1; then
   if ! grep -R "ImageSource.camera" lib >/dev/null 2>&1; then
