@@ -44,11 +44,15 @@ workflows:
       - name: Provision Firebase iOS plist
         script: |
           set -e
-          if [ -z "$FIREBASE_IOS_PLIST_BASE64" ]; then
-            echo "ERROR: FIREBASE_IOS_PLIST_BASE64 is not set in Codemagic environment variables."
+          if [ -n "$FIREBASE_IOS_PLIST_BASE64" ]; then
+            echo "$FIREBASE_IOS_PLIST_BASE64" | base64 --decode > "$FIREBASE_IOS_PLIST_PATH"
+            echo "Using Firebase iOS plist from Codemagic secret."
+          elif [ -f "$FIREBASE_IOS_PLIST_PATH" ]; then
+            echo "Using Firebase iOS plist from repository."
+          else
+            echo "ERROR: Firebase iOS plist not found in secret or repository."
             exit 1
           fi
-          echo "$FIREBASE_IOS_PLIST_BASE64" | base64 --decode > "$FIREBASE_IOS_PLIST_PATH"
           /usr/libexec/PlistBuddy -c "Print :GOOGLE_APP_ID" "$FIREBASE_IOS_PLIST_PATH" >/dev/null
           PLIST_BUNDLE_ID="$(/usr/libexec/PlistBuddy -c "Print :BUNDLE_ID" "$FIREBASE_IOS_PLIST_PATH")"
           if [ "$PLIST_BUNDLE_ID" != "$BUNDLE_ID" ]; then
@@ -323,11 +327,15 @@ workflows:
       - name: Provision Firebase iOS plist
         script: |
           set -e
-          if [ -z "$FIREBASE_IOS_PLIST_BASE64" ]; then
-            echo "ERROR: FIREBASE_IOS_PLIST_BASE64 is not set in Codemagic environment variables."
+          if [ -n "$FIREBASE_IOS_PLIST_BASE64" ]; then
+            echo "$FIREBASE_IOS_PLIST_BASE64" | base64 --decode > "$FIREBASE_IOS_PLIST_PATH"
+            echo "Using Firebase iOS plist from Codemagic secret."
+          elif [ -f "$FIREBASE_IOS_PLIST_PATH" ]; then
+            echo "Using Firebase iOS plist from repository."
+          else
+            echo "ERROR: Firebase iOS plist not found in secret or repository."
             exit 1
           fi
-          echo "$FIREBASE_IOS_PLIST_BASE64" | base64 --decode > "$FIREBASE_IOS_PLIST_PATH"
           /usr/libexec/PlistBuddy -c "Print :GOOGLE_APP_ID" "$FIREBASE_IOS_PLIST_PATH" >/dev/null
           PLIST_BUNDLE_ID="$(/usr/libexec/PlistBuddy -c "Print :BUNDLE_ID" "$FIREBASE_IOS_PLIST_PATH")"
           if [ "$PLIST_BUNDLE_ID" != "$BUNDLE_ID" ]; then
