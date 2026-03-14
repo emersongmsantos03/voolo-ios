@@ -53,21 +53,20 @@ void _runGuardedApp(Widget app) {
 }
 
 Future<void> main() async {
-  WidgetsFlutterBinding.ensureInitialized();
-  FlutterError.onError = (details) {
-    FlutterError.presentError(details);
-    _reportFatalError(
-      details.exception,
-      details.stack ?? StackTrace.current,
-    );
-  };
-  PlatformDispatcher.instance.onError = (error, stackTrace) {
-    _reportFatalError(error, stackTrace);
-    return true;
-  };
-
   await runZonedGuarded<Future<void>>(
     () async {
+      WidgetsFlutterBinding.ensureInitialized();
+      FlutterError.onError = (details) {
+        FlutterError.presentError(details);
+        _reportFatalError(
+          details.exception,
+          details.stack ?? StackTrace.current,
+        );
+      };
+      PlatformDispatcher.instance.onError = (error, stackTrace) {
+        _reportFatalError(error, stackTrace);
+        return true;
+      };
       await _bootstrapApp();
     },
     _reportFatalError,
