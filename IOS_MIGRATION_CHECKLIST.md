@@ -3,7 +3,7 @@
 Este projeto foi adaptado para iOS no Flutter, mas antes de subir na App Store voce precisa validar estes pontos no macOS (Xcode):
 
 1. Firebase (obrigatorio)
-- Adicione o app iOS no Firebase com o mesmo Bundle ID do Xcode (`com.voolo.app`).
+- Adicione o app iOS no Firebase com o mesmo Bundle ID do Xcode (`com.voolo.jetx`).
 - Baixe `GoogleService-Info.plist` e coloque em `ios/Runner/GoogleService-Info.plist`.
 - No Xcode, confirme que o arquivo foi incluído no target `Runner`.
 

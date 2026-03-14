@@ -11,7 +11,7 @@ workflows:
       groups:
         - firebase
       vars:
-        BUNDLE_ID: com.voolo.app
+        BUNDLE_ID: com.voolo.jetx
         FIREBASE_IOS_PLIST_PATH: ios/Runner/GoogleService-Info.plist
 
     integrations:
@@ -230,7 +230,7 @@ workflows:
             <key>API_KEY</key>
             <string>stub-api-key</string>
             <key>BUNDLE_ID</key>
-            <string>com.voolo.app</string>
+            <string>com.voolo.jetx</string>
             <key>GCM_SENDER_ID</key>
             <string>1234567890</string>
             <key>GOOGLE_APP_ID</key>
@@ -306,7 +306,7 @@ workflows:
       groups:
         - firebase
       vars:
-        BUNDLE_ID: com.voolo.app
+        BUNDLE_ID: com.voolo.jetx
         FIREBASE_IOS_PLIST_PATH: ios/Runner/GoogleService-Info.plist
         SIMULATOR_DEVICE: "iPhone 14 Pro"
         SIMULATOR_RUNTIME: "iOS 16.2"
@@ -406,17 +406,17 @@ workflows:
           xcrun simctl boot "$TARGET" || true
           xcrun simctl bootstatus "$TARGET" -b
 
-          xcrun simctl uninstall "$TARGET" com.voolo.app || true
+          xcrun simctl uninstall "$TARGET" com.voolo.jetx || true
           xcrun simctl install "$TARGET" "$APP_PATH"
 
           (xcrun simctl spawn "$TARGET" log stream --style compact --level debug --predicate 'process == "Runner"' > build/preview_runtime.log 2>&1) &
           LOG_PID=$!
           sleep 2
 
-          xcrun simctl launch "$TARGET" com.voolo.app > build/preview_launch.log 2>&1
+          xcrun simctl launch "$TARGET" com.voolo.jetx > build/preview_launch.log 2>&1
           sleep 15
 
-          if ! xcrun simctl spawn "$TARGET" launchctl list | grep -F "com.voolo.app" >/dev/null; then
+          if ! xcrun simctl spawn "$TARGET" launchctl list | grep -F "com.voolo.jetx" >/dev/null; then
             echo "ERROR: Preview app exited right after launch."
             echo "=== preview_launch.log ==="
             cat build/preview_launch.log || true
