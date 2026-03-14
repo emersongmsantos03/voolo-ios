@@ -18,6 +18,8 @@ class RegisterPage extends StatefulWidget {
 }
 
 class _RegisterPageState extends State<RegisterPage> {
+  static const bool _appPreviewMode =
+      bool.fromEnvironment('APP_PREVIEW_MODE', defaultValue: false);
   final firstNameController = TextEditingController();
   final lastNameController = TextEditingController();
   final emailController = TextEditingController();
@@ -70,6 +72,11 @@ class _RegisterPageState extends State<RegisterPage> {
     }
     final lower = diagnostic.toLowerCase();
     if (lower.contains('keychain')) {
+      if (_appPreviewMode) {
+        return 'O cadastro do Firebase no App Preview iOS ainda esta bloqueado pelo Keychain do simulator. '
+            'Teste o cadastro no build assinado do iPhone/TestFlight. '
+            '[$diagnostic]';
+      }
       return 'O iPhone nao conseguiu acessar o Keychain para salvar a sessao. '
           'Isso costuma indicar problema de signing/entitlements no build iOS. '
           '[$diagnostic]';

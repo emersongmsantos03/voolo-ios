@@ -413,9 +413,24 @@ workflows:
       - name: Build iOS simulator .app for App Preview
         script: |
           set -e
-          flutter build ios --simulator --debug --no-codesign \
-            --dart-define=PREVIEW_FORCE_LOGIN=true
+          flutter build ios --simulator --debug \
+            --dart-define=PREVIEW_FORCE_LOGIN=true \
+            --dart-define=APP_PREVIEW_MODE=true
           find build/ios/iphonesimulator -type d -name "*.app" | sed 's|^| - |'
+
+      - name: Inspect preview app signing metadata
+        script: |
+          set -e
+          APP_PATH="$(find build/ios/iphonesimulator -type d -name 'Runner.app' | head -n 1)"
+          if [ -z "$APP_PATH" ]; then
+            echo "ERROR: Runner.app not found after simulator build."
+            exit 1
+          fi
+
+          echo "=== codesign details ==="
+          codesign -dvv "$APP_PATH" || true
+          echo "=== codesign entitlements ==="
+          codesign -d --entitlements :- "$APP_PATH" || true
 
       - name: Validate bundled Firebase config in preview app
         script: |

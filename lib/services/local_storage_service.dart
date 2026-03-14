@@ -88,8 +88,26 @@ class LocalStorageService {
     );
   }
 
+  static Future<void> _configureAppleAuthDefaults() async {
+    if (kIsWeb || defaultTargetPlatform != TargetPlatform.iOS) {
+      return;
+    }
+
+    try {
+      await _auth.setSettings(userAccessGroup: null);
+      debugPrint(
+        'LocalStorageService: FirebaseAuth iOS settings applied with default keychain access.',
+      );
+    } catch (e) {
+      debugPrint(
+        'LocalStorageService: FirebaseAuth iOS settings could not be applied: $e',
+      );
+    }
+  }
+
   static Future<void> init() async {
     if (_initialized) return;
+    await _configureAppleAuthDefaults();
     final authUser = _auth.currentUser;
     if (authUser != null && (authUser.email ?? '').isNotEmpty) {
       _currentUserEmail = authUser.email;

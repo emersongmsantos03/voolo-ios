@@ -20,6 +20,8 @@ class LoginPage extends StatefulWidget {
 }
 
 class _LoginPageState extends State<LoginPage> {
+  static const bool _appPreviewMode =
+      bool.fromEnvironment('APP_PREVIEW_MODE', defaultValue: false);
   final emailController = TextEditingController();
   final passwordController = TextEditingController();
 
@@ -97,6 +99,11 @@ class _LoginPageState extends State<LoginPage> {
     }
     final lower = diagnostic.toLowerCase();
     if (lower.contains('keychain')) {
+      if (_appPreviewMode) {
+        return 'O login do Firebase no App Preview iOS ainda esta bloqueado pelo Keychain do simulator. '
+            'Teste o login no build assinado do iPhone/TestFlight. '
+            '[$diagnostic]';
+      }
       return 'O iPhone nao conseguiu acessar o Keychain para salvar a sessao. '
           'Isso costuma indicar problema de signing/entitlements no build iOS. '
           '[$diagnostic]';
