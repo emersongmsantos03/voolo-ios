@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 
 import 'package:jetx/core/localization/app_strings.dart';
+import 'package:jetx/core/theme/app_theme.dart';
+import 'package:jetx/core/ui/responsive.dart';
 import 'package:jetx/models/user_profile.dart';
 import 'package:jetx/pages/auth/register_page.dart';
 import 'package:jetx/pages/onboarding/onboarding_page.dart';
@@ -9,9 +11,6 @@ import 'package:jetx/services/firestore_service.dart';
 import 'package:jetx/services/local_storage_service.dart';
 import 'package:jetx/services/notification_service.dart';
 import 'package:jetx/services/security_lock_service.dart';
-import 'package:jetx/core/theme/app_theme.dart';
-import 'package:jetx/core/ui/responsive.dart';
-import 'package:jetx/widgets/guided_assistance.dart';
 
 class LoginPage extends StatefulWidget {
   const LoginPage({super.key});
@@ -23,8 +22,9 @@ class LoginPage extends StatefulWidget {
 class _LoginPageState extends State<LoginPage> {
   static const bool _appPreviewMode =
       bool.fromEnvironment('APP_PREVIEW_MODE', defaultValue: false);
-  final emailController = TextEditingController();
-  final passwordController = TextEditingController();
+
+  final TextEditingController emailController = TextEditingController();
+  final TextEditingController passwordController = TextEditingController();
 
   bool _loading = false;
   bool _obscurePassword = true;
@@ -41,6 +41,7 @@ class _LoginPageState extends State<LoginPage> {
   }
 
   Future<void> _login() async {
+    FocusScope.of(context).unfocus();
     setState(() => _loading = true);
 
     final String email = emailController.text.trim();
@@ -66,6 +67,7 @@ class _LoginPageState extends State<LoginPage> {
       setState(() => _loading = false);
       return;
     }
+
     if (!mounted) return;
     if (user == null) {
       final loginError = LocalStorageService.lastLoginError;
@@ -73,6 +75,39 @@ class _LoginPageState extends State<LoginPage> {
         _snack(_loginFeedbackMessage(loginError));
       } else {
         _snack(_loginFeedbackMessage('login_invalid_credentials'));
+      }
+      setState(() => _loading = false);
+      return;
+    }
+
+    setState(() => _loading = false);
+    Navigator.pushReplacement(
+      context,
+      MaterialPageRoute(builder: (_) => const LoginSuccessSplash()),
+    );
+  }
+
+  Future<void> _loginWithGoogle() async {
+    FocusScope.of(context).unfocus();
+    setState(() => _loading = true);
+
+    UserProfile? user;
+    try {
+      user = await LocalStorageService.loginWithGoogle();
+    } catch (_) {
+      if (!mounted) return;
+      _snack(_loginFeedbackMessage('login_failed_try_again'));
+      setState(() => _loading = false);
+      return;
+    }
+
+    if (!mounted) return;
+    if (user == null) {
+      final loginError = LocalStorageService.lastLoginError;
+      if (loginError != null) {
+        _snack(_loginFeedbackMessage(loginError));
+      } else {
+        _snack(_loginFeedbackMessage('login_failed_try_again'));
       }
       setState(() => _loading = false);
       return;
@@ -98,6 +133,7 @@ class _LoginPageState extends State<LoginPage> {
     if (diagnostic == null || diagnostic.trim().isEmpty) {
       return base;
     }
+
     final lower = diagnostic.toLowerCase();
     if (lower.contains('keychain')) {
       if (_appPreviewMode) {
@@ -109,37 +145,8 @@ class _LoginPageState extends State<LoginPage> {
           'Isso costuma indicar problema de signing/entitlements no build iOS. '
           '[$diagnostic]';
     }
+
     return '$base [$diagnostic]';
-  }
-
-  Future<void> _loginWithGoogle() async {
-    setState(() => _loading = true);
-    UserProfile? user;
-    try {
-      user = await LocalStorageService.loginWithGoogle();
-    } catch (_) {
-      if (!mounted) return;
-      _snack(_loginFeedbackMessage('login_failed_try_again'));
-      setState(() => _loading = false);
-      return;
-    }
-    if (!mounted) return;
-    if (user == null) {
-      final loginError = LocalStorageService.lastLoginError;
-      if (loginError != null) {
-        _snack(_loginFeedbackMessage(loginError));
-      } else {
-        _snack(_loginFeedbackMessage('login_failed_try_again'));
-      }
-      setState(() => _loading = false);
-      return;
-    }
-
-    setState(() => _loading = false);
-    Navigator.pushReplacement(
-      context,
-      MaterialPageRoute(builder: (_) => const LoginSuccessSplash()),
-    );
   }
 
   @override
@@ -157,69 +164,130 @@ class _LoginPageState extends State<LoginPage> {
               child: SingleChildScrollView(
                 padding: Responsive.pagePadding(context),
                 child: ConstrainedBox(
-                  constraints: const BoxConstraints(maxWidth: 468),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.stretch,
-                    children: [
-                      _AuthHero(
-                        logoAsset: isDark
-                            ? 'assets/branding/Logo_dark_slogan.png'
-                            : 'assets/branding/Logo_light_slogan.png',
-                        badge: 'Voolo',
-                        title: 'Sua vida financeira, finalmente organizada.',
-                        subtitle:
-                            'Entre para acompanhar gastos, metas, cartões e evolução do mês com clareza.',
-                        chips: const [
-                          'Fluxo simples',
-                          'Visual premium',
-                          'Feito para rotina real',
-                        ],
-                      ),
-                      const SizedBox(height: 24),
-                      Container(
-                        decoration:
-                            AppTheme.panelDecoration(context, highlighted: true),
-                        child: Padding(
-                          padding: EdgeInsets.all(
-                            Responsive.isCompactPhone(context) ? 18 : 24,
+                  constraints: const BoxConstraints(maxWidth: 430),
+                  child: Container(
+                    decoration:
+                        AppTheme.panelDecoration(context, highlighted: true),
+                    padding: EdgeInsets.all(
+                      Responsive.isCompactPhone(context) ? 18 : 24,
+                    ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: [
+                        Row(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  const _LoginMicroBadge(
+                                    label: 'Acesso ao Voolo',
+                                    icon: Icons.verified_user_outlined,
+                                  ),
+                                  const SizedBox(height: 14),
+                                  Image.asset(
+                                    isDark
+                                        ? 'assets/branding/Logo_dark_slogan.png'
+                                        : 'assets/branding/Logo_light_slogan.png',
+                                    width: Responsive.clampLogoWidth(
+                                      context,
+                                      max: 210,
+                                      fraction: 0.46,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                            const SizedBox(width: 12),
+                            Container(
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 12,
+                                vertical: 10,
+                              ),
+                              decoration: AppTheme.tintedPanelDecoration(
+                                context,
+                                tint: scheme.primary,
+                                radius: 18,
+                                tintOpacity: 0.08,
+                              ),
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(
+                                    'Login',
+                                    style:
+                                        theme.textTheme.labelMedium?.copyWith(
+                                      color: scheme.primary,
+                                      fontWeight: FontWeight.w800,
+                                    ),
+                                  ),
+                                  const SizedBox(height: 4),
+                                  Text(
+                                    'Rapido\nseguro',
+                                    style: theme.textTheme.bodySmall?.copyWith(
+                                      color: AppTheme.textPrimary(context),
+                                      fontWeight: FontWeight.w800,
+                                      height: 1.15,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 20),
+                        Text(
+                          'Entrar',
+                          style: theme.textTheme.titleLarge?.copyWith(
+                            fontSize:
+                                Responsive.isCompactPhone(context) ? 30 : 34,
+                            letterSpacing: -0.9,
                           ),
+                        ),
+                        const SizedBox(height: 8),
+                        Text(
+                          'Use seu e-mail ou o Google para acessar sua conta, recuperar sua senha ou criar uma nova.',
+                          style: theme.textTheme.bodyMedium?.copyWith(
+                            height: 1.45,
+                          ),
+                        ),
+                        const SizedBox(height: 18),
+                        const Wrap(
+                          spacing: 8,
+                          runSpacing: 8,
+                          children: [
+                            _LoginAccentChip(
+                              label: 'E-mail e senha',
+                              icon: Icons.mail_outline_rounded,
+                            ),
+                            _LoginAccentChip(
+                              label: 'Google',
+                              icon: Icons.public_rounded,
+                            ),
+                            _LoginAccentChip(
+                              label: 'Protecao da conta',
+                              icon: Icons.shield_outlined,
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 22),
+                        AutofillGroup(
                           child: Column(
                             crossAxisAlignment: CrossAxisAlignment.stretch,
                             children: [
-                              Container(
-                                padding: const EdgeInsets.symmetric(
-                                  horizontal: 12,
-                                  vertical: 8,
-                                ),
-                                decoration: BoxDecoration(
-                                  color: scheme.primary.withValues(alpha: 0.12),
-                                  borderRadius: BorderRadius.circular(999),
-                                ),
-                                child: Text(
-                                  'Acesso seguro',
-                                  style: theme.textTheme.labelMedium?.copyWith(
-                                    color: scheme.primary,
-                                    fontWeight: FontWeight.w800,
-                                  ),
-                                ),
-                              ),
-                              const SizedBox(height: 16),
-                              Text(
-                                'Entrar',
-                                style: theme.textTheme.titleLarge,
-                              ),
-                              const SizedBox(height: 6),
-                              Text(
-                                'Use seu e-mail para continuar de onde parou.',
-                                style: theme.textTheme.bodyMedium,
-                              ),
-                              const SizedBox(height: 20),
+                              const _LoginSectionLabel(label: 'E-mail'),
+                              const SizedBox(height: 8),
                               TextField(
                                 controller: emailController,
                                 keyboardType: TextInputType.emailAddress,
                                 textInputAction: TextInputAction.next,
+                                autofillHints: const [
+                                  AutofillHints.username,
+                                  AutofillHints.email,
+                                ],
                                 decoration: InputDecoration(
-                                  labelText: AppStrings.t(context, 'email'),
+                                  hintText: 'nome@dominio.com',
                                   prefixIcon: Icon(
                                     Icons.alternate_email_rounded,
                                     color: scheme.onSurfaceVariant,
@@ -228,13 +296,18 @@ class _LoginPageState extends State<LoginPage> {
                                 ),
                               ),
                               const SizedBox(height: 14),
+                              const _LoginSectionLabel(label: 'Senha'),
+                              const SizedBox(height: 8),
                               TextField(
                                 controller: passwordController,
                                 obscureText: _obscurePassword,
                                 textInputAction: TextInputAction.done,
-                                onSubmitted: (_) => _loading ? null : _login(),
+                                autofillHints: const [AutofillHints.password],
+                                onSubmitted: (_) {
+                                  if (!_loading) _login();
+                                },
                                 decoration: InputDecoration(
-                                  labelText: AppStrings.t(context, 'password'),
+                                  hintText: 'Digite sua senha',
                                   prefixIcon: Icon(
                                     Icons.lock_outline_rounded,
                                     color: scheme.onSurfaceVariant,
@@ -255,90 +328,101 @@ class _LoginPageState extends State<LoginPage> {
                                   ),
                                 ),
                               ),
-                              const SizedBox(height: 18),
-                              ElevatedButton(
-                                onPressed: _loading ? null : _login,
-                                child: _loading
-                                    ? SizedBox(
-                                        height: 18,
-                                        width: 18,
-                                        child: CircularProgressIndicator(
-                                          strokeWidth: 2,
-                                          color: scheme.onPrimary,
-                                        ),
-                                      )
-                                    : Text(AppStrings.t(context, 'login')),
-                              ),
-                              const SizedBox(height: 14),
-                              Row(
-                                children: [
-                                  Expanded(
-                                    child: Divider(
-                                      color:
-                                          scheme.outline.withValues(alpha: 0.4),
-                                    ),
-                                  ),
-                                  Padding(
-                                    padding: const EdgeInsets.symmetric(
-                                      horizontal: 12,
-                                    ),
-                                    child: Text(
-                                      AppStrings.t(context, 'or'),
-                                      style:
-                                          theme.textTheme.bodySmall?.copyWith(
-                                        color: scheme.onSurfaceVariant,
-                                        fontWeight: FontWeight.w700,
-                                      ),
-                                    ),
-                                  ),
-                                  Expanded(
-                                    child: Divider(
-                                      color:
-                                          scheme.outline.withValues(alpha: 0.4),
-                                    ),
-                                  ),
-                                ],
-                              ),
-                              const SizedBox(height: 14),
-                              OutlinedButton.icon(
-                                onPressed: _loading ? null : _loginWithGoogle,
-                                icon: Icon(
-                                  Icons.g_mobiledata_rounded,
-                                  size: 28,
-                                  color: scheme.primary,
-                                ),
-                                label: Text(
-                                  AppStrings.t(context, 'login_google'),
-                                ),
-                              ),
-                              const SizedBox(height: 8),
-                              TextButton(
-                                onPressed: () {
-                                  Navigator.pushNamed(
-                                    context,
-                                    AppRoutes.forgotPassword,
-                                  );
-                                },
-                                child: Text(
-                                  AppStrings.t(context, 'forgot_password'),
-                                ),
-                              ),
-                              TextButton(
-                                onPressed: () => showSupportSheet(context),
-                                child: const Text('Preciso de ajuda'),
-                              ),
                             ],
                           ),
                         ),
-                      ),
-                      const SizedBox(height: 14),
-                      Container(
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 16,
-                          vertical: 10,
+                        const SizedBox(height: 10),
+                        Align(
+                          alignment: Alignment.centerRight,
+                          child: TextButton(
+                            onPressed: () {
+                              Navigator.pushNamed(
+                                context,
+                                AppRoutes.forgotPassword,
+                              );
+                            },
+                            style: TextButton.styleFrom(
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 4,
+                                vertical: 6,
+                              ),
+                            ),
+                            child: Text(
+                              AppStrings.t(context, 'forgot_password'),
+                              style: TextStyle(
+                                color: scheme.primary,
+                                fontWeight: FontWeight.w700,
+                              ),
+                            ),
+                          ),
                         ),
-                        decoration: AppTheme.panelDecoration(context),
-                        child: Row(
+                        const SizedBox(height: 8),
+                        ElevatedButton(
+                          onPressed: _loading ? null : _login,
+                          child: _loading
+                              ? SizedBox(
+                                  height: 18,
+                                  width: 18,
+                                  child: CircularProgressIndicator(
+                                    strokeWidth: 2,
+                                    color: scheme.onPrimary,
+                                  ),
+                                )
+                              : Text(AppStrings.t(context, 'login')),
+                        ),
+                        const SizedBox(height: 18),
+                        Row(
+                          children: [
+                            Expanded(
+                              child: Divider(
+                                color: scheme.outline.withValues(alpha: 0.4),
+                              ),
+                            ),
+                            Padding(
+                              padding:
+                                  const EdgeInsets.symmetric(horizontal: 12),
+                              child: Text(
+                                AppStrings.t(context, 'or'),
+                                style: theme.textTheme.bodySmall?.copyWith(
+                                  color: scheme.onSurfaceVariant,
+                                  fontWeight: FontWeight.w700,
+                                ),
+                              ),
+                            ),
+                            Expanded(
+                              child: Divider(
+                                color: scheme.outline.withValues(alpha: 0.4),
+                              ),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 18),
+                        OutlinedButton.icon(
+                          onPressed: _loading ? null : _loginWithGoogle,
+                          icon: Container(
+                            width: 30,
+                            height: 30,
+                            alignment: Alignment.center,
+                            decoration: BoxDecoration(
+                              color: scheme.primary.withValues(alpha: 0.12),
+                              shape: BoxShape.circle,
+                            ),
+                            child: Text(
+                              'G',
+                              style: theme.textTheme.titleMedium?.copyWith(
+                                color: scheme.primary,
+                                fontWeight: FontWeight.w900,
+                              ),
+                            ),
+                          ),
+                          label: Text(AppStrings.t(context, 'login_google')),
+                        ),
+                        const SizedBox(height: 18),
+                        Divider(
+                          color: scheme.outline.withValues(alpha: 0.34),
+                        ),
+                        const SizedBox(height: 12),
+                        Row(
                           mainAxisAlignment: MainAxisAlignment.center,
                           children: [
                             Text(
@@ -364,8 +448,8 @@ class _LoginPageState extends State<LoginPage> {
                             ),
                           ],
                         ),
-                      ),
-                    ],
+                      ],
+                    ),
                   ),
                 ),
               ),
@@ -410,7 +494,7 @@ class _AuthBackdrop extends StatelessWidget {
             child: _GlowOrb(
               size: 210,
               color: const Color(0xFFB98D1A)
-                  .withValues(alpha: isDark ? 0.12 : 0.1),
+                  .withValues(alpha: isDark ? 0.12 : 0.10),
             ),
           ),
         ],
@@ -442,91 +526,92 @@ class _GlowOrb extends StatelessWidget {
   }
 }
 
-class _AuthHero extends StatelessWidget {
-  final String logoAsset;
-  final String badge;
-  final String title;
-  final String subtitle;
-  final List<String> chips;
+class _LoginMicroBadge extends StatelessWidget {
+  final String label;
+  final IconData icon;
 
-  const _AuthHero({
-    required this.logoAsset,
-    required this.badge,
-    required this.title,
-    required this.subtitle,
-    required this.chips,
+  const _LoginMicroBadge({
+    required this.label,
+    required this.icon,
   });
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final scheme = theme.colorScheme;
-
     return Container(
-      decoration: AppTheme.panelDecoration(context),
-      padding: const EdgeInsets.fromLTRB(22, 22, 22, 20),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+      decoration: BoxDecoration(
+        gradient: AppTheme.heroGradient,
+        borderRadius: BorderRadius.circular(999),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
         children: [
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-            decoration: BoxDecoration(
-              gradient: AppTheme.heroGradient,
-              borderRadius: BorderRadius.circular(999),
-            ),
-            child: Text(
-              badge,
-              style: theme.textTheme.labelMedium?.copyWith(
-                color: Colors.black,
-                fontWeight: FontWeight.w900,
-              ),
-            ),
-          ),
-          const SizedBox(height: 18),
-          Image.asset(
-            logoAsset,
-            width: Responsive.clampLogoWidth(context, max: 280, fraction: 0.58),
-          ),
-          const SizedBox(height: 18),
-          Text(title, style: theme.textTheme.titleLarge),
-          const SizedBox(height: 8),
+          Icon(icon, size: 16, color: Colors.black),
+          const SizedBox(width: 8),
           Text(
-            subtitle,
-            style: theme.textTheme.bodyMedium?.copyWith(
-              color: scheme.onSurfaceVariant,
-            ),
-          ),
-          const SizedBox(height: 16),
-          Wrap(
-            spacing: 8,
-            runSpacing: 8,
-            children: chips
-                .map(
-                  (chip) => Container(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 12,
-                      vertical: 8,
-                    ),
-                    decoration: BoxDecoration(
-                      color: scheme.surface.withValues(alpha: 0.7),
-                      borderRadius: BorderRadius.circular(999),
-                      border: Border.all(
-                        color: scheme.outline.withValues(alpha: 0.35),
-                      ),
-                    ),
-                    child: Text(
-                      chip,
-                      style: theme.textTheme.labelSmall?.copyWith(
-                        color: scheme.onSurface,
-                        fontWeight: FontWeight.w700,
-                      ),
-                    ),
-                  ),
-                )
-                .toList(),
+            label,
+            style: Theme.of(context).textTheme.labelMedium?.copyWith(
+                  color: Colors.black,
+                  fontWeight: FontWeight.w900,
+                ),
           ),
         ],
       ),
+    );
+  }
+}
+
+class _LoginAccentChip extends StatelessWidget {
+  final String label;
+  final IconData icon;
+
+  const _LoginAccentChip({
+    required this.label,
+    required this.icon,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+      decoration: AppTheme.tintedPanelDecoration(
+        context,
+        tint: scheme.primary,
+        radius: 999,
+        tintOpacity: 0.08,
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(icon, size: 15, color: scheme.primary),
+          const SizedBox(width: 8),
+          Text(
+            label,
+            style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                  color: AppTheme.textPrimary(context),
+                  fontWeight: FontWeight.w700,
+                ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _LoginSectionLabel extends StatelessWidget {
+  final String label;
+
+  const _LoginSectionLabel({required this.label});
+
+  @override
+  Widget build(BuildContext context) {
+    return Text(
+      label,
+      style: Theme.of(context).textTheme.labelMedium?.copyWith(
+            color: AppTheme.textPrimary(context),
+            fontWeight: FontWeight.w800,
+          ),
     );
   }
 }
@@ -562,7 +647,6 @@ class _LoginSuccessSplashState extends State<LoginSuccessSplash> {
   }
 
   Future<void> _startFlow() async {
-    // Wait for remote sync to finish (important for new devices/first login)
     await LocalStorageService.waitForSync(timeoutSeconds: 3);
 
     if (!mounted) return;
@@ -588,13 +672,11 @@ class _LoginSuccessSplashState extends State<LoginSuccessSplash> {
       final uid = LocalStorageService.currentUserId;
       if (uid == null || uid.isEmpty) return;
 
-      // Fixed bills (recurring) reminders
       final series = await FirestoreService.getFixedSeries(uid);
       for (final s in series) {
         await NotificationService.scheduleFixedSeriesReminder(s);
       }
 
-      // Credit card bill reminders
       final user = LocalStorageService.getUserProfile();
       final cards = user?.creditCards ?? const [];
       for (final card in cards) {

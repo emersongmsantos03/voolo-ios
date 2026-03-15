@@ -31,7 +31,6 @@ import 'package:jetx/core/utils/sensitive_display.dart';
 import 'package:jetx/utils/money_input.dart';
 import 'package:jetx/utils/date_utils.dart';
 import 'package:jetx/utils/finance_score_utils.dart';
-import 'package:jetx/widgets/educational_empty_state.dart';
 import 'package:jetx/widgets/money_visibility_button.dart';
 import 'package:jetx/widgets/modals/income_modal.dart';
 import 'package:jetx/widgets/premium_gate.dart';
@@ -2096,6 +2095,162 @@ class _DashboardPageState extends State<DashboardPage> {
     );
   }
 
+  Widget _buildSimpleSummaryCard(MonthlyDashboard d) {
+    Widget stat(String label, double value, Color color, IconData icon) {
+      return Expanded(
+        child: Container(
+          padding: const EdgeInsets.all(14),
+          decoration: AppTheme.tintedPanelDecoration(
+            context,
+            tint: color,
+            radius: 20,
+            tintOpacity: 0.08,
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  Icon(icon, size: 16, color: color),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      label,
+                      style: TextStyle(
+                        color: AppTheme.textSecondary(context),
+                        fontSize: 11,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 10),
+              Text(
+                SensitiveDisplay.money(context, value),
+                style: TextStyle(
+                  color: AppTheme.textPrimary(context),
+                  fontSize: 15,
+                  fontWeight: FontWeight.w800,
+                ),
+              ),
+            ],
+          ),
+        ),
+      );
+    }
+
+    return Container(
+      decoration: AppTheme.panelDecoration(context),
+      padding: const EdgeInsets.all(16),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            'Resumo do mes',
+            style: TextStyle(
+              color: AppTheme.textPrimary(context),
+              fontWeight: FontWeight.w800,
+              fontSize: 16,
+            ),
+          ),
+          const SizedBox(height: 6),
+          Text(
+            'Visao rapida das entradas e saidas principais.',
+            style: TextStyle(
+              color: AppTheme.textSecondary(context),
+              fontSize: 12,
+            ),
+          ),
+          const SizedBox(height: 14),
+          Row(
+            children: [
+              stat(
+                AppStrings.t(context, 'summary_fixed'),
+                d.fixedExpensesTotal,
+                AppTheme.danger,
+                Icons.lock_outline,
+              ),
+              const SizedBox(width: 10),
+              stat(
+                AppStrings.t(context, 'summary_variable'),
+                d.variableExpensesTotal,
+                AppTheme.warning,
+                Icons.shopping_bag_outlined,
+              ),
+            ],
+          ),
+          const SizedBox(height: 10),
+          Row(
+            children: [
+              stat(
+                AppStrings.t(context, 'summary_invest'),
+                d.investmentsTotal,
+                AppTheme.info,
+                Icons.savings_outlined,
+              ),
+              const SizedBox(width: 10),
+              stat(
+                AppStrings.t(context, 'summary_free'),
+                d.remainingSalary,
+                AppTheme.success,
+                Icons.account_balance_wallet_outlined,
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildSimpleEmptyState() {
+    return Container(
+      padding: const EdgeInsets.all(18),
+      decoration: AppTheme.panelDecoration(context),
+      child: Column(
+        children: [
+          Container(
+            width: 56,
+            height: 56,
+            decoration: BoxDecoration(
+              color:
+                  Theme.of(context).colorScheme.primary.withValues(alpha: 0.12),
+              shape: BoxShape.circle,
+            ),
+            child: Icon(
+              Icons.receipt_long_outlined,
+              color: Theme.of(context).colorScheme.primary,
+            ),
+          ),
+          const SizedBox(height: 14),
+          Text(
+            AppStrings.t(context, 'dashboard_empty_title'),
+            textAlign: TextAlign.center,
+            style: TextStyle(
+              color: AppTheme.textPrimary(context),
+              fontWeight: FontWeight.w800,
+              fontSize: 16,
+            ),
+          ),
+          const SizedBox(height: 8),
+          Text(
+            AppStrings.t(context, 'dashboard_empty_message'),
+            textAlign: TextAlign.center,
+            style: TextStyle(
+              color: AppTheme.textSecondary(context),
+              height: 1.4,
+            ),
+          ),
+          const SizedBox(height: 16),
+          ElevatedButton(
+            onPressed: _openAddMenu,
+            child: Text(AppStrings.t(context, 'dashboard_empty_cta')),
+          ),
+        ],
+      ),
+    );
+  }
+
   Widget _insightList() {
     if (_insights.isEmpty) return const SizedBox.shrink();
 
@@ -3514,20 +3669,6 @@ class _DashboardPageState extends State<DashboardPage> {
     final locale = Localizations.localeOf(context).toLanguageTag();
     final title = DateUtilsJetx.monthYear(_currentMonth, locale: locale);
 
-    final level = GamificationEngine.currentLevel(
-      xp: _user!.totalXp,
-      isPremium: _user!.isPremium,
-    );
-    final nextLevel = GamificationEngine.nextLevel(
-      xp: _user!.totalXp,
-      isPremium: _user!.isPremium,
-    );
-
-    final progress = nextLevel == null
-        ? 1.0
-        : ((_user!.totalXp - level.minXp) / (nextLevel.minXp - level.minXp))
-            .clamp(0.0, 1.0);
-
     return PopScope(
       canPop: false,
       onPopInvokedWithResult: (didPop, _) {
@@ -3602,79 +3743,14 @@ class _DashboardPageState extends State<DashboardPage> {
               children: [
                 _buildOverviewHero(d, title),
                 const SizedBox(height: 18),
-                if (!_user!.isPremium) ...[
-                  PremiumUpsellCard(
-                    perks: [
-                      AppStrings.t(context, 'score_title_month_tips'),
-                      AppStrings.t(context, 'premium_step_invest_title'),
-                      AppStrings.t(context, 'missions_premium_perk3'),
-                    ],
-                    onCta: _openPremium,
-                  ),
-                  const SizedBox(height: 18),
-                ],
-
-                // Progresso e niveis (Simplified for logic cleanup)
-                if (_user!.isPremium)
-                  _buildProgressCard(level, progress, nextLevel)
-                else
-                  _lockedFeatureCard(
-                    title: AppStrings.t(context, 'progress_levels_title'),
-                    subtitle: AppStrings.t(
-                      context,
-                      'progress_levels_locked_subtitle',
-                    ),
-                    icon: Icons.lock_outline,
-                  ),
+                _buildSimpleSummaryCard(d),
                 const SizedBox(height: 18),
-
-                if (_user!.isPremium)
-                  _buildScoreCard()
-                else
+                if (!_user!.isPremium)
                   _lockedFeatureCard(
                     title: AppStrings.t(context, 'score_title'),
                     subtitle: AppStrings.t(context, 'score_locked_subtitle'),
-                    icon: Icons.shield_outlined,
+                    icon: Icons.auto_awesome_outlined,
                   ),
-                const SizedBox(height: 18),
-                _buildDistributionCard(d),
-
-                const SizedBox(height: 16),
-                _SummaryRow(
-                  fixed: d.fixedExpensesTotal,
-                  variable: d.variableExpensesTotal,
-                  invest: d.investmentsTotal,
-                  free: d.remainingSalary,
-                  salary: d.salary,
-                ),
-
-                const SizedBox(height: 18),
-                if (_user!.isPremium)
-                  _comparisonCard(d)
-                else
-                  _lockedFeatureCard(
-                    title: AppStrings.t(context, 'compare_title'),
-                    subtitle: AppStrings.t(
-                      context,
-                      'compare_locked_subtitle',
-                    ),
-                    icon: Icons.compare_arrows,
-                  ),
-
-                const SizedBox(height: 18),
-                _creditCardBillsSection(d),
-                const SizedBox(height: 12),
-                Align(
-                  alignment: Alignment.centerLeft,
-                  child: TextButton.icon(
-                    onPressed: _addCard,
-                    icon: const Icon(Icons.add_card),
-                    label: Text(AppStrings.t(context, 'card_add')),
-                    style: TextButton.styleFrom(
-                      foregroundColor: Theme.of(context).colorScheme.primary,
-                    ),
-                  ),
-                ),
                 const SizedBox(height: 18),
                 Row(
                   children: [
@@ -3708,17 +3784,8 @@ class _DashboardPageState extends State<DashboardPage> {
                   ],
                 ),
                 const SizedBox(height: 10),
-
                 if (d.expenses.isEmpty)
-                  EducationalEmptyState(
-                    title: AppStrings.t(context, 'dashboard_empty_title'),
-                    message: AppStrings.t(context, 'dashboard_empty_message'),
-                    icon: Icons.receipt_long_outlined,
-                    action: ElevatedButton(
-                      onPressed: _openAddMenu,
-                      child: Text(AppStrings.t(context, 'dashboard_empty_cta')),
-                    ),
-                  )
+                  _buildSimpleEmptyState()
                 else
                   ...d.expenses.map(
                     (e) => _ExpenseTile(
