@@ -5,11 +5,6 @@ import 'package:http/http.dart' as http;
 
 import 'backend_config_service.dart';
 
-enum BillingPlatform {
-  googlePlay,
-  appStore,
-}
-
 class BillingException implements Exception {
   BillingException(this.code, {this.details});
 
@@ -22,6 +17,17 @@ class BillingException implements Exception {
 
 class BillingService {
   BillingService._();
+
+  static const String googlePlayUnifiedSubscriptionId = 'voolo_monthly';
+  static const String googlePlayMonthlySubscriptionId =
+      'voolo-premium-monthly';
+  static const String googlePlayYearlySubscriptionId =
+      'voolo-premium-yearly';
+  static const Set<String> supportedGooglePlaySubscriptionIds = {
+    googlePlayUnifiedSubscriptionId,
+    googlePlayMonthlySubscriptionId,
+    googlePlayYearlySubscriptionId,
+  };
 
   static Future<Map<String, dynamic>> _post(
     String path,
@@ -82,39 +88,5 @@ class BillingService {
       'purchaseToken': purchaseToken,
       'subscriptionId': subscriptionId,
     });
-  }
-
-  static Future<Map<String, dynamic>> syncAppStoreSubscription({
-    required String receiptData,
-    required String subscriptionId,
-    String? transactionId,
-  }) {
-    return _post('/billing/appstore/sync-subscription', {
-      'receiptData': receiptData,
-      'subscriptionId': subscriptionId,
-      if (transactionId != null && transactionId.isNotEmpty)
-        'transactionId': transactionId,
-    });
-  }
-
-  static Future<Map<String, dynamic>> syncSubscription({
-    required BillingPlatform platform,
-    required String verificationPayload,
-    required String subscriptionId,
-    String? transactionId,
-  }) {
-    switch (platform) {
-      case BillingPlatform.googlePlay:
-        return syncGooglePlaySubscription(
-          purchaseToken: verificationPayload,
-          subscriptionId: subscriptionId,
-        );
-      case BillingPlatform.appStore:
-        return syncAppStoreSubscription(
-          receiptData: verificationPayload,
-          subscriptionId: subscriptionId,
-          transactionId: transactionId,
-        );
-    }
   }
 }

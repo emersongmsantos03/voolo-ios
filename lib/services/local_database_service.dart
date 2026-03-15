@@ -16,24 +16,14 @@ class LocalDatabaseService {
   static const _seedAssetPath = 'assets/local_db_seed.json';
 
   static bool _initialized = false;
-  static bool _volatileStorageMode = false;
   static File? _dbFile;
   static Map<String, dynamic> _data = {};
 
   static Future<void> init() async {
     if (_initialized) return;
-    try {
-      final dir = await getApplicationDocumentsDirectory();
-      final path = join(dir.path, _dbFileName);
-      _dbFile = File(path);
-    } catch (_) {
-      // Fallback for unstable environments (e.g. remote simulator preview),
-      // where path_provider channel may be unavailable.
-      final fallbackDir = Directory.systemTemp.createTempSync('jetx_local_');
-      final path = join(fallbackDir.path, _dbFileName);
-      _dbFile = File(path);
-      _volatileStorageMode = true;
-    }
+    final dir = await getApplicationDocumentsDirectory();
+    final path = join(dir.path, _dbFileName);
+    _dbFile = File(path);
 
     await _loadOrSeed();
     _initialized = true;
@@ -86,25 +76,12 @@ class LocalDatabaseService {
       throw StateError('LocalDatabaseService.init() must be called first.');
     }
     final raw = jsonEncode(_data);
-    try {
-      await _dbFile!.writeAsString(raw);
-    } catch (_) {
-      // Keep app functional even if file persistence is not available.
-      if (!_volatileStorageMode) rethrow;
-    }
+    await _dbFile!.writeAsString(raw);
   }
 
   static void _ensureInit() {
     if (!_initialized) {
-      // Keep the app running even if initialization was skipped or failed.
-      _data = {
-        'users': <dynamic>[],
-        'dashboards': <dynamic>[],
-        'goals': <dynamic>[],
-        'settings': <String, dynamic>{},
-      };
-      _volatileStorageMode = true;
-      _initialized = true;
+      throw StateError('LocalDatabaseService.init() must be called first.');
     }
   }
 
@@ -179,43 +156,6 @@ class LocalDatabaseService {
       if (email == oldNormalized) {
         map['email'] = newEmail;
       }
-    }
-
-    await _persist();
-  }
-
-  static Future<void> deleteUserData({
-    String? email,
-    String? uid,
-  }) async {
-    _ensureInit();
-
-    final normalizedEmail = email?.trim().toLowerCase() ?? '';
-    if (normalizedEmail.isNotEmpty) {
-      final users = _data['users'] as List<dynamic>;
-      users.removeWhere((u) {
-        final map = u as Map<String, dynamic>;
-        return (map['email'] as String?)?.toLowerCase() == normalizedEmail;
-      });
-
-      final dashboards = _data['dashboards'] as List<dynamic>;
-      dashboards.removeWhere((d) {
-        final map = d as Map<String, dynamic>;
-        return map['email']?.toString().toLowerCase() == normalizedEmail;
-      });
-
-      final goals = _data['goals'] as List<dynamic>;
-      goals.removeWhere((g) {
-        final map = g as Map<String, dynamic>;
-        return map['email']?.toString().toLowerCase() == normalizedEmail;
-      });
-    }
-
-    final normalizedUid = uid?.trim() ?? '';
-    if (normalizedUid.isNotEmpty) {
-      final settings = _data['settings'] as Map<String, dynamic>;
-      settings.removeWhere((key, _) =>
-          key.endsWith(normalizedUid) || key.contains('_$normalizedUid'));
     }
 
     await _persist();

@@ -33,7 +33,7 @@ class BackendConfigService {
     if (_apiBaseFromEnv.trim().isNotEmpty) {
       return _apiBaseFromEnv.trim();
     }
-    // Legacy default kept for backward compatibility.
-    return 'https://us-central1-voolo-ad416.cloudfunctions.net/api';
+    // Dedicated billing function URL (isolated from generic /api routes).
+    return 'https://us-central1-voolo-ad416.cloudfunctions.net/billingApiUs';
   }
 }

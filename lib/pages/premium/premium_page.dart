@@ -1,11 +1,11 @@
 import 'dart:async';
+import 'dart:io';
 
-import 'package:flutter/foundation.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:in_app_purchase/in_app_purchase.dart';
-import 'package:url_launcher/url_launcher.dart';
+import 'package:in_app_purchase_android/in_app_purchase_android.dart';
 
-import '../../core/constants/auth_links.dart';
 import '../../core/localization/app_strings.dart';
 import '../../services/billing_service.dart';
 
@@ -21,10 +21,23 @@ class PremiumPage extends StatefulWidget {
   State<PremiumPage> createState() => _PremiumPageState();
 }
 
-class _PremiumPageState extends State<PremiumPage> {
-  static const String _monthlySubscriptionId = 'voolo-mensal';
-  static const String _yearlySubscriptionId = 'voolo-anual';
+class _PlanPurchaseOption {
+  const _PlanPurchaseOption({
+    required this.planKey,
+    required this.productId,
+    required this.productDetails,
+    required this.priceText,
+    this.offerToken,
+  });
 
+  final String planKey; // monthly | yearly
+  final String productId;
+  final ProductDetails productDetails;
+  final String priceText;
+  final String? offerToken;
+}
+
+class _PremiumPageState extends State<PremiumPage> {
   final InAppPurchase _iap = InAppPurchase.instance;
   StreamSubscription<List<PurchaseDetails>>? _purchaseSub;
 
@@ -33,32 +46,20 @@ class _PremiumPageState extends State<PremiumPage> {
   bool _working = false;
   String? _error;
 
-  final Map<String, ProductDetails> _productsById = {};
-  late String _selectedProductId;
+  final Map<String, _PlanPurchaseOption> _planOptions = {};
+  final Map<String, GooglePlayPurchaseDetails> _activeSubscriptionsByProductId =
+      {};
+  late String _selectedPlan; // monthly | yearly
 
   String _t(String key, String fallback) {
     final value = AppStrings.t(context, key);
     return value == key ? fallback : value;
   }
 
-  bool get _isStorePlatformSupported {
-    if (kIsWeb) return false;
-    return defaultTargetPlatform == TargetPlatform.android ||
-        defaultTargetPlatform == TargetPlatform.iOS;
-  }
-
-  String get _storeName {
-    return defaultTargetPlatform == TargetPlatform.iOS
-        ? 'App Store'
-        : 'Google Play';
-  }
-
   @override
   void initState() {
     super.initState();
-    _selectedProductId = widget.initialPlan == 'yearly'
-        ? _yearlySubscriptionId
-        : _monthlySubscriptionId;
+    _selectedPlan = widget.initialPlan == 'yearly' ? 'yearly' : 'monthly';
     _purchaseSub = _iap.purchaseStream.listen(
       _onPurchaseUpdates,
       onError: (_) {},
@@ -73,11 +74,11 @@ class _PremiumPageState extends State<PremiumPage> {
   }
 
   Future<void> _initStore() async {
-    if (!_isStorePlatformSupported) {
+    if (!Platform.isAndroid) {
       setState(() {
         _storeAvailable = false;
         _loading = false;
-        _error = 'unsupported-platform';
+        _error = 'android-only';
       });
       return;
     }
@@ -93,8 +94,13 @@ class _PremiumPageState extends State<PremiumPage> {
         return;
       }
 
-      final response = await _iap
-          .queryProductDetails({_monthlySubscriptionId, _yearlySubscriptionId});
+      final response = await _iap.queryProductDetails(
+        {
+          BillingService.googlePlayUnifiedSubscriptionId,
+          BillingService.googlePlayMonthlySubscriptionId,
+          BillingService.googlePlayYearlySubscriptionId,
+        },
+      );
 
       if (response.error != null) {
         setState(() {
@@ -105,18 +111,18 @@ class _PremiumPageState extends State<PremiumPage> {
         return;
       }
 
-      final products = <String, ProductDetails>{
-        for (final p in response.productDetails) p.id: p,
-      };
+      final options = _buildPlanOptions(response.productDetails);
 
       setState(() {
         _storeAvailable = true;
-        _productsById
+        _planOptions
           ..clear()
-          ..addAll(products);
+          ..addAll(options);
         _loading = false;
-        _error = products.isEmpty ? 'product-not-found' : null;
+        _error = options.isEmpty ? 'product-not-found' : null;
       });
+
+      await _loadPastPurchasesAndSync();
     } catch (_) {
       if (!mounted) return;
       setState(() {
@@ -127,11 +133,145 @@ class _PremiumPageState extends State<PremiumPage> {
     }
   }
 
+  Map<String, _PlanPurchaseOption> _buildPlanOptions(
+      List<ProductDetails> productDetails) {
+    final options = <String, _PlanPurchaseOption>{};
+
+    // Prefer unified subscription with base plans/offers.
+    for (final pd in productDetails) {
+      if (pd.id != BillingService.googlePlayUnifiedSubscriptionId) continue;
+      if (pd is! GooglePlayProductDetails) continue;
+
+      final index = pd.subscriptionIndex;
+      final offers = pd.productDetails.subscriptionOfferDetails;
+      if (index == null || offers == null || index >= offers.length) continue;
+
+      final offer = offers[index];
+      final planKey = _inferPlanFromOffer(
+        basePlanId: offer.basePlanId,
+        offerId: offer.offerId,
+        offerTags: offer.offerTags,
+        billingPeriods:
+            offer.pricingPhases.map((phase) => phase.billingPeriod).toList(),
+      );
+      if (planKey == null || options.containsKey(planKey)) continue;
+
+      options[planKey] = _PlanPurchaseOption(
+        planKey: planKey,
+        productId: pd.id,
+        productDetails: pd,
+        priceText: _extractOfferDisplayPrice(offer.pricingPhases, pd.price),
+        offerToken: pd.offerToken,
+      );
+    }
+
+    // Fallback to legacy product IDs when unified offers are unavailable.
+    ProductDetails? firstById(String id) {
+      for (final p in productDetails) {
+        if (p.id == id) return p;
+      }
+      return null;
+    }
+
+    final legacyMonthly =
+        firstById(BillingService.googlePlayMonthlySubscriptionId);
+    if (!options.containsKey('monthly') && legacyMonthly != null) {
+      options['monthly'] = _PlanPurchaseOption(
+        planKey: 'monthly',
+        productId: legacyMonthly.id,
+        productDetails: legacyMonthly,
+        priceText: legacyMonthly.price,
+      );
+    }
+
+    final legacyYearly = firstById(BillingService.googlePlayYearlySubscriptionId);
+    if (!options.containsKey('yearly') && legacyYearly != null) {
+      options['yearly'] = _PlanPurchaseOption(
+        planKey: 'yearly',
+        productId: legacyYearly.id,
+        productDetails: legacyYearly,
+        priceText: legacyYearly.price,
+      );
+    }
+
+    return options;
+  }
+
+  String? _inferPlanFromOffer({
+    required String basePlanId,
+    required String? offerId,
+    required List<String> offerTags,
+    required List<String> billingPeriods,
+  }) {
+    final normalized = <String>[
+      basePlanId,
+      offerId ?? '',
+      ...offerTags,
+    ].join(' ').toLowerCase();
+
+    if (normalized.contains('anual') ||
+        normalized.contains('yearly') ||
+        normalized.contains('year')) {
+      return 'yearly';
+    }
+    if (normalized.contains('mensal') ||
+        normalized.contains('monthly') ||
+        normalized.contains('month')) {
+      return 'monthly';
+    }
+
+    final joinedPeriods = billingPeriods.join(' ').toUpperCase();
+    if (joinedPeriods.contains('P1Y') || joinedPeriods.contains('P12M')) {
+      return 'yearly';
+    }
+    if (joinedPeriods.contains('P1M')) {
+      return 'monthly';
+    }
+    return null;
+  }
+
+  String _extractOfferDisplayPrice(List<dynamic> phases, String fallback) {
+    for (final phase in phases) {
+      final micros = (phase.priceAmountMicros as int?) ?? 0;
+      if (micros > 0) {
+        final formatted = (phase.formattedPrice as String?) ?? '';
+        if (formatted.trim().isNotEmpty) return formatted.trim();
+      }
+    }
+    return fallback;
+  }
+
+  Future<void> _loadPastPurchasesAndSync() async {
+    if (!Platform.isAndroid) return;
+    try {
+      final addition = _iap.getPlatformAddition<
+          InAppPurchaseAndroidPlatformAddition>();
+      final response = await addition.queryPastPurchases();
+      if (response.error != null) return;
+
+      for (final purchase in response.pastPurchases) {
+        if (!BillingService.supportedGooglePlaySubscriptionIds
+            .contains(purchase.productID)) {
+          continue;
+        }
+        _activeSubscriptionsByProductId[purchase.productID] = purchase;
+        await _syncPremium(purchase, showFeedback: false);
+      }
+    } catch (_) {
+      // Ignore on startup; user can still restore manually.
+    }
+  }
+
   Future<void> _restore() async {
     if (_working) return;
     setState(() => _working = true);
     try {
       await _iap.restorePurchases();
+      await _loadPastPurchasesAndSync();
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Compras restauradas e sincronizadas.')),
+      );
     } finally {
       if (mounted) setState(() => _working = false);
     }
@@ -139,13 +279,12 @@ class _PremiumPageState extends State<PremiumPage> {
 
   Future<void> _buySelectedPlan() async {
     if (_working) return;
-    final product = _productsById[_selectedProductId];
-    if (product == null) {
+    final option = _planOptions[_selectedPlan];
+    if (option == null) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content:
-              Text('Plano ainda nao disponivel na $_storeName para este app.'),
+        const SnackBar(
+          content: Text('Plano ainda nao disponivel no Google Play para este app.'),
         ),
       );
       return;
@@ -153,11 +292,36 @@ class _PremiumPageState extends State<PremiumPage> {
 
     setState(() => _working = true);
     try {
-      final param = PurchaseParam(productDetails: product);
+      final PurchaseParam param;
+      if (Platform.isAndroid) {
+        final oldSub = _findOldSubscriptionForTarget(option.productId);
+        final uid = FirebaseAuth.instance.currentUser?.uid;
+        param = GooglePlayPurchaseParam(
+          productDetails: option.productDetails,
+          applicationUserName: uid,
+          offerToken: option.offerToken,
+          changeSubscriptionParam: (oldSub != null &&
+                  oldSub.productID != option.productId)
+              ? ChangeSubscriptionParam(oldPurchaseDetails: oldSub)
+              : null,
+        );
+      } else {
+        param = PurchaseParam(productDetails: option.productDetails);
+      }
+
       await _iap.buyNonConsumable(purchaseParam: param);
     } finally {
       if (mounted) setState(() => _working = false);
     }
+  }
+
+  GooglePlayPurchaseDetails? _findOldSubscriptionForTarget(
+      String targetProductId) {
+    for (final entry in _activeSubscriptionsByProductId.entries) {
+      if (entry.key == targetProductId) continue;
+      return entry.value;
+    }
+    return null;
   }
 
   Future<void> _onPurchaseUpdates(List<PurchaseDetails> purchases) async {
@@ -173,6 +337,11 @@ class _PremiumPageState extends State<PremiumPage> {
 
       if (purchase.status == PurchaseStatus.purchased ||
           purchase.status == PurchaseStatus.restored) {
+        if (purchase is GooglePlayPurchaseDetails &&
+            BillingService.supportedGooglePlaySubscriptionIds
+                .contains(purchase.productID)) {
+          _activeSubscriptionsByProductId[purchase.productID] = purchase;
+        }
         await _syncPremium(purchase);
       }
 
@@ -182,61 +351,67 @@ class _PremiumPageState extends State<PremiumPage> {
     }
   }
 
-  Future<void> _syncPremium(PurchaseDetails purchase) async {
-    final verificationPayload =
+  Future<void> _syncPremium(
+    PurchaseDetails purchase, {
+    bool showFeedback = true,
+  }) async {
+    final purchaseToken =
         purchase.verificationData.serverVerificationData.toString().trim();
     final subscriptionId = purchase.productID.toString().trim();
-    if (verificationPayload.isEmpty || subscriptionId.isEmpty) return;
+    if (purchaseToken.isEmpty || subscriptionId.isEmpty) return;
 
-    final platform = defaultTargetPlatform == TargetPlatform.iOS
-        ? BillingPlatform.appStore
-        : BillingPlatform.googlePlay;
+    if (!BillingService.supportedGooglePlaySubscriptionIds
+        .contains(subscriptionId)) {
+      return;
+    }
 
     try {
-      final res = await BillingService.syncSubscription(
-        platform: platform,
-        verificationPayload: verificationPayload,
+      final res = await BillingService.syncGooglePlaySubscription(
+        purchaseToken: purchaseToken,
         subscriptionId: subscriptionId,
-        transactionId: purchase.purchaseID,
       );
       final granted = res['premiumGranted'] == true;
-      if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(
-            granted
-                ? _t('billing_premium_activated', 'Premium ativado!')
-                : 'Assinatura vinculada, mas sem Premium ativo.',
+      if (showFeedback && mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              granted
+                  ? _t('billing_premium_activated', 'Premium ativado!')
+                  : 'Assinatura vinculada, mas sem Premium ativo.',
+            ),
           ),
-        ),
-      );
+        );
+      }
     } on BillingException catch (_) {
-      if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Nao foi possivel validar a compra agora.'),
-        ),
-      );
+      if (showFeedback && mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Nao foi possivel validar a compra agora.'),
+          ),
+        );
+      }
     } catch (_) {
-      if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Erro ao sincronizar Premium.')),
-      );
+      if (showFeedback && mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Erro ao sincronizar Premium.')),
+        );
+      }
     }
   }
 
   Widget _planTile({
-    required String id,
+    required String planKey,
     required String title,
+    required String fallbackPrice,
     required String subtitle,
   }) {
     final scheme = Theme.of(context).colorScheme;
-    final selected = _selectedProductId == id;
-    final product = _productsById[id];
-    final priceText = product?.price ?? 'Preço indisponível no momento';
+    final selected = _selectedPlan == planKey;
+    final option = _planOptions[planKey];
+    final priceText = option?.priceText ?? fallbackPrice;
 
     return InkWell(
-      onTap: () => setState(() => _selectedProductId = id),
+      onTap: option == null ? null : () => setState(() => _selectedPlan = planKey),
       borderRadius: BorderRadius.circular(16),
       child: AnimatedContainer(
         duration: const Duration(milliseconds: 180),
@@ -282,6 +457,13 @@ class _PremiumPageState extends State<PremiumPage> {
                     subtitle,
                     style: TextStyle(color: scheme.onSurfaceVariant),
                   ),
+                  if (option == null) ...[
+                    const SizedBox(height: 6),
+                    Text(
+                      'Indisponivel no momento',
+                      style: TextStyle(color: scheme.error, fontSize: 12),
+                    ),
+                  ],
                 ],
               ),
             ),
@@ -289,12 +471,6 @@ class _PremiumPageState extends State<PremiumPage> {
         ),
       ),
     );
-  }
-
-  Future<void> _openExternalUrl(String url) async {
-    final uri = Uri.tryParse(url);
-    if (uri == null || uri.scheme.isEmpty) return;
-    await launchUrl(uri, mode: LaunchMode.externalApplication);
   }
 
   @override
@@ -330,31 +506,33 @@ class _PremiumPageState extends State<PremiumPage> {
                   const SizedBox(height: 16),
                   if (!_storeAvailable) ...[
                     Text(
-                      _error == 'unsupported-platform'
-                          ? 'Compras disponiveis apenas no Android e iOS.'
+                      _error == 'android-only'
+                          ? 'Disponivel apenas no Android.'
                           : 'Loja indisponivel.',
                       style: TextStyle(color: scheme.error),
                     ),
                   ] else ...[
                     _planTile(
-                      id: _monthlySubscriptionId,
+                      planKey: 'monthly',
                       title: 'Plano mensal',
+                      fallbackPrice: 'R\$ 29,90 / mes',
                       subtitle: 'Renovacao automatica. Cancele quando quiser.',
                     ),
                     const SizedBox(height: 10),
                     _planTile(
-                      id: _yearlySubscriptionId,
+                      planKey: 'yearly',
                       title: 'Plano anual',
+                      fallbackPrice: 'R\$ 299,90 / ano',
                       subtitle: 'Cobranca anual. Equivale a R\$ 24,99/mes.',
                     ),
                     const SizedBox(height: 14),
                     SizedBox(
                       height: 50,
                       child: ElevatedButton(
-                        onPressed: _working ||
-                                !_productsById.containsKey(_selectedProductId)
-                            ? null
-                            : _buySelectedPlan,
+                        onPressed:
+                            _working || _planOptions[_selectedPlan] == null
+                                ? null
+                                : _buySelectedPlan,
                         child: _working
                             ? const SizedBox(
                                 height: 18,
@@ -375,32 +553,9 @@ class _PremiumPageState extends State<PremiumPage> {
                     ),
                     const SizedBox(height: 10),
                     Text(
-                      'Pagamento sera cobrado na sua conta Apple ID na confirmacao da compra. A assinatura renova automaticamente ate cancelamento nas configuracoes da App Store.',
-                      style: TextStyle(
-                        color: scheme.onSurfaceVariant,
-                        fontSize: 12,
-                      ),
-                    ),
-                    const SizedBox(height: 10),
-                    Text(
                       'No plano anual voce paga uma vez por ano e continua com acesso premium por todos os meses do periodo.',
-                      style: TextStyle(
-                          color: scheme.onSurfaceVariant, fontSize: 12),
-                    ),
-                    const SizedBox(height: 10),
-                    Wrap(
-                      spacing: 4,
-                      children: [
-                        TextButton(
-                          onPressed: () => _openExternalUrl(AuthLinks.termsUrl),
-                          child: const Text('Termos de Uso'),
-                        ),
-                        TextButton(
-                          onPressed: () =>
-                              _openExternalUrl(AuthLinks.privacyUrl),
-                          child: const Text('Politica de Privacidade'),
-                        ),
-                      ],
+                      style:
+                          TextStyle(color: scheme.onSurfaceVariant, fontSize: 12),
                     ),
                   ],
                 ],

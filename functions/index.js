@@ -2,10 +2,21 @@ const functions = require('firebase-functions');
 const admin = require('firebase-admin');
 const nodemailer = require('nodemailer');
 const crypto = require('crypto');
+const { google } = require('googleapis');
 
 admin.initializeApp();
 
 const REGION = 'southamerica-east1';
+const PLAY_ANDROID_PUBLISHER_SCOPE = ['https://www.googleapis.com/auth/androidpublisher'];
+const SUPPORTED_PLAY_SUBSCRIPTION_IDS = new Set([
+  'voolo_monthly',
+  'voolo-premium-monthly',
+  'voolo-premium-yearly',
+]);
+const ACTIVE_SUBSCRIPTION_STATES = new Set([
+  'SUBSCRIPTION_STATE_ACTIVE',
+  'SUBSCRIPTION_STATE_IN_GRACE_PERIOD',
+]);
 const CODE_TTL_MS = 5 * 60 * 1000;
 const TOKEN_TTL_MS = 10 * 60 * 1000;
 const LINK_TTL_MS = 30 * 60 * 1000;
@@ -108,6 +119,149 @@ const requireAuth = async (req) => {
     const error = new Error('unauthenticated');
     error.code = 'unauthenticated';
     throw error;
+  }
+};
+
+const normalizeApiPath = (pathValue) => {
+  const raw = String(pathValue || '/').trim();
+  if (!raw) return '/';
+  const normalized = raw.replace(/\/+$/, '');
+  return normalized || '/';
+};
+
+const getPlayPackageName = () => {
+  const fromEnv = String(process.env.PLAY_PACKAGE_NAME || '').trim();
+  if (fromEnv) return fromEnv;
+  const fromConfig = String(getConfig()?.billing?.play_package_name || '').trim();
+  if (fromConfig) return fromConfig;
+  return 'com.voolo.app';
+};
+
+const getAndroidPublisherClient = async () => {
+  const auth = new google.auth.GoogleAuth({
+    scopes: PLAY_ANDROID_PUBLISHER_SCOPE,
+  });
+  const authClient = await auth.getClient();
+  return google.androidpublisher({
+    version: 'v3',
+    auth: authClient,
+  });
+};
+
+const parseRfc3339Date = (value) => {
+  if (!value) return null;
+  const d = new Date(String(value));
+  if (Number.isNaN(d.getTime())) return null;
+  return d;
+};
+
+const parseMillisDate = (value) => {
+  const n = Number(value);
+  if (!Number.isFinite(n) || n <= 0) return null;
+  const d = new Date(n);
+  if (Number.isNaN(d.getTime())) return null;
+  return d;
+};
+
+const isStateActive = (state) => ACTIVE_SUBSCRIPTION_STATES.has(String(state || '').trim().toUpperCase());
+
+const getLatestLineItemExpiry = (lineItems) => {
+  const items = Array.isArray(lineItems) ? lineItems : [];
+  let latest = null;
+  let productId = null;
+
+  for (const item of items) {
+    const expiry = parseRfc3339Date(item?.expiryTime);
+    if (!expiry) continue;
+    if (!latest || expiry.getTime() > latest.getTime()) {
+      latest = expiry;
+      productId = String(item?.productId || '').trim() || null;
+    }
+  }
+
+  return { expiryDate: latest, productId };
+};
+
+const normalizeGoogleErrorCode = (error) => {
+  const status = Number(error?.code || error?.response?.status || 0);
+  if (status === 401 || status === 403) return 'play-permission-denied';
+  if (status === 404) return 'play-subscription-not-found';
+  if (status === 429) return 'play-rate-limited';
+  if (status >= 500) return 'play-api-unavailable';
+  return 'play-verification-failed';
+};
+
+const verifyGooglePlaySubscription = async ({
+  packageName,
+  purchaseToken,
+  requestedSubscriptionId,
+}) => {
+  const publisher = await getAndroidPublisherClient();
+
+  try {
+    const v2 = await publisher.purchases.subscriptionsv2.get({
+      packageName,
+      token: purchaseToken,
+    });
+    const data = v2?.data || {};
+    const state = String(data.subscriptionState || '').trim().toUpperCase();
+    const latest = getLatestLineItemExpiry(data.lineItems);
+    const resolvedSubscriptionId =
+      String(latest.productId || requestedSubscriptionId || '').trim();
+
+    if (!resolvedSubscriptionId || !SUPPORTED_PLAY_SUBSCRIPTION_IDS.has(resolvedSubscriptionId)) {
+      const err = new Error('unsupported-subscription-id');
+      err.code = 'unsupported-subscription-id';
+      throw err;
+    }
+
+    const now = Date.now();
+    const expiryMs = latest.expiryDate?.getTime() || 0;
+    const notExpired = expiryMs > now;
+    const premiumGranted = notExpired && (isStateActive(state) || !state);
+
+    return {
+      source: 'subscriptionsv2',
+      subscriptionId: resolvedSubscriptionId,
+      subscriptionState: state || null,
+      premiumGranted,
+      premiumUntil: latest.expiryDate,
+      rawOrderId: String(data.latestOrderId || '').trim() || null,
+    };
+  } catch (v2Error) {
+    if (v2Error?.code === 'unsupported-subscription-id') throw v2Error;
+
+    try {
+      const v1 = await publisher.purchases.subscriptions.get({
+        packageName,
+        subscriptionId: requestedSubscriptionId,
+        token: purchaseToken,
+      });
+      const data = v1?.data || {};
+      const expiry = parseMillisDate(data.expiryTimeMillis);
+      const now = Date.now();
+      const premiumGranted = Boolean(expiry && expiry.getTime() > now);
+
+      const resolvedSubscriptionId = String(requestedSubscriptionId || '').trim();
+      if (!SUPPORTED_PLAY_SUBSCRIPTION_IDS.has(resolvedSubscriptionId)) {
+        const err = new Error('unsupported-subscription-id');
+        err.code = 'unsupported-subscription-id';
+        throw err;
+      }
+
+      return {
+        source: 'subscriptionsv1',
+        subscriptionId: resolvedSubscriptionId,
+        subscriptionState: null,
+        premiumGranted,
+        premiumUntil: expiry,
+        rawOrderId: String(data.orderId || '').trim() || null,
+      };
+    } catch (v1Error) {
+      const err = new Error(normalizeGoogleErrorCode(v1Error));
+      err.code = err.message;
+      throw err;
+    }
   }
 };
 
@@ -1530,3 +1684,160 @@ exports.computeInvestmentProfile = functions
       return sendError(res, 500, 'unknown');
     }
   });
+
+// ====== BILLING API (Google Play subscriptions) ======
+
+const billingApiHttpHandler = async (req, res) => {
+    if (!applyCors(req, res)) return;
+
+    const path = normalizeApiPath(req.path);
+    if (path !== '/billing/googleplay/sync-subscription') {
+      return sendError(res, 404, 'not-found');
+    }
+
+    if (req.method !== 'POST') {
+      return sendError(res, 405, 'method-not-allowed');
+    }
+
+    try {
+      const auth = await requireAuth(req);
+      const uid = String(auth?.uid || '').trim();
+      if (!uid) {
+        return sendError(res, 401, 'unauthenticated');
+      }
+
+      const purchaseToken = String(req.body?.data?.purchaseToken || '').trim();
+      const requestedSubscriptionId = String(req.body?.data?.subscriptionId || '').trim();
+
+      if (!purchaseToken || !requestedSubscriptionId) {
+        return sendError(res, 400, 'invalid-argument');
+      }
+      if (!SUPPORTED_PLAY_SUBSCRIPTION_IDS.has(requestedSubscriptionId)) {
+        return sendError(res, 400, 'unsupported-subscription-id');
+      }
+
+      const packageName = getPlayPackageName();
+      const verification = await verifyGooglePlaySubscription({
+        packageName,
+        purchaseToken,
+        requestedSubscriptionId,
+      });
+
+      const premiumGranted = verification.premiumGranted === true;
+      const premiumUntil =
+        verification.premiumUntil instanceof Date &&
+        !Number.isNaN(verification.premiumUntil.getTime())
+          ? verification.premiumUntil
+          : null;
+
+      const nowIso = new Date().toISOString();
+      const premiumPatch = {
+        isPremium: premiumGranted,
+        premium: premiumGranted,
+        premiumAtivo: premiumGranted,
+        plan: premiumGranted ? 'premium' : 'free',
+        premiumUntil: premiumUntil
+          ? admin.firestore.Timestamp.fromDate(premiumUntil)
+          : null,
+        premiumUpdatedAt: admin.firestore.FieldValue.serverTimestamp(),
+        premiumUpdatedBy: 'billing-googleplay',
+      };
+
+      const db = admin.firestore();
+      const userRef = db.collection('users').doc(uid);
+      await userRef.set(premiumPatch, { merge: true });
+
+      const authEmail = String(auth?.email || '').trim().toLowerCase();
+      if (authEmail) {
+        const legacyRef = db.collection('users').doc(authEmail);
+        const legacySnap = await legacyRef.get();
+        if (legacySnap.exists && legacyRef.id !== uid) {
+          await legacyRef.set(premiumPatch, { merge: true });
+        }
+      }
+
+      const purchaseTokenHash = crypto
+        .createHash('sha256')
+        .update(purchaseToken)
+        .digest('hex');
+
+      await userRef.collection('billingEvents').add({
+        provider: 'google_play',
+        action: 'sync_subscription',
+        source: verification.source,
+        packageName,
+        requestedSubscriptionId,
+        resolvedSubscriptionId: verification.subscriptionId,
+        subscriptionState: verification.subscriptionState,
+        premiumGranted,
+        premiumUntil: premiumUntil
+          ? admin.firestore.Timestamp.fromDate(premiumUntil)
+          : null,
+        purchaseTokenHash,
+        orderId: verification.rawOrderId,
+        createdAt: admin.firestore.FieldValue.serverTimestamp(),
+        createdBy: uid,
+      });
+
+      await userRef.collection('subscriptions').doc('google_play').set(
+        {
+          provider: 'google_play',
+          packageName,
+          subscriptionId: verification.subscriptionId,
+          requestedSubscriptionId,
+          subscriptionState: verification.subscriptionState,
+          premiumGranted,
+          premiumUntil: premiumUntil
+            ? admin.firestore.Timestamp.fromDate(premiumUntil)
+            : null,
+          purchaseTokenHash,
+          updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+          updatedBy: uid,
+        },
+        { merge: true }
+      );
+
+      return res.json({
+        premiumGranted,
+        premiumUntil: premiumUntil ? premiumUntil.toISOString() : null,
+        subscriptionId: verification.subscriptionId,
+        subscriptionState: verification.subscriptionState,
+        packageName,
+        source: verification.source,
+        syncedAt: nowIso,
+      });
+    } catch (error) {
+      const code = error?.code || error?.message || 'unknown';
+      if (code === 'unauthenticated') {
+        return sendError(res, 401, 'unauthenticated');
+      }
+      if (
+        code === 'invalid-argument' ||
+        code === 'unsupported-subscription-id'
+      ) {
+        return sendError(res, 400, code);
+      }
+      if (
+        code === 'play-permission-denied' ||
+        code === 'play-subscription-not-found' ||
+        code === 'play-rate-limited' ||
+        code === 'play-api-unavailable' ||
+        code === 'play-verification-failed'
+      ) {
+        return sendError(res, 502, code);
+      }
+      return sendError(res, 500, 'unknown');
+    }
+  };
+
+exports.api = functions
+  .region(REGION)
+  .https.onRequest(billingApiHttpHandler);
+
+exports.billingApi = functions
+  .region(REGION)
+  .https.onRequest(billingApiHttpHandler);
+
+exports.billingApiUs = functions
+  .region('us-central1')
+  .https.onRequest(billingApiHttpHandler);

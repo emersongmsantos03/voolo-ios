@@ -106,8 +106,7 @@ class AppStrings {
           'Alinhe gastos para fechar o mês no positivo',
       'mission_desc_daily_balance_repair':
           'Revise seus gastos planejados e faça ajustes para garantir saldo positivo.',
-      'mission_daily_variable_reflect':
-          'Liste 3 gastos variáveis para revisar',
+      'mission_daily_variable_reflect': 'Liste 3 gastos variáveis para revisar',
       'mission_desc_daily_variable_reflect':
           'Olhe seus gastos variáveis recentes e veja onde pode economizar.',
       'mission_daily_invest_review':
@@ -153,8 +152,7 @@ class AppStrings {
       'mission_monthly_simple_plan': 'Defina um plano simples',
       'mission_desc_monthly_simple_plan':
           'Crie uma meta básica de economia ou limite de gastos para o mês.',
-      'mission_monthly_balance_repair':
-          'Replaneje este mês para sair no verde',
+      'mission_monthly_balance_repair': 'Replaneje este mês para sair no verde',
       'mission_desc_monthly_balance_repair':
           'Faça cortes necessários agora para terminar o mês com saldo positivo.',
       'mission_monthly_variable_trim':
@@ -183,8 +181,7 @@ class AppStrings {
       'mission_objective_trip_low': 'Defina o custo total da viagem',
       'mission_objective_save_high': 'Automatize um valor para reserva',
       'mission_objective_save_low': 'Defina um valor mínimo para guardar',
-      'mission_objective_security_high':
-          'Monte 1 mês de reserva de emergência',
+      'mission_objective_security_high': 'Monte 1 mês de reserva de emergência',
       'mission_objective_security_low': 'Defina sua meta de reserva',
       'mission_objective_dream_high': 'Quebre seu sonho em 3 marcos',
       'mission_objective_dream_low': 'Defina o prazo do sonho',
@@ -243,7 +240,7 @@ class AppStrings {
       'reset_resend_wait': 'Aguarde 60 segundos para reenviar.',
       'reset_rate_limited': 'Muitas tentativas. Tente novamente mais tarde.',
       'login_google_not_ready':
-          'Google ainda nao configurado. No Firebase, configure Android (SHA-1 + google-services.json) e iOS (GoogleService-Info.plist + URL Scheme do REVERSED_CLIENT_ID).',
+          'Google ainda nao configurado. No Firebase, adicione o SHA-1 do Android e baixe novamente android/app/google-services.json.',
       'login_apple_not_ready': 'Login com Apple ainda não configurado.',
       'login_cancelled': 'Login cancelado.',
       'login_google': 'Entrar com Google',
@@ -471,8 +468,7 @@ class AppStrings {
       'cancel': 'Cancelar',
       'back': 'Voltar',
       'finish': 'Finalizar',
-      'onboarding_objectives_title':
-          'Para começar, quais são seus objetivos?',
+      'onboarding_objectives_title': 'Para começar, quais são seus objetivos?',
       'onboarding_objectives_subtitle':
           'Isso nos ajuda a sugerir metas e missões mais alinhadas com você.',
       'onboarding_objectives_required': 'Escolha pelo menos um objetivo.',
@@ -510,10 +506,8 @@ class AppStrings {
       'plan_title': 'Plano do mês',
       'plan_subtitle': 'Ações rápidas para melhorar seu mês.',
       'plan_next_action': 'Próxima ação',
-      'plan_action_variable':
-          'Reduza gastos variáveis para até 30% da renda.',
-      'plan_action_fixed':
-          'Traga os gastos fixos para no máximo 50% da renda.',
+      'plan_action_variable': 'Reduza gastos variáveis para até 30% da renda.',
+      'plan_action_fixed': 'Traga os gastos fixos para no máximo 50% da renda.',
       'plan_action_invest': 'Direcione {value} para investimentos.',
       'plan_action_ok': 'Você está equilibrado. Mantenha o ritmo.',
       'alert_title': 'Alertas inteligentes',
@@ -798,7 +792,7 @@ class AppStrings {
       'reset_resend_wait': 'Please wait 60 seconds to resend.',
       'reset_rate_limited': 'Too many attempts. Try again later.',
       'login_google_not_ready':
-          'Google login is not set up yet. In Firebase, configure Android (SHA-1 + google-services.json) and iOS (GoogleService-Info.plist + REVERSED_CLIENT_ID URL scheme).',
+          'Google login is not set up yet. In Firebase, add the Android SHA-1 and re-download android/app/google-services.json.',
       'login_apple_not_ready': 'Apple login is not set up yet.',
       'login_cancelled': 'Sign-in cancelled.',
       'login_google': 'Sign in with Google',
@@ -1337,7 +1331,7 @@ class AppStrings {
       'reset_resend_wait': 'Espera 60 segundos para reenviar.',
       'reset_rate_limited': 'Demasiados intentos. Intenta más tarde.',
       'login_google_not_ready':
-          'El inicio con Google aun no esta configurado. En Firebase, configura Android (SHA-1 + google-services.json) e iOS (GoogleService-Info.plist + URL Scheme REVERSED_CLIENT_ID).',
+          'El inicio con Google aun no esta configurado. En Firebase, agrega el SHA-1 de Android y vuelve a descargar android/app/google-services.json.',
       'login_apple_not_ready': 'El inicio con Apple aún no está configurado.',
       'login_cancelled': 'Inicio de sesion cancelado.',
       'login_google': 'Entrar con Google',
@@ -1446,21 +1440,18 @@ class AppStrings {
       'premium_tour_missions_title': 'Misiones premium',
       'premium_tour_missions_body':
           'Misiones diarias, semanales y mensuales para mantener constancia.',
-      'premium_tour_missions_location':
-          'Dónde está: menú lateral > Misiones.',
+      'premium_tour_missions_location': 'Dónde está: menú lateral > Misiones.',
       'premium_tour_missions_tip': 'Completa misiones y sigue tu XP.',
       'premium_tour_reports_title': 'Reportes premium',
       'premium_tour_reports_body':
           'Resumen mensual con totales y comparativos.',
-      'premium_tour_reports_location':
-          'Dónde está: menú lateral > Reportes.',
+      'premium_tour_reports_location': 'Dónde está: menú lateral > Reportes.',
       'premium_tour_reports_tip':
           'Cambia el mes arriba para comparar periodos.',
       'premium_tour_insights_title': 'Insights',
       'premium_tour_insights_body':
           'Alertas y sugerencias para equilibrar tus gastos.',
-      'premium_tour_insights_location':
-          'Dónde está: menú lateral > Insights.',
+      'premium_tour_insights_location': 'Dónde está: menú lateral > Insights.',
       'premium_tour_insights_tip': 'Sigue el foco principal y mejora tu mes.',
       'close': 'Cerrar',
       'user_label': 'Usuario',
@@ -1562,8 +1553,7 @@ class AppStrings {
       'cancel': 'Cancelar',
       'back': 'Atrás',
       'finish': 'Finalizar',
-      'onboarding_objectives_title':
-          'Para empezar, ¿cuáles son tus objetivos?',
+      'onboarding_objectives_title': 'Para empezar, ¿cuáles son tus objetivos?',
       'onboarding_objectives_subtitle':
           'Esto nos ayuda a sugerir metas y misiones más alineadas contigo.',
       'onboarding_objectives_required': 'Elige al menos un objetivo.',
@@ -1731,11 +1721,11 @@ class AppStrings {
     0x0192: 0x83, // ƒ
     0x201E: 0x84, // „
     0x2026: 0x85, // …
-    0x2020: 0x86, // �
+    0x2020: 0x86, // †
     0x2021: 0x87, // ‡
     0x02C6: 0x88, // ˆ
     0x2030: 0x89, // ‰
-    0x0160: 0x8A, // �
+    0x0160: 0x8A, // Š
     0x2039: 0x8B, // ‹
     0x0152: 0x8C, // Œ
     0x017D: 0x8E, // Ž

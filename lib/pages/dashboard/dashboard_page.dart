@@ -31,6 +31,7 @@ import 'package:jetx/core/utils/sensitive_display.dart';
 import 'package:jetx/utils/money_input.dart';
 import 'package:jetx/utils/date_utils.dart';
 import 'package:jetx/utils/finance_score_utils.dart';
+import 'package:jetx/widgets/educational_empty_state.dart';
 import 'package:jetx/widgets/money_visibility_button.dart';
 import 'package:jetx/widgets/modals/income_modal.dart';
 import 'package:jetx/widgets/premium_gate.dart';
@@ -62,11 +63,6 @@ class _DashboardPageState extends State<DashboardPage> {
   List<String> _timeline = [];
   StreamSubscription<List<Expense>>? _transactionsSubscription;
   StreamSubscription<List<DebtV2>>? _debtsSubscription;
-  String? _debtsSubscriptionUid;
-  String? _transactionsSubscriptionUid;
-  int? _transactionsSubscriptionMonth;
-  int? _transactionsSubscriptionYear;
-  String? _lastReminderSyncKey;
   bool _hasOpenDebts = false;
   bool _essentialGuideHandledInSession = false;
 
@@ -107,165 +103,51 @@ class _DashboardPageState extends State<DashboardPage> {
     super.dispose();
   }
 
-  void _cancelRealtimeSubscriptions() {
-    _transactionsSubscription?.cancel();
-    _transactionsSubscription = null;
-    _transactionsSubscriptionUid = null;
-    _transactionsSubscriptionMonth = null;
-    _transactionsSubscriptionYear = null;
-
-    _debtsSubscription?.cancel();
-    _debtsSubscription = null;
-    _debtsSubscriptionUid = null;
-  }
-
-  void _recomputeDerivedState() {
-    final user = _user;
-    final dashboard = _dashboard;
-    if (user == null || dashboard == null) {
-      _insights = [];
-      _score = 0;
-      _scoreStatus = 'critical';
-      _scoreResult = null;
-      _timeline = [];
-      return;
-    }
-
-    final plan = UserPlan.fromProfile(user);
-    final goals = LocalStorageService.getGoals();
-    _insights = _insightService.generateInsights(dashboard, goals, plan);
-
-    final housing = dashboard.expenses
-        .where((e) => e.category == ExpenseCategory.moradia && !e.isInvestment)
-        .fold(0.0, (sum, e) => sum + e.amount);
-
-    final result = FinanceScoreUtils.computeFinancialHealthScore(
-      income: dashboard.salary,
-      fixed: dashboard.fixedExpensesTotal,
-      variable: dashboard.variableExpensesTotal,
-      investContribution: dashboard.investmentsTotal,
-      hasOpenDebts: _hasOpenDebts,
-      housing: housing,
-      propertyValue: user.propertyValue,
-      investBalance: user.investBalance,
-    );
-    _score = result.score;
-    _scoreStatus = result.status;
-    _scoreResult = result;
-    _timeline = _getTimelineItems(dashboard);
-  }
-
-  void _ensureDebtsSubscription(String? uid) {
-    final normalizedUid = uid?.trim();
-    if (normalizedUid == _debtsSubscriptionUid) {
-      return;
-    }
-
-    _debtsSubscription?.cancel();
-    _debtsSubscription = null;
-    _debtsSubscriptionUid = normalizedUid;
-
-    if (normalizedUid == null || normalizedUid.isEmpty) {
-      _hasOpenDebts = false;
-      return;
-    }
-
-    _debtsSubscription = FirestoreService.watchDebts(normalizedUid).listen((
-      debts,
-    ) {
-      final hasOpen = debts.any(
-        (d) => d.status == 'ACTIVE' || d.status == 'NEGOTIATING',
-      );
-      if (!mounted || hasOpen == _hasOpenDebts) {
-        return;
-      }
-      setState(() {
-        _hasOpenDebts = hasOpen;
-        _recomputeDerivedState();
-      });
-    });
-  }
-
-  void _ensureTransactionsSubscription({
-    required String? uid,
-    required int month,
-    required int year,
-  }) {
-    final normalizedUid = uid?.trim();
-    if (_transactionsSubscriptionUid == normalizedUid &&
-        _transactionsSubscriptionMonth == month &&
-        _transactionsSubscriptionYear == year) {
-      return;
-    }
-
-    _transactionsSubscription?.cancel();
-    _transactionsSubscription = null;
-    _transactionsSubscriptionUid = normalizedUid;
-    _transactionsSubscriptionMonth = month;
-    _transactionsSubscriptionYear = year;
-
-    _transactionsSubscription = LocalStorageService.watchTransactions(
-      month,
-      year,
-    ).listen((txs) {
-      if (!mounted) return;
-      setState(() {
-        final dashboard = _dashboard;
-        if (dashboard == null) {
-          return;
-        }
-        _dashboard = dashboard.copyWith(expenses: txs);
-        _recomputeDerivedState();
-      });
-    });
-  }
-
-  String _buildReminderSyncKey(UserProfile user, MonthlyDashboard? dashboard) {
-    final cardsKey =
-        user.creditCards.map((card) => '${card.id}:${card.dueDay}').join('|');
-    final expensesKey = dashboard == null
-        ? ''
-        : dashboard.expenses
-            .where(
-              (expense) =>
-                  expense.isFixed &&
-                  !expense.isCreditCard &&
-                  expense.dueDay != null,
-            )
-            .map(
-              (expense) =>
-                  '${expense.id}:${expense.dueDay}:${expense.date.year}-${expense.date.month}',
-            )
-            .join('|');
-    return '${LocalStorageService.currentUserId}|'
-        '${_currentMonth.year}-${_currentMonth.month}|'
-        '$cardsKey|$expensesKey';
-  }
-
   void _load() {
-    final nextUser = LocalStorageService.getUserProfile();
+    _user = LocalStorageService.getUserProfile();
 
-    if (nextUser == null) {
-      _cancelRealtimeSubscriptions();
+    if (_user == null) {
       setState(() {
-        _user = null;
         _dashboard = null;
-        _insights = [];
-        _timeline = [];
-        _score = 0;
-        _scoreResult = null;
-        _hasOpenDebts = false;
       });
       _wasPremium = false;
-      _lastReminderSyncKey = null;
       return;
     }
 
-    _user = nextUser;
-    _checkPremiumActivation(nextUser);
+    _checkPremiumActivation(_user!);
 
     final uid = LocalStorageService.currentUserId;
-    _ensureDebtsSubscription(uid);
+    _debtsSubscription?.cancel();
+    if (uid != null && uid.isNotEmpty) {
+      _debtsSubscription = FirestoreService.watchDebts(uid).listen((debts) {
+        final hasOpen = debts.any(
+          (d) => d.status == 'ACTIVE' || d.status == 'NEGOTIATING',
+        );
+        if (!mounted) return;
+        if (hasOpen == _hasOpenDebts) return;
+        setState(() {
+          _hasOpenDebts = hasOpen;
+          if (_dashboard == null || _user == null) return;
+          final housing = _dashboard!.expenses
+              .where((e) =>
+                  e.category == ExpenseCategory.moradia && !e.isInvestment)
+              .fold(0.0, (sum, e) => sum + e.amount);
+          final result = FinanceScoreUtils.computeFinancialHealthScore(
+            income: _dashboard!.salary,
+            fixed: _dashboard!.fixedExpensesTotal,
+            variable: _dashboard!.variableExpensesTotal,
+            investContribution: _dashboard!.investmentsTotal,
+            hasOpenDebts: _hasOpenDebts,
+            housing: housing,
+            propertyValue: _user?.propertyValue ?? 0.0,
+            investBalance: _user?.investBalance,
+          );
+          _score = result.score;
+          _scoreStatus = result.status;
+          _scoreResult = result;
+        });
+      });
+    }
 
     final existing = LocalStorageService.getDashboard(
       _currentMonth.month,
@@ -300,19 +182,65 @@ class _DashboardPageState extends State<DashboardPage> {
       LocalStorageService.saveDashboard(_dashboard!);
     }
 
-    _ensureTransactionsSubscription(
-      uid: uid,
-      month: _currentMonth.month,
-      year: _currentMonth.year,
+    // Subscribe to transactions for real-time updates
+    _transactionsSubscription?.cancel();
+    _transactionsSubscription = LocalStorageService.watchTransactions(
+      _currentMonth.month,
+      _currentMonth.year,
+    ).listen((txs) {
+      if (!mounted) return;
+      setState(() {
+        _dashboard = _dashboard!.copyWith(expenses: txs);
+
+        final plan = UserPlan.fromProfile(_user);
+        final goals = LocalStorageService.getGoals();
+        _insights = _insightService.generateInsights(_dashboard!, goals, plan);
+
+        final housing = _dashboard!.expenses
+            .where(
+                (e) => e.category == ExpenseCategory.moradia && !e.isInvestment)
+            .fold(0.0, (sum, e) => sum + e.amount);
+
+        final result = FinanceScoreUtils.computeFinancialHealthScore(
+          income: _dashboard!.salary,
+          fixed: _dashboard!.fixedExpensesTotal,
+          variable: _dashboard!.variableExpensesTotal,
+          investContribution: _dashboard!.investmentsTotal,
+          hasOpenDebts: _hasOpenDebts,
+          housing: housing,
+          propertyValue: _user?.propertyValue ?? 0.0,
+          investBalance: _user?.investBalance,
+        );
+        _score = result.score;
+        _scoreStatus = result.status;
+        _scoreResult = result;
+        _timeline = _getTimelineItems(_dashboard!);
+      });
+    });
+
+    final plan = UserPlan.fromProfile(_user);
+    final goals = LocalStorageService.getGoals();
+    _insights = _insightService.generateInsights(_dashboard!, goals, plan);
+
+    final housingInit = _dashboard!.expenses
+        .where((e) => e.category == ExpenseCategory.moradia && !e.isInvestment)
+        .fold(0.0, (sum, e) => sum + e.amount);
+
+    final result = FinanceScoreUtils.computeFinancialHealthScore(
+      income: _dashboard!.salary,
+      fixed: _dashboard!.fixedExpensesTotal,
+      variable: _dashboard!.variableExpensesTotal,
+      investContribution: _dashboard!.investmentsTotal,
+      hasOpenDebts: _hasOpenDebts,
+      housing: housingInit,
+      propertyValue: _user?.propertyValue ?? 0.0,
+      investBalance: _user?.investBalance,
     );
-
-    _recomputeDerivedState();
-
-    final reminderKey = _buildReminderSyncKey(nextUser, _dashboard);
-    if (_lastReminderSyncKey != reminderKey) {
-      _lastReminderSyncKey = reminderKey;
-      unawaited(_syncDueReminders());
-    }
+    _score = result.score;
+    _scoreStatus = result.status;
+    _scoreResult = result;
+    _timeline = _getTimelineItems(_dashboard!);
+    unawaited(_syncDueReminders());
 
     setState(() {});
     if (!_essentialGuideHandledInSession) {
@@ -1688,569 +1616,6 @@ class _DashboardPageState extends State<DashboardPage> {
     }
   }
 
-  Widget _overviewStatChip(
-    BuildContext context, {
-    required IconData icon,
-    required String label,
-    required String value,
-  }) {
-    final scheme = Theme.of(context).colorScheme;
-    return Expanded(
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
-        decoration: AppTheme.tintedPanelDecoration(
-          context,
-          tint: scheme.primary,
-          radius: 20,
-          tintOpacity: 0.1,
-        ),
-        child: Row(
-          children: [
-            Container(
-              width: 38,
-              height: 38,
-              decoration: BoxDecoration(
-                color: scheme.primary.withValues(alpha: 0.16),
-                borderRadius: BorderRadius.circular(14),
-              ),
-              child: Icon(icon, size: 18, color: scheme.primary),
-            ),
-            const SizedBox(width: 10),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    label,
-                    style: TextStyle(
-                      color: AppTheme.textMuted(context),
-                      fontSize: 11,
-                      fontWeight: FontWeight.w700,
-                    ),
-                  ),
-                  const SizedBox(height: 2),
-                  Text(
-                    value,
-                    style: TextStyle(
-                      color: AppTheme.textPrimary(context),
-                      fontSize: 14,
-                      fontWeight: FontWeight.w800,
-                      letterSpacing: -0.2,
-                    ),
-                    overflow: TextOverflow.ellipsis,
-                  ),
-                ],
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _buildOverviewHero(MonthlyDashboard d, String title) {
-    final scheme = Theme.of(context).colorScheme;
-    final isPremium = _user?.isPremium ?? false;
-
-    return Container(
-      padding: EdgeInsets.all(Responsive.isCompactPhone(context) ? 18 : 22),
-      decoration: AppTheme.panelDecoration(context, highlighted: true),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              Container(
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                decoration: BoxDecoration(
-                  gradient: AppTheme.heroGradient,
-                  borderRadius: BorderRadius.circular(999),
-                ),
-                child: Text(
-                  title,
-                  style: const TextStyle(
-                    color: Colors.black,
-                    fontSize: 12,
-                    fontWeight: FontWeight.w900,
-                  ),
-                ),
-              ),
-              const Spacer(),
-              Container(
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                decoration: BoxDecoration(
-                  color: scheme.surface.withValues(alpha: 0.65),
-                  borderRadius: BorderRadius.circular(999),
-                  border: Border.all(
-                    color: scheme.outline.withValues(alpha: 0.35),
-                  ),
-                ),
-                child: Text(
-                  isPremium ? 'Premium' : 'Plano Free',
-                  style: TextStyle(
-                    color: AppTheme.textPrimary(context),
-                    fontWeight: FontWeight.w800,
-                    fontSize: 12,
-                  ),
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 18),
-          Text(
-            AppStrings.t(context, 'month_salary'),
-            style: TextStyle(
-              color: AppTheme.textSecondary(context),
-              fontWeight: FontWeight.w700,
-            ),
-          ),
-          const SizedBox(height: 6),
-          Row(
-            crossAxisAlignment: CrossAxisAlignment.end,
-            children: [
-              Expanded(
-                child: Text(
-                  SensitiveDisplay.money(context, d.salary),
-                  style: TextStyle(
-                    color: AppTheme.textPrimary(context),
-                    fontSize: Responsive.isCompactPhone(context) ? 28 : 34,
-                    fontWeight: FontWeight.w900,
-                    letterSpacing: -1.0,
-                  ),
-                ),
-              ),
-              const SizedBox(width: 12),
-              OutlinedButton.icon(
-                onPressed: _openIncomeEditorPopup,
-                icon: const Icon(Icons.edit_outlined, size: 18),
-                label: const Text('Editar'),
-                style: OutlinedButton.styleFrom(
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
-                  side: BorderSide(
-                    color: scheme.outline.withValues(alpha: 0.7),
-                  ),
-                  backgroundColor: scheme.surface.withValues(alpha: 0.72),
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 12),
-          Text(
-            'Resumo rápido do que entrou, saiu e do espaço livre para agir neste mês.',
-            style: TextStyle(
-              color: AppTheme.textSecondary(context),
-              height: 1.4,
-            ),
-          ),
-          const SizedBox(height: 18),
-          Container(
-            height: 1,
-            color: scheme.outline.withValues(alpha: 0.28),
-          ),
-          const SizedBox(height: 18),
-          Row(
-            children: [
-              _overviewStatChip(
-                context,
-                icon: Icons.account_balance_wallet_outlined,
-                label: AppStrings.t(context, 'summary_free'),
-                value: SensitiveDisplay.money(context, d.remainingSalary),
-              ),
-              const SizedBox(width: 10),
-              _overviewStatChip(
-                context,
-                icon: Icons.savings_outlined,
-                label: AppStrings.t(context, 'summary_invest'),
-                value: SensitiveDisplay.money(context, d.investmentsTotal),
-              ),
-            ],
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildScoreCard() {
-    final tint = _scoreColor(_scoreStatus);
-    return InkWell(
-      onTap: _openInsights,
-      borderRadius: BorderRadius.circular(24),
-      child: Container(
-        padding: EdgeInsets.all(Responsive.isCompactPhone(context) ? 16 : 24),
-        decoration: AppTheme.tintedPanelDecoration(
-          context,
-          tint: tint,
-          radius: 24,
-          tintOpacity: 0.12,
-        ),
-        child: Row(
-          children: [
-            Container(
-              width: 96,
-              height: 96,
-              decoration: BoxDecoration(
-                color: Theme.of(context)
-                    .colorScheme
-                    .surface
-                    .withValues(alpha: 0.72),
-                shape: BoxShape.circle,
-                border: Border.all(color: tint.withValues(alpha: 0.18)),
-              ),
-              child: Stack(
-                alignment: Alignment.center,
-                children: [
-                  SizedBox(
-                    width: 80,
-                    height: 80,
-                    child: CircularProgressIndicator(
-                      value: _score / 100,
-                      strokeWidth: 8,
-                      backgroundColor: tint.withValues(alpha: 0.12),
-                      valueColor: AlwaysStoppedAnimation<Color>(tint),
-                    ),
-                  ),
-                  Column(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      Text(
-                        '$_score',
-                        style: TextStyle(
-                          color: AppTheme.textPrimary(context),
-                          fontWeight: FontWeight.w900,
-                          fontSize: 24,
-                        ),
-                      ),
-                      Text(
-                        '100',
-                        style: TextStyle(
-                          color: AppTheme.textMuted(context),
-                          fontSize: 11,
-                          fontWeight: FontWeight.w700,
-                        ),
-                      ),
-                    ],
-                  ),
-                ],
-              ),
-            ),
-            const SizedBox(width: 20),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Container(
-                    padding:
-                        const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-                    decoration: BoxDecoration(
-                      color: tint.withValues(alpha: 0.12),
-                      borderRadius: BorderRadius.circular(999),
-                    ),
-                    child: Text(
-                      AppStrings.t(context, 'score_title'),
-                      style: TextStyle(
-                        color: tint,
-                        fontWeight: FontWeight.w800,
-                        fontSize: 11,
-                      ),
-                    ),
-                  ),
-                  const SizedBox(height: 10),
-                  Text(
-                    AppStrings.t(context, 'score_health_label'),
-                    style: TextStyle(
-                      color: AppTheme.textPrimary(context),
-                      fontWeight: FontWeight.w800,
-                      fontSize: 18,
-                      letterSpacing: -0.5,
-                    ),
-                  ),
-                  const SizedBox(height: 6),
-                  Text(
-                    FinanceScoreUtils.localizeTip(
-                      _scoreResult ??
-                          HealthScoreResult(
-                            score: 0,
-                            status: 'critical',
-                            tip: '',
-                            tipKey: 'score_tip_add_income',
-                            needsIncome: true,
-                          ),
-                      tr: (key, params) => AppStrings.tr(context, key, params),
-                    ),
-                    style: TextStyle(
-                      color: AppTheme.textSecondary(context),
-                      fontSize: 13,
-                      height: 1.45,
-                    ),
-                  ),
-                ],
-              ),
-            ),
-            const SizedBox(width: 12),
-            Container(
-              width: 38,
-              height: 38,
-              decoration: BoxDecoration(
-                color: Theme.of(context)
-                    .colorScheme
-                    .surface
-                    .withValues(alpha: 0.78),
-                shape: BoxShape.circle,
-                border: Border.all(color: tint.withValues(alpha: 0.18)),
-              ),
-              child: Icon(Icons.chevron_right, color: tint),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _buildDistributionCard(MonthlyDashboard d) {
-    Widget legendItem(String label, Color color) {
-      return Container(
-        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
-        decoration: AppTheme.tintedPanelDecoration(
-          context,
-          tint: color,
-          radius: 999,
-          tintOpacity: 0.08,
-        ),
-        child: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Container(
-              width: 8,
-              height: 8,
-              decoration: BoxDecoration(color: color, shape: BoxShape.circle),
-            ),
-            const SizedBox(width: 8),
-            Text(
-              label,
-              style: TextStyle(
-                color: AppTheme.textSecondary(context),
-                fontSize: 11,
-                fontWeight: FontWeight.w700,
-              ),
-            ),
-          ],
-        ),
-      );
-    }
-
-    return Container(
-      decoration: AppTheme.panelDecoration(context),
-      padding: const EdgeInsets.all(16),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            'Distribuicao do mes',
-            style: TextStyle(
-              color: AppTheme.textPrimary(context),
-              fontWeight: FontWeight.w800,
-              fontSize: 16,
-            ),
-          ),
-          const SizedBox(height: 6),
-          Text(
-            'Distribuicao do mes por tipo de gasto.',
-            style: TextStyle(
-              color: AppTheme.textSecondary(context),
-              fontSize: 12,
-            ),
-          ),
-          const SizedBox(height: 14),
-          Wrap(
-            spacing: 8,
-            runSpacing: 8,
-            children: [
-              legendItem(
-                  AppStrings.t(context, 'summary_fixed'), AppTheme.danger),
-              legendItem(
-                  AppStrings.t(context, 'summary_variable'), AppTheme.warning),
-              legendItem(
-                  AppStrings.t(context, 'summary_invest'), AppTheme.info),
-              legendItem(
-                  AppStrings.t(context, 'summary_free'), AppTheme.success),
-            ],
-          ),
-          const SizedBox(height: 14),
-          SizedBox(
-            height: 220,
-            child: PieChart(
-              PieChartData(
-                sectionsSpace: 3,
-                centerSpaceRadius: 50,
-                sections: _sections(d),
-              ),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildSimpleSummaryCard(MonthlyDashboard d) {
-    Widget stat(String label, double value, Color color, IconData icon) {
-      return Expanded(
-        child: Container(
-          padding: const EdgeInsets.all(14),
-          decoration: AppTheme.tintedPanelDecoration(
-            context,
-            tint: color,
-            radius: 20,
-            tintOpacity: 0.08,
-          ),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Row(
-                children: [
-                  Icon(icon, size: 16, color: color),
-                  const SizedBox(width: 8),
-                  Expanded(
-                    child: Text(
-                      label,
-                      style: TextStyle(
-                        color: AppTheme.textSecondary(context),
-                        fontSize: 11,
-                        fontWeight: FontWeight.w700,
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 10),
-              Text(
-                SensitiveDisplay.money(context, value),
-                style: TextStyle(
-                  color: AppTheme.textPrimary(context),
-                  fontSize: 15,
-                  fontWeight: FontWeight.w800,
-                ),
-              ),
-            ],
-          ),
-        ),
-      );
-    }
-
-    return Container(
-      decoration: AppTheme.panelDecoration(context),
-      padding: const EdgeInsets.all(16),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            'Resumo do mes',
-            style: TextStyle(
-              color: AppTheme.textPrimary(context),
-              fontWeight: FontWeight.w800,
-              fontSize: 16,
-            ),
-          ),
-          const SizedBox(height: 6),
-          Text(
-            'Visao rapida das entradas e saidas principais.',
-            style: TextStyle(
-              color: AppTheme.textSecondary(context),
-              fontSize: 12,
-            ),
-          ),
-          const SizedBox(height: 14),
-          Row(
-            children: [
-              stat(
-                AppStrings.t(context, 'summary_fixed'),
-                d.fixedExpensesTotal,
-                AppTheme.danger,
-                Icons.lock_outline,
-              ),
-              const SizedBox(width: 10),
-              stat(
-                AppStrings.t(context, 'summary_variable'),
-                d.variableExpensesTotal,
-                AppTheme.warning,
-                Icons.shopping_bag_outlined,
-              ),
-            ],
-          ),
-          const SizedBox(height: 10),
-          Row(
-            children: [
-              stat(
-                AppStrings.t(context, 'summary_invest'),
-                d.investmentsTotal,
-                AppTheme.info,
-                Icons.savings_outlined,
-              ),
-              const SizedBox(width: 10),
-              stat(
-                AppStrings.t(context, 'summary_free'),
-                d.remainingSalary,
-                AppTheme.success,
-                Icons.account_balance_wallet_outlined,
-              ),
-            ],
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildSimpleEmptyState() {
-    return Container(
-      padding: const EdgeInsets.all(18),
-      decoration: AppTheme.panelDecoration(context),
-      child: Column(
-        children: [
-          Container(
-            width: 56,
-            height: 56,
-            decoration: BoxDecoration(
-              color:
-                  Theme.of(context).colorScheme.primary.withValues(alpha: 0.12),
-              shape: BoxShape.circle,
-            ),
-            child: Icon(
-              Icons.receipt_long_outlined,
-              color: Theme.of(context).colorScheme.primary,
-            ),
-          ),
-          const SizedBox(height: 14),
-          Text(
-            AppStrings.t(context, 'dashboard_empty_title'),
-            textAlign: TextAlign.center,
-            style: TextStyle(
-              color: AppTheme.textPrimary(context),
-              fontWeight: FontWeight.w800,
-              fontSize: 16,
-            ),
-          ),
-          const SizedBox(height: 8),
-          Text(
-            AppStrings.t(context, 'dashboard_empty_message'),
-            textAlign: TextAlign.center,
-            style: TextStyle(
-              color: AppTheme.textSecondary(context),
-              height: 1.4,
-            ),
-          ),
-          const SizedBox(height: 16),
-          ElevatedButton(
-            onPressed: _openAddMenu,
-            child: Text(AppStrings.t(context, 'dashboard_empty_cta')),
-          ),
-        ],
-      ),
-    );
-  }
-
   Widget _insightList() {
     if (_insights.isEmpty) return const SizedBox.shrink();
 
@@ -2761,8 +2126,14 @@ class _DashboardPageState extends State<DashboardPage> {
     final prev = _previousMonthDashboard();
     if (prev == null) {
       return Container(
-        padding: const EdgeInsets.all(18),
-        decoration: AppTheme.panelDecoration(context, radius: 24),
+        padding: const EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          color: Theme.of(context).colorScheme.surface,
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(
+            color: Theme.of(context).colorScheme.outline.withValues(alpha: 0.6),
+          ),
+        ),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
@@ -2783,62 +2154,40 @@ class _DashboardPageState extends State<DashboardPage> {
       );
     }
 
-    Widget row(
-      String label,
-      double current,
-      double previous,
-      Color color, {
-      bool increaseIsGood = false,
-    }) {
+    Widget row(String label, double current, double previous, Color color) {
       final diff = current - previous;
       final up = diff > 0;
-      final trendColor =
-          up == increaseIsGood ? AppTheme.success : AppTheme.danger;
-      return Container(
-        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-        decoration: AppTheme.tintedPanelDecoration(
-          context,
-          tint: color,
-          radius: 18,
-          tintOpacity: 0.08,
-        ),
-        child: Row(
-          children: [
-            Expanded(
-              child: Text(
-                label,
-                style: TextStyle(
-                  color: AppTheme.textSecondary(context),
-                  fontWeight: FontWeight.w700,
-                ),
-              ),
-            ),
-            Container(
-              width: 28,
-              height: 28,
-              decoration: BoxDecoration(
-                color: trendColor.withValues(alpha: 0.12),
-                shape: BoxShape.circle,
-              ),
-              child: Icon(
+      return Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          Text(label, style: TextStyle(color: AppTheme.textSecondary(context))),
+          Row(
+            children: [
+              Icon(
                 up ? Icons.arrow_upward : Icons.arrow_downward,
                 size: 14,
-                color: trendColor,
+                color: up ? AppTheme.danger : AppTheme.success,
               ),
-            ),
-            const SizedBox(width: 8),
-            Text(
-              SensitiveDisplay.money(context, diff.abs()),
-              style: TextStyle(color: color, fontWeight: FontWeight.w700),
-            ),
-          ],
-        ),
+              const SizedBox(width: 4),
+              Text(
+                SensitiveDisplay.money(context, diff.abs()),
+                style: TextStyle(color: color, fontWeight: FontWeight.w600),
+              ),
+            ],
+          ),
+        ],
       );
     }
 
     return Container(
-      padding: const EdgeInsets.all(18),
-      decoration: AppTheme.panelDecoration(context, radius: 24),
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: Theme.of(context).colorScheme.surface,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(
+          color: Theme.of(context).colorScheme.outline.withValues(alpha: 0.6),
+        ),
+      ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -2849,14 +2198,6 @@ class _DashboardPageState extends State<DashboardPage> {
               fontWeight: FontWeight.w700,
             ),
           ),
-          const SizedBox(height: 4),
-          Text(
-            'Leitura direta do que subiu ou caiu vs. mes anterior.',
-            style: TextStyle(
-              color: AppTheme.textSecondary(context),
-              fontSize: 12,
-            ),
-          ),
           const SizedBox(height: 10),
           row(
             AppStrings.t(context, 'summary_fixed'),
@@ -2864,28 +2205,26 @@ class _DashboardPageState extends State<DashboardPage> {
             prev.fixedExpensesTotal,
             AppTheme.danger,
           ),
-          const SizedBox(height: 8),
+          const SizedBox(height: 6),
           row(
             AppStrings.t(context, 'summary_variable'),
             d.variableExpensesTotal,
             prev.variableExpensesTotal,
             AppTheme.warning,
           ),
-          const SizedBox(height: 8),
+          const SizedBox(height: 6),
           row(
             AppStrings.t(context, 'summary_invest'),
             d.investmentsTotal,
             prev.investmentsTotal,
             AppTheme.info,
-            increaseIsGood: true,
           ),
-          const SizedBox(height: 8),
+          const SizedBox(height: 6),
           row(
             AppStrings.t(context, 'summary_free'),
             d.remainingSalary,
             prev.remainingSalary,
             AppTheme.success,
-            increaseIsGood: true,
           ),
         ],
       ),
@@ -3669,6 +3008,20 @@ class _DashboardPageState extends State<DashboardPage> {
     final locale = Localizations.localeOf(context).toLanguageTag();
     final title = DateUtilsJetx.monthYear(_currentMonth, locale: locale);
 
+    final level = GamificationEngine.currentLevel(
+      xp: _user!.totalXp,
+      isPremium: _user!.isPremium,
+    );
+    final nextLevel = GamificationEngine.nextLevel(
+      xp: _user!.totalXp,
+      isPremium: _user!.isPremium,
+    );
+
+    final progress = nextLevel == null
+        ? 1.0
+        : ((_user!.totalXp - level.minXp) / (nextLevel.minXp - level.minXp))
+            .clamp(0.0, 1.0);
+
     return PopScope(
       canPop: false,
       onPopInvokedWithResult: (didPop, _) {
@@ -3721,85 +3074,248 @@ class _DashboardPageState extends State<DashboardPage> {
             Navigator.pushNamed(context, AppRoutes.investmentCalculator);
           },
         ),
-        body: DecoratedBox(
-          decoration: BoxDecoration(
-            gradient: LinearGradient(
-              colors: Theme.of(context).brightness == Brightness.dark
-                  ? const [
-                      Color(0xFF11141A),
-                      Color(0xFF141922),
-                    ]
-                  : const [
-                      Color(0xFFF6F0E4),
-                      Color(0xFFF1E7D4),
-                    ],
-              begin: Alignment.topCenter,
-              end: Alignment.bottomCenter,
-            ),
-          ),
-          child: Padding(
-            padding: Responsive.pagePadding(context),
-            child: ListView(
-              children: [
-                _buildOverviewHero(d, title),
-                const SizedBox(height: 18),
-                _buildSimpleSummaryCard(d),
-                const SizedBox(height: 18),
-                if (!_user!.isPremium)
-                  _lockedFeatureCard(
-                    title: AppStrings.t(context, 'score_title'),
-                    subtitle: AppStrings.t(context, 'score_locked_subtitle'),
-                    icon: Icons.auto_awesome_outlined,
+        body: Padding(
+          padding: Responsive.pagePadding(context),
+          child: ListView(
+            children: [
+              Text(
+                AppStrings.t(context, 'month_salary'),
+                style: TextStyle(color: AppTheme.textSecondary(context)),
+              ),
+              const SizedBox(height: 6),
+              Row(
+                children: [
+                  Expanded(
+                    child: Text(
+                      SensitiveDisplay.money(context, d.salary),
+                      style: const TextStyle(
+                        color: Colors.amber,
+                        fontSize: 26,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
                   ),
-                const SizedBox(height: 18),
-                Row(
-                  children: [
-                    Text(
-                      AppStrings.t(context, 'month_entries'),
-                      style: TextStyle(
-                        color: AppTheme.textPrimary(context),
-                        fontWeight: FontWeight.w800,
-                        fontSize: 17,
-                      ),
-                    ),
-                    const SizedBox(width: 10),
-                    Container(
-                      padding: const EdgeInsets.symmetric(
-                          horizontal: 10, vertical: 6),
-                      decoration: AppTheme.tintedPanelDecoration(
-                        context,
-                        tint: Theme.of(context).colorScheme.primary,
-                        radius: 999,
-                        tintOpacity: 0.08,
-                      ),
-                      child: Text(
-                        '${d.expenses.length}',
-                        style: TextStyle(
-                          color: AppTheme.textPrimary(context),
-                          fontWeight: FontWeight.w800,
-                          fontSize: 12,
-                        ),
-                      ),
-                    ),
+                  TextButton.icon(
+                    onPressed: _openIncomeEditorPopup,
+                    icon: const Icon(Icons.edit, size: 18),
+                    label: const Text('Editar'),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 18),
+              if (!_user!.isPremium) ...[
+                PremiumUpsellCard(
+                  perks: [
+                    AppStrings.t(context, 'score_title_month_tips'),
+                    AppStrings.t(context, 'premium_step_invest_title'),
+                    AppStrings.t(context, 'missions_premium_perk3'),
                   ],
+                  onCta: _openPremium,
                 ),
-                const SizedBox(height: 10),
-                if (d.expenses.isEmpty)
-                  _buildSimpleEmptyState()
-                else
-                  ...d.expenses.map(
-                    (e) => _ExpenseTile(
-                      expense: e,
-                      onTogglePaid: (e.isFixed && !e.isCreditCard)
-                          ? () => _toggleExpensePaid(e, !e.isPaid)
-                          : null,
-                      onEdit: () => _editExpense(e),
-                      onDelete: () => _deleteExpense(e),
+                const SizedBox(height: 18),
+              ],
+
+              // Progresso e niveis (Simplified for logic cleanup)
+              if (_user!.isPremium)
+                _buildProgressCard(level, progress, nextLevel)
+              else
+                _lockedFeatureCard(
+                  title: AppStrings.t(context, 'progress_levels_title'),
+                  subtitle: AppStrings.t(
+                    context,
+                    'progress_levels_locked_subtitle',
+                  ),
+                  icon: Icons.lock_outline,
+                ),
+              const SizedBox(height: 18),
+
+              if (_user!.isPremium)
+                InkWell(
+                  onTap: _openInsights,
+                  borderRadius: BorderRadius.circular(24),
+                  child: Container(
+                    padding: EdgeInsets.all(
+                        Responsive.isCompactPhone(context) ? 16 : 24),
+                    decoration: BoxDecoration(
+                      color: Theme.of(context).colorScheme.surface,
+                      borderRadius: BorderRadius.circular(24),
+                      border: Border.all(
+                        color: Theme.of(context)
+                            .colorScheme
+                            .outline
+                            .withValues(alpha: 0.2),
+                      ),
+                      boxShadow: [
+                        BoxShadow(
+                          color: Theme.of(context)
+                              .shadowColor
+                              .withValues(alpha: 0.08),
+                          blurRadius: 12,
+                          offset: const Offset(0, 6),
+                        ),
+                      ],
+                    ),
+                    child: Row(
+                      children: [
+                        Stack(
+                          alignment: Alignment.center,
+                          children: [
+                            SizedBox(
+                              width: 80,
+                              height: 80,
+                              child: CircularProgressIndicator(
+                                value: _score / 100,
+                                strokeWidth: 8,
+                                backgroundColor: Colors.white10,
+                                valueColor: AlwaysStoppedAnimation<Color>(
+                                    _scoreColor(_scoreStatus)),
+                              ),
+                            ),
+                            Text(
+                              '$_score',
+                              style: TextStyle(
+                                color: AppTheme.textPrimary(context),
+                                fontWeight: FontWeight.w900,
+                                fontSize: 24,
+                              ),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(width: 24),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Text(
+                                AppStrings.t(context, 'score_health_label'),
+                                style: TextStyle(
+                                    color: AppTheme.textPrimary(context),
+                                    fontWeight: FontWeight.w800,
+                                    fontSize: 18,
+                                    letterSpacing: -0.5),
+                              ),
+                              const SizedBox(height: 6),
+                              Text(
+                                FinanceScoreUtils.localizeTip(
+                                  _scoreResult ??
+                                      HealthScoreResult(
+                                        score: 0,
+                                        status: 'critical',
+                                        tip: '',
+                                        tipKey: 'score_tip_add_income',
+                                        needsIncome: true,
+                                      ),
+                                  tr: (key, params) =>
+                                      AppStrings.tr(context, key, params),
+                                ),
+                                style: TextStyle(
+                                  color: AppTheme.textSecondary(context),
+                                  fontSize: 13,
+                                  height: 1.4,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                        Icon(Icons.chevron_right,
+                            color: AppTheme.textSecondary(context)),
+                      ],
                     ),
                   ),
-                const SizedBox(height: 104),
-              ],
-            ),
+                )
+              else
+                _lockedFeatureCard(
+                  title: AppStrings.t(context, 'score_title'),
+                  subtitle: AppStrings.t(context, 'score_locked_subtitle'),
+                  icon: Icons.shield_outlined,
+                ),
+              const SizedBox(height: 18),
+              const SizedBox(height: 18),
+
+              Card(
+                color: Colors.transparent,
+                child: Padding(
+                  padding: const EdgeInsets.all(16),
+                  child: SizedBox(
+                    height: 220,
+                    child: PieChart(
+                      PieChartData(
+                        sectionsSpace: 2,
+                        centerSpaceRadius: 48,
+                        sections: _sections(d),
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+
+              const SizedBox(height: 16),
+              _SummaryRow(
+                fixed: d.fixedExpensesTotal,
+                variable: d.variableExpensesTotal,
+                invest: d.investmentsTotal,
+                free: d.remainingSalary,
+                salary: d.salary,
+              ),
+
+              const SizedBox(height: 18),
+              if (_user!.isPremium)
+                _comparisonCard(d)
+              else
+                _lockedFeatureCard(
+                  title: AppStrings.t(context, 'compare_title'),
+                  subtitle: AppStrings.t(
+                    context,
+                    'compare_locked_subtitle',
+                  ),
+                  icon: Icons.compare_arrows,
+                ),
+
+              const SizedBox(height: 18),
+              _creditCardBillsSection(d),
+              const SizedBox(height: 12),
+              Align(
+                alignment: Alignment.centerLeft,
+                child: TextButton.icon(
+                  onPressed: _addCard,
+                  icon: const Icon(Icons.add_card),
+                  label: Text(AppStrings.t(context, 'card_add')),
+                  style: TextButton.styleFrom(
+                    foregroundColor: Theme.of(context).colorScheme.primary,
+                  ),
+                ),
+              ),
+              const SizedBox(height: 18),
+              Text(
+                AppStrings.t(context, 'month_entries'),
+                style: TextStyle(color: AppTheme.textSecondary(context)),
+              ),
+              const SizedBox(height: 10),
+
+              if (d.expenses.isEmpty)
+                EducationalEmptyState(
+                  title: AppStrings.t(context, 'dashboard_empty_title'),
+                  message: AppStrings.t(context, 'dashboard_empty_message'),
+                  icon: Icons.receipt_long_outlined,
+                  action: ElevatedButton(
+                    onPressed: _openAddMenu,
+                    child: Text(AppStrings.t(context, 'dashboard_empty_cta')),
+                  ),
+                )
+              else
+                ...d.expenses.map(
+                  (e) => _ExpenseTile(
+                    expense: e,
+                    onTogglePaid: (e.isFixed && !e.isCreditCard)
+                        ? () => _toggleExpensePaid(e, !e.isPaid)
+                        : null,
+                    onEdit: () => _editExpense(e),
+                    onDelete: () => _deleteExpense(e),
+                  ),
+                ),
+              const SizedBox(height: 90),
+            ],
           ),
         ),
       ),
@@ -4304,64 +3820,35 @@ class _BottomActionRow extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final scheme = Theme.of(context).colorScheme;
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-      decoration: BoxDecoration(
-        gradient: LinearGradient(
-          colors: isDark
-              ? const [
-                  Color(0xFF1A1E27),
-                  Color(0xFF141820),
-                ]
-              : [
-                  scheme.surface.withValues(alpha: 0.96),
-                  const Color(0xFFFFFBF4),
-                ],
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-        ),
-        borderRadius: BorderRadius.circular(28),
-        border: Border.all(
-          color: scheme.outline.withValues(alpha: isDark ? 0.4 : 0.72),
-        ),
-        boxShadow: AppTheme.softShadow(context, depth: 1.05),
-      ),
-      child: SizedBox(
-        width: 248,
-        child: Row(
-          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-          children: [
-            FloatingActionButton(
-              heroTag: 'goals',
-              mini: true,
-              backgroundColor: scheme.surface.withValues(alpha: 0.92),
-              foregroundColor: AppTheme.textPrimary(context),
-              elevation: 0,
-              onPressed: onGoals,
-              child: const Icon(Icons.flag),
-            ),
-            FloatingActionButton(
-              heroTag: 'add',
-              backgroundColor: scheme.primary,
-              foregroundColor: Colors.black,
-              elevation: 0,
-              onPressed: onAdd,
-              child: const Icon(Icons.add),
-            ),
-            FloatingActionButton(
-              heroTag: 'calc',
-              mini: true,
-              backgroundColor: scheme.surface.withValues(alpha: 0.92),
-              foregroundColor: AppTheme.textPrimary(context),
-              elevation: 0,
-              onPressed: onCalculator,
-              child: const Icon(Icons.calculate),
-            ),
-          ],
-        ),
+    return SizedBox(
+      width: 240,
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          FloatingActionButton(
+            heroTag: 'goals',
+            mini: true,
+            backgroundColor: Theme.of(context).colorScheme.surface,
+            foregroundColor: AppTheme.textPrimary(context),
+            onPressed: onGoals,
+            child: const Icon(Icons.flag),
+          ),
+          FloatingActionButton(
+            heroTag: 'add',
+            backgroundColor: Theme.of(context).colorScheme.primary,
+            foregroundColor: Colors.black,
+            onPressed: onAdd,
+            child: const Icon(Icons.add),
+          ),
+          FloatingActionButton(
+            heroTag: 'calc',
+            mini: true,
+            backgroundColor: Theme.of(context).colorScheme.surface,
+            foregroundColor: AppTheme.textPrimary(context),
+            onPressed: onCalculator,
+            child: const Icon(Icons.calculate),
+          ),
+        ],
       ),
     );
   }
@@ -4525,14 +4012,13 @@ class _SummaryRow extends StatelessWidget {
     return Expanded(
       child: InkWell(
         onTap: () => _expandCard(context, label, value, color),
-        borderRadius: BorderRadius.circular(18),
+        borderRadius: BorderRadius.circular(14),
         child: Container(
-          padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 12),
-          decoration: AppTheme.tintedPanelDecoration(
-            context,
-            tint: color,
-            radius: 20,
-            tintOpacity: 0.08,
+          padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 10),
+          decoration: BoxDecoration(
+            color: Theme.of(context).colorScheme.surface,
+            borderRadius: BorderRadius.circular(14),
+            border: Border.all(color: Colors.white10),
           ),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
@@ -4553,7 +4039,7 @@ class _SummaryRow extends StatelessWidget {
               Text(
                 SensitiveDisplay.money(context, value),
                 style: TextStyle(
-                    color: color, fontWeight: FontWeight.bold, fontSize: 13.5),
+                    color: color, fontWeight: FontWeight.bold, fontSize: 13),
                 overflow: TextOverflow.ellipsis,
               ),
               const SizedBox(height: 4),
@@ -4614,17 +4100,6 @@ class _ExpenseTile extends StatelessWidget {
     }
   }
 
-  IconData get _icon {
-    switch (expense.type) {
-      case ExpenseType.fixed:
-        return Icons.lock_outline;
-      case ExpenseType.variable:
-        return Icons.shopping_bag_outlined;
-      case ExpenseType.investment:
-        return Icons.savings_outlined;
-    }
-  }
-
   String get _typeLabel {
     switch (expense.type) {
       case ExpenseType.fixed:
@@ -4663,62 +4138,6 @@ class _ExpenseTile extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    Widget actionButton({
-      required VoidCallback? onPressed,
-      required IconData icon,
-      required String tooltip,
-      Color? foreground,
-    }) {
-      return Tooltip(
-        message: tooltip,
-        child: InkWell(
-          onTap: onPressed,
-          borderRadius: BorderRadius.circular(12),
-          child: Container(
-            width: 34,
-            height: 34,
-            decoration: BoxDecoration(
-              color:
-                  Theme.of(context).colorScheme.surface.withValues(alpha: 0.7),
-              borderRadius: BorderRadius.circular(12),
-              border: Border.all(
-                color: Theme.of(context)
-                    .colorScheme
-                    .outline
-                    .withValues(alpha: 0.55),
-              ),
-            ),
-            child: Icon(
-              icon,
-              size: 18,
-              color: foreground ?? AppTheme.textMuted(context),
-            ),
-          ),
-        ),
-      );
-    }
-
-    Widget metaChip(String text, {Color? tint}) {
-      final chipColor = tint ?? _color;
-      return Container(
-        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-        decoration: AppTheme.tintedPanelDecoration(
-          context,
-          tint: chipColor,
-          radius: 999,
-          tintOpacity: 0.08,
-        ),
-        child: Text(
-          text,
-          style: TextStyle(
-            color: AppTheme.textSecondary(context),
-            fontSize: 11,
-            fontWeight: FontWeight.w700,
-          ),
-        ),
-      );
-    }
-
     final due =
         (expense.isFixed || expense.isCreditCard) && expense.dueDay != null
             ? expense.isCreditCard
@@ -4736,108 +4155,81 @@ class _ExpenseTile extends StatelessWidget {
         ? _typeLabel
         : '$_typeLabel - ${_categoryLabel(expense.category)}$due$cardInfo';
     final canTogglePaid = onTogglePaid != null;
-    return Container(
-      margin: const EdgeInsets.only(bottom: 10),
-      padding: const EdgeInsets.all(14),
-      decoration: AppTheme.tintedPanelDecoration(
-        context,
-        tint: _color,
-        radius: 24,
-        tintOpacity: 0.06,
-      ),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Container(
-            width: 42,
-            height: 42,
-            decoration: BoxDecoration(
-              color: _color.withValues(alpha: 0.14),
-              borderRadius: BorderRadius.circular(14),
+    return Card(
+      elevation: 0,
+      child: ListTile(
+        isThreeLine: true,
+        leading: Container(
+          width: 10,
+          height: 10,
+          decoration: BoxDecoration(color: _color, shape: BoxShape.circle),
+        ),
+        title: Text(expense.name,
+            style: TextStyle(color: AppTheme.textPrimary(context))),
+        subtitle: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              subtitleText,
+              style: TextStyle(color: AppTheme.textSecondary(context)),
             ),
-            child: Icon(_icon, color: _color, size: 20),
-          ),
-          const SizedBox(width: 12),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
+            const SizedBox(height: 6),
+            Wrap(
+              spacing: 2,
+              runSpacing: 2,
               children: [
-                Row(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Expanded(
-                      child: Text(
-                        expense.name,
-                        style: TextStyle(
-                          color: AppTheme.textPrimary(context),
-                          fontWeight: FontWeight.w800,
-                          fontSize: 15,
-                        ),
-                      ),
+                if (canTogglePaid)
+                  IconButton(
+                    onPressed: onTogglePaid,
+                    icon: Icon(
+                      expense.isPaid
+                          ? Icons.check_circle_rounded
+                          : Icons.circle_outlined,
+                      color: expense.isPaid
+                          ? AppTheme.success
+                          : AppTheme.textMuted(context),
+                      size: 20,
                     ),
-                    const SizedBox(width: 12),
-                    Text(
-                      SensitiveDisplay.money(context, expense.amount),
-                      style: TextStyle(
-                        color: _color,
-                        fontWeight: FontWeight.w800,
-                        fontSize: 14,
-                      ),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 8),
-                Text(
-                  subtitleText,
-                  style: TextStyle(
-                    color: AppTheme.textSecondary(context),
-                    height: 1.35,
+                    tooltip: expense.isPaid ? 'Pago' : 'Pagar',
+                    visualDensity: VisualDensity.compact,
+                    padding: EdgeInsets.zero,
+                    constraints:
+                        const BoxConstraints.tightFor(width: 34, height: 34),
                   ),
+                IconButton(
+                  onPressed: onEdit,
+                  icon: Icon(
+                    Icons.edit_outlined,
+                    color: AppTheme.textMuted(context),
+                    size: 20,
+                  ),
+                  tooltip: AppStrings.t(context, 'edit_entry'),
+                  visualDensity: VisualDensity.compact,
+                  padding: EdgeInsets.zero,
+                  constraints:
+                      const BoxConstraints.tightFor(width: 34, height: 34),
                 ),
-                const SizedBox(height: 10),
-                Wrap(
-                  spacing: 8,
-                  runSpacing: 8,
-                  children: [
-                    metaChip(_typeLabel),
-                    if (!expense.isInvestment)
-                      metaChip(_categoryLabel(expense.category)),
-                    if (expense.isPaid)
-                      metaChip('Pago', tint: AppTheme.success),
-                  ],
-                ),
-                const SizedBox(height: 12),
-                Wrap(
-                  spacing: 8,
-                  runSpacing: 8,
-                  children: [
-                    if (canTogglePaid)
-                      actionButton(
-                        onPressed: onTogglePaid,
-                        icon: expense.isPaid
-                            ? Icons.check_circle_rounded
-                            : Icons.circle_outlined,
-                        tooltip: expense.isPaid ? 'Pago' : 'Pagar',
-                        foreground: expense.isPaid
-                            ? AppTheme.success
-                            : AppTheme.textMuted(context),
-                      ),
-                    actionButton(
-                      onPressed: onEdit,
-                      icon: Icons.edit_outlined,
-                      tooltip: AppStrings.t(context, 'edit_entry'),
-                    ),
-                    actionButton(
-                      onPressed: onDelete,
-                      icon: Icons.delete_outline,
-                      tooltip: AppStrings.t(context, 'delete_entry'),
-                    ),
-                  ],
+                IconButton(
+                  onPressed: onDelete,
+                  icon: Icon(
+                    Icons.delete_outline,
+                    color: AppTheme.textMuted(context),
+                    size: 20,
+                  ),
+                  tooltip: AppStrings.t(context, 'delete_entry'),
+                  visualDensity: VisualDensity.compact,
+                  padding: EdgeInsets.zero,
+                  constraints:
+                      const BoxConstraints.tightFor(width: 34, height: 34),
                 ),
               ],
             ),
-          ),
-        ],
+          ],
+        ),
+        trailing: Text(
+          SensitiveDisplay.money(context, expense.amount),
+          style: TextStyle(color: _color, fontWeight: FontWeight.bold),
+        ),
       ),
     );
   }

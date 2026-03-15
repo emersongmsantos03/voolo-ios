@@ -15,15 +15,13 @@ class ThemeState extends ChangeNotifier {
 
   Future<void> _load() async {
     final raw = await LocalDatabaseService.getSetting(_kThemeMode);
-    final nextMode = switch (raw) {
-      'light' => ThemeMode.light,
-      'dark' => ThemeMode.dark,
-      _ => ThemeMode.system,
-    };
-    if (_mode == nextMode) {
-      return;
+    if (raw == 'light') {
+      _mode = ThemeMode.light;
+    } else if (raw == 'dark') {
+      _mode = ThemeMode.dark;
+    } else {
+      _mode = ThemeMode.system;
     }
-    _mode = nextMode;
     notifyListeners();
   }
 

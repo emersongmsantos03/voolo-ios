@@ -13,35 +13,20 @@ import '../models/expense.dart';
 import '../models/fixed_series.dart';
 import '../models/v2/enums.dart';
 import '../core/plans/user_plan.dart';
-import '../firebase_options.dart';
 import 'habits_service.dart';
 import 'local_database_service.dart';
 import 'firestore_service.dart';
 import 'notification_service.dart';
 
-class AccountDeletionException implements Exception {
-  AccountDeletionException(this.code, {this.details});
-
-  final String code;
-  final Object? details;
-
-  @override
-  String toString() => 'AccountDeletionException($code)';
-}
-
 class LocalStorageService {
   LocalStorageService._();
 
-  /// Web OAuth client for the current Firebase project.
+  /// Web client ID (OAuth 2.0) from Google Cloud / Firebase project.
+  /// Used on Android to request an ID token when needed.
   ///
-  /// It can still be overridden via `--dart-define=GOOGLE_WEB_CLIENT_ID=...`,
-  /// but keeping a project fallback avoids preview/login regressions when the
-  /// build pipeline forgets to inject the value.
-  static const String _googleServerClientId = String.fromEnvironment(
-    'GOOGLE_WEB_CLIENT_ID',
-    defaultValue:
-        '100666481363-oudvh15h83umb4gf4plfm1eilgihepab.apps.googleusercontent.com',
-  );
+  /// Provide via: `--dart-define=GOOGLE_WEB_CLIENT_ID=...`
+  static const String _googleServerClientId =
+      String.fromEnvironment('GOOGLE_WEB_CLIENT_ID', defaultValue: '');
 
   static bool _initialized = false;
   static final ValueNotifier<UserProfile?> userNotifier =
@@ -63,51 +48,21 @@ class LocalStorageService {
   static StreamSubscription<List<MonthlyDashboard>>? _dashboardsSubscription;
   static String? _lastSyncError;
   static String? _lastLoginError;
-  static String? _lastAuthDiagnostic;
   static final List<MonthlyDashboard> _dashboards = [];
   static final List<Goal> _goals = [];
   static final List<IncomeSource> _incomes = [];
   static GoogleSignIn? _googleSignIn;
 
-  static String? _googleClientIdForCurrentPlatform() {
-    if (kIsWeb) return null;
-    switch (defaultTargetPlatform) {
-      case TargetPlatform.iOS:
-        return DefaultFirebaseOptions.ios.iosClientId;
-      default:
-        return null;
-    }
-  }
-
   static GoogleSignIn _googleSignInClient() {
     return _googleSignIn ??= GoogleSignIn(
       scopes: const ['email', 'profile'],
-      clientId: _googleClientIdForCurrentPlatform(),
       serverClientId:
           _googleServerClientId.isEmpty ? null : _googleServerClientId,
     );
   }
 
-  static Future<void> _configureAppleAuthDefaults() async {
-    if (kIsWeb || defaultTargetPlatform != TargetPlatform.iOS) {
-      return;
-    }
-
-    try {
-      await _auth.setSettings(userAccessGroup: null);
-      debugPrint(
-        'LocalStorageService: FirebaseAuth iOS settings applied with default keychain access.',
-      );
-    } catch (e) {
-      debugPrint(
-        'LocalStorageService: FirebaseAuth iOS settings could not be applied: $e',
-      );
-    }
-  }
-
   static Future<void> init() async {
     if (_initialized) return;
-    await _configureAppleAuthDefaults();
     final authUser = _auth.currentUser;
     if (authUser != null && (authUser.email ?? '').isNotEmpty) {
       _currentUserEmail = authUser.email;
@@ -215,14 +170,6 @@ class LocalStorageService {
   static String? get currentUserId => _currentUserId;
   static String? get lastSyncError => _lastSyncError;
   static String? get lastLoginError => _lastLoginError;
-  static String? get lastAuthDiagnostic => _lastAuthDiagnostic;
-  static bool get currentUserUsesPasswordProvider =>
-      _auth.currentUser?.providerData.any((p) => p.providerId == 'password') ??
-      false;
-  static bool get currentUserUsesGoogleProvider =>
-      _auth.currentUser?.providerData
-          .any((p) => p.providerId == 'google.com') ??
-      false;
   static UserProfile? getUserProfile() {
     if (_loggedOut) return null;
     if (_currentUserEmail == null || _currentUserEmail!.isEmpty) {
@@ -243,7 +190,6 @@ class LocalStorageService {
   }) async {
     await _ensureInit();
     _lastLoginError = null;
-    _lastAuthDiagnostic = null;
     final normalizedEmail = email.trim().toLowerCase();
     if (normalizedEmail.isEmpty) return null;
 
@@ -256,18 +202,13 @@ class LocalStorageService {
       debugPrint('LocalStorageService: Login successful for $normalizedEmail');
     } on FirebaseAuthException catch (e) {
       debugPrint('LocalStorageService: Login error: ${e.code} - ${e.message}');
-      _lastAuthDiagnostic =
-          '${e.code}${e.message == null ? '' : ' - ${e.message}'}';
       if (e.code == 'user-disabled') {
         _lastLoginError = 'login_blocked';
       } else if (e.code == 'invalid-email') {
         _lastLoginError = 'login_invalid_email';
       } else if (e.code == 'network-request-failed') {
         _lastLoginError = 'no_connection';
-      } else if (e.code == 'user-not-found' ||
-          e.code == 'wrong-password' ||
-          e.code == 'invalid-credential' ||
-          e.code == 'invalid-login-credentials') {
+      } else if (e.code == 'user-not-found' || e.code == 'wrong-password') {
         _lastLoginError = 'login_invalid_credentials';
       } else {
         _lastLoginError = 'login_failed_try_again';
@@ -275,7 +216,6 @@ class LocalStorageService {
       return null;
     } catch (e) {
       debugPrint('LocalStorageService: Unexpected login error: $e');
-      _lastAuthDiagnostic = e.toString();
       _lastLoginError = 'login_failed_try_again';
       return null;
     }
@@ -284,28 +224,17 @@ class LocalStorageService {
     if (authUser == null) return null;
     _currentUserId = authUser.uid;
     _currentUserEmail = authUser.email ?? normalizedEmail;
-    try {
-      final user = await _ensureUserProfile();
-      if (user == null) {
-        _lastAuthDiagnostic = 'authenticated-but-profile-missing';
-        _lastLoginError = 'login_failed_try_again';
-        return null;
-      }
 
-      await setCurrentUser(email);
-      return user;
-    } catch (e) {
-      debugPrint('LocalStorageService: Post-login sync error: $e');
-      _lastAuthDiagnostic = e.toString();
-      _lastLoginError = 'login_failed_try_again';
-      return null;
-    }
+    final user = await _ensureUserProfile();
+    if (user == null) return null;
+
+    await setCurrentUser(email);
+    return user;
   }
 
   static Future<UserProfile?> loginWithGoogle() async {
     await _ensureInit();
     _lastLoginError = null;
-    _lastAuthDiagnostic = null;
     syncNotifier.value = false;
     try {
       if (kIsWeb) {
@@ -315,11 +244,6 @@ class LocalStorageService {
         await _auth.signInWithPopup(provider);
       } else {
         final googleSignIn = _googleSignInClient();
-        debugPrint(
-          'LocalStorageService: GoogleSignIn config '
-          'clientId=${_googleClientIdForCurrentPlatform() ?? 'auto'} '
-          'serverClientId=${_googleServerClientId.isEmpty ? 'none' : _googleServerClientId}',
-        );
 
         // Avoid silently reusing a stale session and make account selection more predictable.
         try {
@@ -336,7 +260,7 @@ class LocalStorageService {
         if (googleAuth.accessToken == null && googleAuth.idToken == null) {
           debugPrint(
             'LocalStorageService: GoogleSignIn returned null tokens. '
-            'Set GOOGLE_WEB_CLIENT_ID (Web client ID) and configure Firebase for the active platform (google-services.json / GoogleService-Info.plist).',
+            'Set GOOGLE_WEB_CLIENT_ID (Web client ID) or re-download google-services.json.',
           );
           _lastLoginError = 'login_google_not_ready';
           return null;
@@ -352,17 +276,11 @@ class LocalStorageService {
       debugPrint(
         'LocalStorageService: Google login FirebaseAuthException: ${e.code} - ${e.message}',
       );
-      _lastAuthDiagnostic =
-          '${e.code}${e.message == null ? '' : ' - ${e.message}'}';
       if (e.code == 'network-request-failed') {
         _lastLoginError = 'no_connection';
       } else if (e.code == 'popup-closed-by-user' ||
           e.code == 'cancelled-popup-request') {
         _lastLoginError = 'login_cancelled';
-      } else if (e.code == 'operation-not-allowed' ||
-          e.code == 'invalid-credential' ||
-          e.code == 'invalid-idp-response') {
-        _lastLoginError = 'login_google_not_ready';
       } else {
         _lastLoginError = 'login_failed_try_again';
       }
@@ -371,8 +289,6 @@ class LocalStorageService {
       debugPrint(
         'LocalStorageService: Google login PlatformException: ${e.code} - ${e.message}',
       );
-      _lastAuthDiagnostic =
-          '${e.code}${e.message == null ? '' : ' - ${e.message}'}';
       if (e.code == 'network_error') {
         _lastLoginError = 'no_connection';
       } else if (e.code == 'sign_in_canceled' ||
@@ -385,7 +301,6 @@ class LocalStorageService {
       return null;
     } catch (e) {
       debugPrint('LocalStorageService: Unexpected Google login error: $e');
-      _lastAuthDiagnostic = e.toString();
       _lastLoginError = 'login_failed_try_again';
       return null;
     }
@@ -396,46 +311,39 @@ class LocalStorageService {
     _currentUserId = authUser.uid;
     _currentUserEmail = authUser.email ?? '';
     _loggedOut = false;
-    try {
-      var user = await FirestoreService.getUserByUid(_currentUserId!);
-      if (user == null) {
-        final displayName = authUser.displayName ?? '';
-        final parts =
-            displayName.trim().split(' ').where((p) => p.isNotEmpty).toList();
-        final firstName = parts.isNotEmpty ? parts.first : 'Usuario';
-        final lastName = parts.length > 1 ? parts.sublist(1).join(' ') : '';
-        user = UserProfile(
-          firstName: firstName,
-          lastName: lastName,
-          email: (_currentUserEmail ?? '').trim().toLowerCase(),
-          birthDate: DateTime(2000, 1, 1),
-          profession: '',
-          monthlyIncome: 0,
-          gender: 'Nao informado',
-          photoPath: authUser.photoURL,
-          objectives: const [],
-          setupCompleted: false,
-          isPremium: false,
-          isActive: true,
-          totalXp: 0,
-        );
-        await FirestoreService.upsertUser(user);
-      }
 
-      await setCurrentUser(_currentUserEmail ?? '');
-      return getUserProfile();
-    } catch (e) {
-      debugPrint('LocalStorageService: Post-Google-login sync error: $e');
-      _lastAuthDiagnostic = e.toString();
-      _lastLoginError = 'login_failed_try_again';
-      return null;
+    var user = await FirestoreService.getUserByUid(_currentUserId!);
+    if (user == null) {
+      final displayName = authUser.displayName ?? '';
+      final parts =
+          displayName.trim().split(' ').where((p) => p.isNotEmpty).toList();
+      final firstName = parts.isNotEmpty ? parts.first : 'Usuario';
+      final lastName = parts.length > 1 ? parts.sublist(1).join(' ') : '';
+      user = UserProfile(
+        firstName: firstName,
+        lastName: lastName,
+        email: (_currentUserEmail ?? '').trim().toLowerCase(),
+        birthDate: DateTime(2000, 1, 1),
+        profession: '',
+        monthlyIncome: 0,
+        gender: 'Nao informado',
+        photoPath: authUser.photoURL,
+        objectives: const [],
+        setupCompleted: false,
+        isPremium: false,
+        isActive: true,
+        totalXp: 0,
+      );
+      await FirestoreService.upsertUser(user);
     }
+
+    await setCurrentUser(_currentUserEmail ?? '');
+    return getUserProfile();
   }
 
   static Future<void> setCurrentUser(String email) async {
     await _ensureInit();
     _lastLoginError = null;
-    _lastAuthDiagnostic = null;
     final authUser = _auth.currentUser;
     _currentUserEmail = authUser?.email ?? email.trim();
     _currentUserId = authUser?.uid;
@@ -458,8 +366,9 @@ class LocalStorageService {
   static Future<bool> createAccount(UserProfile profile) async {
     await _ensureInit();
     _lastLoginError = null;
-    _lastAuthDiagnostic = null;
     profile.isPremium = false;
+    final existsRemote = await FirestoreService.userExists(profile.email);
+    if (existsRemote == true) return false;
     try {
       final credential = await _auth.createUserWithEmailAndPassword(
         email: profile.email.trim(),
@@ -471,24 +380,14 @@ class LocalStorageService {
         _currentUserEmail = createdUser.email ?? profile.email.trim();
         _loggedOut = false;
       }
-    } on FirebaseAuthException catch (e) {
-      _lastAuthDiagnostic =
-          '${e.code}${e.message == null ? '' : ' - ${e.message}'}';
-      rethrow;
-    } catch (e) {
-      _lastAuthDiagnostic = e.toString();
+    } on FirebaseAuthException {
       rethrow;
     }
 
     final ok = await FirestoreService.upsertUser(profile);
     _setSyncError(ok);
     _accounts.add(profile);
-    try {
-      await setCurrentUser(profile.email);
-    } catch (e) {
-      debugPrint('LocalStorageService: Post-signup sync error: $e');
-      _lastAuthDiagnostic = e.toString();
-    }
+    await setCurrentUser(profile.email);
     return true;
   }
 
@@ -533,18 +432,17 @@ class LocalStorageService {
   }) async {
     await _ensureInit();
     _lastLoginError = null;
-    _lastAuthDiagnostic = null;
     final prevEmail = previous.email.toLowerCase();
     final newEmail = updated.email.toLowerCase();
 
     if (newEmail != prevEmail) {
+      final conflict = await FirestoreService.userExists(updated.email);
+      if (conflict == true) return false;
       final authUser = _auth.currentUser;
       if (authUser != null && authUser.email?.toLowerCase() == prevEmail) {
         try {
           await authUser.updateEmail(updated.email);
-        } on FirebaseAuthException catch (e) {
-          _lastAuthDiagnostic =
-              '${e.code}${e.message == null ? '' : ' - ${e.message}'}';
+        } on FirebaseAuthException {
           return false;
         }
       }
@@ -614,88 +512,6 @@ class LocalStorageService {
       await _googleSignInClient().signOut();
     } catch (_) {}
     await _auth.signOut();
-  }
-
-  static Future<void> deleteCurrentAccount({String? password}) async {
-    await _ensureInit();
-
-    final authUser = _auth.currentUser;
-    final uid = authUser?.uid ?? _currentUserId;
-    final email = (authUser?.email ?? _currentUserEmail ?? '').trim();
-    if (authUser == null || uid == null || uid.isEmpty || email.isEmpty) {
-      throw AccountDeletionException('not-authenticated');
-    }
-
-    final providers = authUser.providerData.map((p) => p.providerId).toSet();
-    if (providers.contains('password')) {
-      final normalizedPassword = password ?? '';
-      if (normalizedPassword.isEmpty) {
-        throw AccountDeletionException('password-required');
-      }
-      try {
-        final credential = EmailAuthProvider.credential(
-          email: email,
-          password: normalizedPassword,
-        );
-        await authUser.reauthenticateWithCredential(credential);
-      } on FirebaseAuthException catch (e) {
-        throw AccountDeletionException(e.code, details: e);
-      }
-    } else if (providers.contains('google.com')) {
-      try {
-        final googleSignIn = _googleSignInClient();
-        try {
-          await googleSignIn.signOut();
-        } catch (_) {}
-
-        final googleUser = await googleSignIn.signIn();
-        if (googleUser == null) {
-          throw AccountDeletionException('reauth-cancelled');
-        }
-
-        final googleAuth = await googleUser.authentication;
-        final credential = GoogleAuthProvider.credential(
-          accessToken: googleAuth.accessToken,
-          idToken: googleAuth.idToken,
-        );
-        await authUser.reauthenticateWithCredential(credential);
-      } on AccountDeletionException {
-        rethrow;
-      } on FirebaseAuthException catch (e) {
-        throw AccountDeletionException(e.code, details: e);
-      } on PlatformException catch (e) {
-        throw AccountDeletionException(e.code, details: e);
-      } catch (e) {
-        throw AccountDeletionException('reauth-failed', details: e);
-      }
-    } else {
-      throw AccountDeletionException('unsupported-provider');
-    }
-
-    try {
-      await FirestoreService.deleteUserAccount(uid: uid, email: email);
-      await LocalDatabaseService.deleteUserData(email: email, uid: uid);
-      await authUser.delete();
-    } on FirebaseAuthException catch (e) {
-      throw AccountDeletionException(e.code, details: e);
-    } catch (e) {
-      throw AccountDeletionException('delete-failed', details: e);
-    }
-
-    _accounts.removeWhere((u) => u.email.toLowerCase() == email.toLowerCase());
-    _currentUserEmail = null;
-    _currentUserId = null;
-    _loggedOut = true;
-    _stopUserListener();
-    _dashboards.clear();
-    _goals.clear();
-    _incomes.clear();
-    userNotifier.value = null;
-    syncNotifier.value = true;
-
-    try {
-      await _googleSignInClient().signOut();
-    } catch (_) {}
   }
 
   static Future<bool> updateMonthlyIncome(double income) async {
@@ -1500,7 +1316,11 @@ class LocalStorageService {
       totalXp: 0,
     );
     _accounts.add(fallback);
-    await FirestoreService.upsertUser(fallback);
+
+    final existsRemote = await FirestoreService.userExists(normalizedEmail);
+    if (existsRemote == false) {
+      await FirestoreService.upsertUser(fallback);
+    }
     return fallback;
   }
 

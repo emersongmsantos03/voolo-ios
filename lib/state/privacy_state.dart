@@ -15,12 +15,11 @@ class PrivacyState extends ChangeNotifier {
 
   Future<void> _load() async {
     final raw = await LocalDatabaseService.getSetting(_kShowAmounts);
-    final nextShowAmounts = raw != '0';
-    if (_showAmounts == nextShowAmounts) {
-      CurrencyUtils.hideValues = !_showAmounts;
-      return;
+    if (raw == '0') {
+      _showAmounts = false;
+    } else {
+      _showAmounts = true;
     }
-    _showAmounts = nextShowAmounts;
     CurrencyUtils.hideValues = !_showAmounts;
     notifyListeners();
   }
