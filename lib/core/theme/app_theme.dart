@@ -70,17 +70,17 @@ class AppTheme {
 
   static List<BoxShadow> softShadow(BuildContext context, {double depth = 1}) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
-    final opacity = isDark ? 0.18 : 0.08;
+    final opacity = isDark ? 0.22 : 0.09;
     return [
       BoxShadow(
         color: Colors.black.withValues(alpha: opacity * depth),
-        blurRadius: 28,
-        offset: const Offset(0, 14),
+        blurRadius: 32,
+        offset: const Offset(0, 18),
       ),
       BoxShadow(
-        color: Colors.black.withValues(alpha: opacity * 0.5 * depth),
-        blurRadius: 10,
-        offset: const Offset(0, 4),
+        color: Colors.black.withValues(alpha: opacity * 0.35 * depth),
+        blurRadius: 14,
+        offset: const Offset(0, 6),
       ),
     ];
   }
@@ -92,27 +92,32 @@ class AppTheme {
   }) {
     final scheme = Theme.of(context).colorScheme;
     final isDark = Theme.of(context).brightness == Brightness.dark;
+    final baseColors = highlighted
+        ? (isDark
+            ? const [
+                Color(0xFF2D2310),
+                Color(0xFF1C2028),
+                Color(0xFF15181F),
+              ]
+            : const [
+                Color(0xFFFFFDF7),
+                Color(0xFFF9F1DD),
+                Color(0xFFF4E7C4),
+              ])
+        : (isDark
+            ? const [
+                Color(0xFF1B2029),
+                Color(0xFF161A21),
+                Color(0xFF12151B),
+              ]
+            : [
+                const Color(0xFFFFFFFF),
+                const Color(0xFFFFFCF8),
+                scheme.surface,
+              ]);
     return BoxDecoration(
       gradient: LinearGradient(
-        colors: highlighted
-            ? (isDark
-                ? const [
-                    Color(0xFF2B220D),
-                    Color(0xFF1A1D24),
-                  ]
-                : const [
-                    Color(0xFFFFFBF2),
-                    Color(0xFFF8F1DD),
-                  ])
-            : (isDark
-                ? const [
-                    Color(0xFF1A1E27),
-                    Color(0xFF14171D),
-                  ]
-                : [
-                    scheme.surface,
-                    const Color(0xFFFFFCF8),
-                  ]),
+        colors: baseColors,
         begin: Alignment.topLeft,
         end: Alignment.bottomRight,
       ),
@@ -120,9 +125,41 @@ class AppTheme {
       border: Border.all(
         color: highlighted
             ? scheme.primary.withValues(alpha: isDark ? 0.3 : 0.22)
-            : scheme.outline.withValues(alpha: isDark ? 0.3 : 0.58),
+            : scheme.outline.withValues(alpha: isDark ? 0.34 : 0.72),
       ),
       boxShadow: softShadow(context, depth: highlighted ? 1.2 : 1),
+    );
+  }
+
+  static BoxDecoration tintedPanelDecoration(
+    BuildContext context, {
+    required Color tint,
+    double radius = _radiusLarge,
+    double tintOpacity = 0.12,
+  }) {
+    final scheme = Theme.of(context).colorScheme;
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    return BoxDecoration(
+      gradient: LinearGradient(
+        colors: [
+          Color.alphaBlend(
+            tint.withValues(alpha: isDark ? tintOpacity * 1.2 : tintOpacity),
+            scheme.surface,
+          ),
+          Color.alphaBlend(
+            tint.withValues(
+                alpha: isDark ? tintOpacity * 0.35 : tintOpacity * 0.55),
+            scheme.surface,
+          ),
+        ],
+        begin: Alignment.topLeft,
+        end: Alignment.bottomRight,
+      ),
+      borderRadius: BorderRadius.circular(radius),
+      border: Border.all(
+        color: tint.withValues(alpha: isDark ? 0.22 : 0.18),
+      ),
+      boxShadow: softShadow(context, depth: 0.9),
     );
   }
 
