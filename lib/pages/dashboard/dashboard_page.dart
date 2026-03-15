@@ -1689,82 +1689,6 @@ class _DashboardPageState extends State<DashboardPage> {
     }
   }
 
-  Widget _buildDashboardBackdrop() {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-    final primary = Theme.of(context).colorScheme.primary;
-
-    Widget orb({
-      required double size,
-      required Color color,
-    }) {
-      return Container(
-        width: size,
-        height: size,
-        decoration: BoxDecoration(
-          shape: BoxShape.circle,
-          gradient: RadialGradient(
-            colors: [
-              color,
-              color.withValues(alpha: 0),
-            ],
-          ),
-        ),
-      );
-    }
-
-    return IgnorePointer(
-      child: Stack(
-        children: [
-          Positioned.fill(
-            child: DecoratedBox(
-              decoration: BoxDecoration(
-                gradient: LinearGradient(
-                  colors: isDark
-                      ? const [
-                          Color(0xFF0F1116),
-                          Color(0xFF12161D),
-                          Color(0xFF15171C),
-                        ]
-                      : const [
-                          Color(0xFFF7F1E4),
-                          Color(0xFFF5EFE4),
-                          Color(0xFFF0E6D5),
-                        ],
-                  begin: Alignment.topCenter,
-                  end: Alignment.bottomCenter,
-                ),
-              ),
-            ),
-          ),
-          Positioned(
-            top: -110,
-            right: -70,
-            child: orb(
-              size: 260,
-              color: primary.withValues(alpha: isDark ? 0.12 : 0.14),
-            ),
-          ),
-          Positioned(
-            top: 250,
-            left: -80,
-            child: orb(
-              size: 220,
-              color: AppTheme.info.withValues(alpha: isDark ? 0.08 : 0.07),
-            ),
-          ),
-          Positioned(
-            bottom: 70,
-            right: -90,
-            child: orb(
-              size: 240,
-              color: AppTheme.success.withValues(alpha: isDark ? 0.06 : 0.05),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
   Widget _overviewStatChip(
     BuildContext context, {
     required IconData icon,
@@ -3656,149 +3580,160 @@ class _DashboardPageState extends State<DashboardPage> {
             Navigator.pushNamed(context, AppRoutes.investmentCalculator);
           },
         ),
-        body: Stack(
-          children: [
-            Positioned.fill(child: _buildDashboardBackdrop()),
-            Padding(
-              padding: Responsive.pagePadding(context),
-              child: ListView(
-                children: [
-                  _buildOverviewHero(d, title),
-                  const SizedBox(height: 18),
-                  if (!_user!.isPremium) ...[
-                    PremiumUpsellCard(
-                      perks: [
-                        AppStrings.t(context, 'score_title_month_tips'),
-                        AppStrings.t(context, 'premium_step_invest_title'),
-                        AppStrings.t(context, 'missions_premium_perk3'),
-                      ],
-                      onCta: _openPremium,
-                    ),
-                    const SizedBox(height: 18),
-                  ],
-
-                  // Progresso e niveis (Simplified for logic cleanup)
-                  if (_user!.isPremium)
-                    _buildProgressCard(level, progress, nextLevel)
-                  else
-                    _lockedFeatureCard(
-                      title: AppStrings.t(context, 'progress_levels_title'),
-                      subtitle: AppStrings.t(
-                        context,
-                        'progress_levels_locked_subtitle',
-                      ),
-                      icon: Icons.lock_outline,
-                    ),
-                  const SizedBox(height: 18),
-
-                  if (_user!.isPremium)
-                    _buildScoreCard()
-                  else
-                    _lockedFeatureCard(
-                      title: AppStrings.t(context, 'score_title'),
-                      subtitle: AppStrings.t(context, 'score_locked_subtitle'),
-                      icon: Icons.shield_outlined,
-                    ),
-                  const SizedBox(height: 18),
-                  _buildDistributionCard(d),
-
-                  const SizedBox(height: 16),
-                  _SummaryRow(
-                    fixed: d.fixedExpensesTotal,
-                    variable: d.variableExpensesTotal,
-                    invest: d.investmentsTotal,
-                    free: d.remainingSalary,
-                    salary: d.salary,
-                  ),
-
-                  const SizedBox(height: 18),
-                  if (_user!.isPremium)
-                    _comparisonCard(d)
-                  else
-                    _lockedFeatureCard(
-                      title: AppStrings.t(context, 'compare_title'),
-                      subtitle: AppStrings.t(
-                        context,
-                        'compare_locked_subtitle',
-                      ),
-                      icon: Icons.compare_arrows,
-                    ),
-
-                  const SizedBox(height: 18),
-                  _creditCardBillsSection(d),
-                  const SizedBox(height: 12),
-                  Align(
-                    alignment: Alignment.centerLeft,
-                    child: TextButton.icon(
-                      onPressed: _addCard,
-                      icon: const Icon(Icons.add_card),
-                      label: Text(AppStrings.t(context, 'card_add')),
-                      style: TextButton.styleFrom(
-                        foregroundColor: Theme.of(context).colorScheme.primary,
-                      ),
-                    ),
+        body: DecoratedBox(
+          decoration: BoxDecoration(
+            gradient: LinearGradient(
+              colors: Theme.of(context).brightness == Brightness.dark
+                  ? const [
+                      Color(0xFF11141A),
+                      Color(0xFF141922),
+                    ]
+                  : const [
+                      Color(0xFFF6F0E4),
+                      Color(0xFFF1E7D4),
+                    ],
+              begin: Alignment.topCenter,
+              end: Alignment.bottomCenter,
+            ),
+          ),
+          child: Padding(
+            padding: Responsive.pagePadding(context),
+            child: ListView(
+              children: [
+                _buildOverviewHero(d, title),
+                const SizedBox(height: 18),
+                if (!_user!.isPremium) ...[
+                  PremiumUpsellCard(
+                    perks: [
+                      AppStrings.t(context, 'score_title_month_tips'),
+                      AppStrings.t(context, 'premium_step_invest_title'),
+                      AppStrings.t(context, 'missions_premium_perk3'),
+                    ],
+                    onCta: _openPremium,
                   ),
                   const SizedBox(height: 18),
-                  Row(
-                    children: [
-                      Text(
-                        AppStrings.t(context, 'month_entries'),
+                ],
+
+                // Progresso e niveis (Simplified for logic cleanup)
+                if (_user!.isPremium)
+                  _buildProgressCard(level, progress, nextLevel)
+                else
+                  _lockedFeatureCard(
+                    title: AppStrings.t(context, 'progress_levels_title'),
+                    subtitle: AppStrings.t(
+                      context,
+                      'progress_levels_locked_subtitle',
+                    ),
+                    icon: Icons.lock_outline,
+                  ),
+                const SizedBox(height: 18),
+
+                if (_user!.isPremium)
+                  _buildScoreCard()
+                else
+                  _lockedFeatureCard(
+                    title: AppStrings.t(context, 'score_title'),
+                    subtitle: AppStrings.t(context, 'score_locked_subtitle'),
+                    icon: Icons.shield_outlined,
+                  ),
+                const SizedBox(height: 18),
+                _buildDistributionCard(d),
+
+                const SizedBox(height: 16),
+                _SummaryRow(
+                  fixed: d.fixedExpensesTotal,
+                  variable: d.variableExpensesTotal,
+                  invest: d.investmentsTotal,
+                  free: d.remainingSalary,
+                  salary: d.salary,
+                ),
+
+                const SizedBox(height: 18),
+                if (_user!.isPremium)
+                  _comparisonCard(d)
+                else
+                  _lockedFeatureCard(
+                    title: AppStrings.t(context, 'compare_title'),
+                    subtitle: AppStrings.t(
+                      context,
+                      'compare_locked_subtitle',
+                    ),
+                    icon: Icons.compare_arrows,
+                  ),
+
+                const SizedBox(height: 18),
+                _creditCardBillsSection(d),
+                const SizedBox(height: 12),
+                Align(
+                  alignment: Alignment.centerLeft,
+                  child: TextButton.icon(
+                    onPressed: _addCard,
+                    icon: const Icon(Icons.add_card),
+                    label: Text(AppStrings.t(context, 'card_add')),
+                    style: TextButton.styleFrom(
+                      foregroundColor: Theme.of(context).colorScheme.primary,
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 18),
+                Row(
+                  children: [
+                    Text(
+                      AppStrings.t(context, 'month_entries'),
+                      style: TextStyle(
+                        color: AppTheme.textPrimary(context),
+                        fontWeight: FontWeight.w800,
+                        fontSize: 17,
+                      ),
+                    ),
+                    const SizedBox(width: 10),
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 10, vertical: 6),
+                      decoration: AppTheme.tintedPanelDecoration(
+                        context,
+                        tint: Theme.of(context).colorScheme.primary,
+                        radius: 999,
+                        tintOpacity: 0.08,
+                      ),
+                      child: Text(
+                        '${d.expenses.length}',
                         style: TextStyle(
                           color: AppTheme.textPrimary(context),
                           fontWeight: FontWeight.w800,
-                          fontSize: 17,
+                          fontSize: 12,
                         ),
-                      ),
-                      const SizedBox(width: 10),
-                      Container(
-                        padding: const EdgeInsets.symmetric(
-                            horizontal: 10, vertical: 6),
-                        decoration: AppTheme.tintedPanelDecoration(
-                          context,
-                          tint: Theme.of(context).colorScheme.primary,
-                          radius: 999,
-                          tintOpacity: 0.08,
-                        ),
-                        child: Text(
-                          '${d.expenses.length}',
-                          style: TextStyle(
-                            color: AppTheme.textPrimary(context),
-                            fontWeight: FontWeight.w800,
-                            fontSize: 12,
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 10),
-
-                  if (d.expenses.isEmpty)
-                    EducationalEmptyState(
-                      title: AppStrings.t(context, 'dashboard_empty_title'),
-                      message: AppStrings.t(context, 'dashboard_empty_message'),
-                      icon: Icons.receipt_long_outlined,
-                      action: ElevatedButton(
-                        onPressed: _openAddMenu,
-                        child:
-                            Text(AppStrings.t(context, 'dashboard_empty_cta')),
-                      ),
-                    )
-                  else
-                    ...d.expenses.map(
-                      (e) => _ExpenseTile(
-                        expense: e,
-                        onTogglePaid: (e.isFixed && !e.isCreditCard)
-                            ? () => _toggleExpensePaid(e, !e.isPaid)
-                            : null,
-                        onEdit: () => _editExpense(e),
-                        onDelete: () => _deleteExpense(e),
                       ),
                     ),
-                  const SizedBox(height: 104),
-                ],
-              ),
+                  ],
+                ),
+                const SizedBox(height: 10),
+
+                if (d.expenses.isEmpty)
+                  EducationalEmptyState(
+                    title: AppStrings.t(context, 'dashboard_empty_title'),
+                    message: AppStrings.t(context, 'dashboard_empty_message'),
+                    icon: Icons.receipt_long_outlined,
+                    action: ElevatedButton(
+                      onPressed: _openAddMenu,
+                      child: Text(AppStrings.t(context, 'dashboard_empty_cta')),
+                    ),
+                  )
+                else
+                  ...d.expenses.map(
+                    (e) => _ExpenseTile(
+                      expense: e,
+                      onTogglePaid: (e.isFixed && !e.isCreditCard)
+                          ? () => _toggleExpensePaid(e, !e.isPaid)
+                          : null,
+                      onEdit: () => _editExpense(e),
+                      onDelete: () => _deleteExpense(e),
+                    ),
+                  ),
+                const SizedBox(height: 104),
+              ],
             ),
-          ],
+          ),
         ),
       ),
     );
