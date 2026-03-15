@@ -68,7 +68,8 @@ class LocalDatabaseService {
     _data['users'] = _data['users'] as List<dynamic>? ?? <dynamic>[];
     _data['dashboards'] = _data['dashboards'] as List<dynamic>? ?? <dynamic>[];
     _data['goals'] = _data['goals'] as List<dynamic>? ?? <dynamic>[];
-    _data['settings'] = _data['settings'] as Map<String, dynamic>? ?? <String, dynamic>{};
+    _data['settings'] =
+        _data['settings'] as Map<String, dynamic>? ?? <String, dynamic>{};
   }
 
   static Future<void> _persist() async {
@@ -161,6 +162,45 @@ class LocalDatabaseService {
     await _persist();
   }
 
+  static Future<void> deleteUserData({
+    String? email,
+    String? uid,
+  }) async {
+    _ensureInit();
+
+    final normalizedEmail = email?.trim().toLowerCase() ?? '';
+    if (normalizedEmail.isNotEmpty) {
+      final users = _data['users'] as List<dynamic>;
+      users.removeWhere((u) {
+        final map = u as Map<String, dynamic>;
+        return (map['email'] as String?)?.toLowerCase() == normalizedEmail;
+      });
+
+      final dashboards = _data['dashboards'] as List<dynamic>;
+      dashboards.removeWhere((d) {
+        final map = d as Map<String, dynamic>;
+        return map['email']?.toString().toLowerCase() == normalizedEmail;
+      });
+
+      final goals = _data['goals'] as List<dynamic>;
+      goals.removeWhere((g) {
+        final map = g as Map<String, dynamic>;
+        return map['email']?.toString().toLowerCase() == normalizedEmail;
+      });
+    }
+
+    final normalizedUid = uid?.trim() ?? '';
+    if (normalizedUid.isNotEmpty) {
+      final settings = _data['settings'] as Map<String, dynamic>;
+      settings.removeWhere(
+        (key, _) =>
+            key.endsWith(normalizedUid) || key.contains('_$normalizedUid'),
+      );
+    }
+
+    await _persist();
+  }
+
   // ================= USERS =================
 
   static Future<List<UserProfile>> getUsers() async {
@@ -196,11 +236,10 @@ class LocalDatabaseService {
             (d as Map<String, dynamic>)['email'].toString().toLowerCase() ==
             email.toLowerCase())
         .map((d) {
-          final map = Map<String, dynamic>.from(d as Map<String, dynamic>);
-          map.remove('email');
-          return MonthlyDashboard.fromJson(map);
-        })
-        .toList();
+      final map = Map<String, dynamic>.from(d as Map<String, dynamic>);
+      map.remove('email');
+      return MonthlyDashboard.fromJson(map);
+    }).toList();
   }
 
   static Future<void> replaceDashboards(
@@ -230,11 +269,10 @@ class LocalDatabaseService {
             (g as Map<String, dynamic>)['email'].toString().toLowerCase() ==
             email.toLowerCase())
         .map((g) {
-          final map = Map<String, dynamic>.from(g as Map<String, dynamic>);
-          map.remove('email');
-          return Goal.fromJson(map);
-        })
-        .toList();
+      final map = Map<String, dynamic>.from(g as Map<String, dynamic>);
+      map.remove('email');
+      return Goal.fromJson(map);
+    }).toList();
   }
 
   static Future<void> replaceGoals(String email, List<Goal> goals) async {

@@ -18,6 +18,16 @@ import 'local_database_service.dart';
 import 'firestore_service.dart';
 import 'notification_service.dart';
 
+class AccountDeletionException implements Exception {
+  AccountDeletionException(this.code, {this.details});
+
+  final String code;
+  final Object? details;
+
+  @override
+  String toString() => 'AccountDeletionException($code)';
+}
+
 class LocalStorageService {
   LocalStorageService._();
 
@@ -170,6 +180,13 @@ class LocalStorageService {
   static String? get currentUserId => _currentUserId;
   static String? get lastSyncError => _lastSyncError;
   static String? get lastLoginError => _lastLoginError;
+  static bool get currentUserUsesPasswordProvider =>
+      _auth.currentUser?.providerData.any((p) => p.providerId == 'password') ??
+      false;
+  static bool get currentUserUsesGoogleProvider =>
+      _auth.currentUser?.providerData
+          .any((p) => p.providerId == 'google.com') ??
+      false;
   static UserProfile? getUserProfile() {
     if (_loggedOut) return null;
     if (_currentUserEmail == null || _currentUserEmail!.isEmpty) {
@@ -512,6 +529,88 @@ class LocalStorageService {
       await _googleSignInClient().signOut();
     } catch (_) {}
     await _auth.signOut();
+  }
+
+  static Future<void> deleteCurrentAccount({String? password}) async {
+    await _ensureInit();
+
+    final authUser = _auth.currentUser;
+    final uid = authUser?.uid ?? _currentUserId;
+    final email = (authUser?.email ?? _currentUserEmail ?? '').trim();
+    if (authUser == null || uid == null || uid.isEmpty || email.isEmpty) {
+      throw AccountDeletionException('not-authenticated');
+    }
+
+    final providers = authUser.providerData.map((p) => p.providerId).toSet();
+    if (providers.contains('password')) {
+      final normalizedPassword = password ?? '';
+      if (normalizedPassword.isEmpty) {
+        throw AccountDeletionException('password-required');
+      }
+      try {
+        final credential = EmailAuthProvider.credential(
+          email: email,
+          password: normalizedPassword,
+        );
+        await authUser.reauthenticateWithCredential(credential);
+      } on FirebaseAuthException catch (e) {
+        throw AccountDeletionException(e.code, details: e);
+      }
+    } else if (providers.contains('google.com')) {
+      try {
+        final googleSignIn = _googleSignInClient();
+        try {
+          await googleSignIn.signOut();
+        } catch (_) {}
+
+        final googleUser = await googleSignIn.signIn();
+        if (googleUser == null) {
+          throw AccountDeletionException('reauth-cancelled');
+        }
+
+        final googleAuth = await googleUser.authentication;
+        final credential = GoogleAuthProvider.credential(
+          accessToken: googleAuth.accessToken,
+          idToken: googleAuth.idToken,
+        );
+        await authUser.reauthenticateWithCredential(credential);
+      } on AccountDeletionException {
+        rethrow;
+      } on FirebaseAuthException catch (e) {
+        throw AccountDeletionException(e.code, details: e);
+      } on PlatformException catch (e) {
+        throw AccountDeletionException(e.code, details: e);
+      } catch (e) {
+        throw AccountDeletionException('reauth-failed', details: e);
+      }
+    } else {
+      throw AccountDeletionException('unsupported-provider');
+    }
+
+    try {
+      await FirestoreService.deleteUserAccount(uid: uid, email: email);
+      await LocalDatabaseService.deleteUserData(email: email, uid: uid);
+      await authUser.delete();
+    } on FirebaseAuthException catch (e) {
+      throw AccountDeletionException(e.code, details: e);
+    } catch (e) {
+      throw AccountDeletionException('delete-failed', details: e);
+    }
+
+    _accounts.removeWhere((u) => u.email.toLowerCase() == email.toLowerCase());
+    _currentUserEmail = null;
+    _currentUserId = null;
+    _loggedOut = true;
+    _stopUserListener();
+    _dashboards.clear();
+    _goals.clear();
+    _incomes.clear();
+    userNotifier.value = null;
+    syncNotifier.value = true;
+
+    try {
+      await _googleSignInClient().signOut();
+    } catch (_) {}
   }
 
   static Future<bool> updateMonthlyIncome(double income) async {

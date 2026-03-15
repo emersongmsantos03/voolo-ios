@@ -15,6 +15,7 @@ import '../../core/utils/sensitive_display.dart';
 import '../../models/user_profile.dart';
 import '../../models/credit_card.dart';
 import '../../models/income_source.dart';
+import '../../routes/app_routes.dart';
 import '../../services/local_storage_service.dart';
 import '../../services/notification_service.dart';
 import '../../theme/app_colors.dart';
@@ -300,6 +301,113 @@ class _ProfilePageState extends State<ProfilePage> {
 
   void _snack(String msg) {
     ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(msg)));
+  }
+
+  String _accountDeletionErrorMessage(AccountDeletionException error) {
+    switch (error.code) {
+      case 'password-required':
+        return 'Digite sua senha atual para confirmar a exclusao da conta.';
+      case 'wrong-password':
+      case 'invalid-credential':
+        return 'Senha incorreta. Confira e tente novamente.';
+      case 'requires-recent-login':
+        return 'Por seguranca, faca login novamente e tente excluir a conta.';
+      case 'reauth-cancelled':
+        return 'A confirmacao foi cancelada antes da exclusao.';
+      case 'network-request-failed':
+        return 'Sem conexao. Tente novamente quando a internet voltar.';
+      case 'unsupported-provider':
+        return 'Este metodo de login ainda nao suporta exclusao automatica.';
+      default:
+        return 'Nao foi possivel excluir a conta agora. Tente novamente.';
+    }
+  }
+
+  Future<void> _deleteAccount() async {
+    final needsPassword = LocalStorageService.currentUserUsesPasswordProvider;
+    final confirmationController = TextEditingController();
+    final passwordController = TextEditingController();
+
+    final confirmed = await showDialog<bool>(
+      context: context,
+      barrierDismissible: false,
+      builder: (dialogContext) => AlertDialog(
+        title: const Text('Excluir conta'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text(
+              'Esta acao remove seu acesso e apaga seus dados sincronizados do app. Digite EXCLUIR para confirmar.',
+            ),
+            const SizedBox(height: 12),
+            TextField(
+              controller: confirmationController,
+              textCapitalization: TextCapitalization.characters,
+              decoration: const InputDecoration(
+                labelText: 'Confirmacao',
+                hintText: 'EXCLUIR',
+              ),
+            ),
+            if (needsPassword) ...[
+              const SizedBox(height: 12),
+              TextField(
+                controller: passwordController,
+                obscureText: true,
+                decoration: const InputDecoration(
+                  labelText: 'Senha atual',
+                ),
+              ),
+            ],
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(dialogContext, false),
+            child: const Text('Cancelar'),
+          ),
+          ElevatedButton(
+            onPressed: () {
+              final confirmation =
+                  confirmationController.text.trim().toUpperCase();
+              if (confirmation != 'EXCLUIR') {
+                return;
+              }
+              Navigator.pop(dialogContext, true);
+            },
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Colors.redAccent,
+              foregroundColor: Colors.white,
+            ),
+            child: const Text('Excluir conta'),
+          ),
+        ],
+      ),
+    );
+
+    final password = passwordController.text;
+    confirmationController.dispose();
+    passwordController.dispose();
+
+    if (confirmed != true) return;
+
+    setState(() => _saving = true);
+    try {
+      await LocalStorageService.deleteCurrentAccount(password: password);
+      if (!mounted) return;
+      Navigator.pushNamedAndRemoveUntil(
+        context,
+        AppRoutes.login,
+        (route) => false,
+      );
+    } on AccountDeletionException catch (e) {
+      if (!mounted) return;
+      _snack(_accountDeletionErrorMessage(e));
+    } finally {
+      if (mounted) {
+        setState(() => _saving = false);
+      }
+    }
   }
 
   Future<String?> _askIncomeDeleteScope() async {
@@ -644,6 +752,49 @@ class _ProfilePageState extends State<ProfilePage> {
                         child: CircularProgressIndicator(strokeWidth: 2),
                       )
                     : Text(AppStrings.t(context, 'save')),
+              ),
+            ),
+            const SizedBox(height: 18),
+            Container(
+              padding: const EdgeInsets.all(14),
+              decoration: BoxDecoration(
+                color: Colors.redAccent.withValues(alpha: 0.08),
+                borderRadius: BorderRadius.circular(12),
+                border:
+                    Border.all(color: Colors.redAccent.withValues(alpha: 0.2)),
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Text(
+                    'Zona de risco',
+                    style: TextStyle(
+                      fontWeight: FontWeight.w700,
+                      color: Colors.redAccent,
+                    ),
+                  ),
+                  const SizedBox(height: 6),
+                  Text(
+                    'Se voce nao quiser mais usar o Voolo, exclua sua conta por aqui. Esta acao e permanente.',
+                    style: TextStyle(
+                      color: AppTheme.textSecondary(context),
+                      fontSize: 12,
+                    ),
+                  ),
+                  const SizedBox(height: 10),
+                  SizedBox(
+                    width: double.infinity,
+                    child: OutlinedButton.icon(
+                      onPressed: _saving ? null : _deleteAccount,
+                      icon: const Icon(Icons.delete_forever_outlined),
+                      label: const Text('Excluir minha conta'),
+                      style: OutlinedButton.styleFrom(
+                        foregroundColor: Colors.redAccent,
+                        side: const BorderSide(color: Colors.redAccent),
+                      ),
+                    ),
+                  ),
+                ],
               ),
             ),
           ],
