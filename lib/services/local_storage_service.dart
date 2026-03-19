@@ -675,6 +675,14 @@ class LocalStorageService {
     await _auth?.signOut();
   }
 
+  static Future<void> deleteCurrentAccount() async {
+    final uid = _resolvedUid();
+    if (uid != null && uid.isNotEmpty) {
+      await FirestoreService.deleteUserAccount(uid);
+    }
+    await logout();
+  }
+
   static Future<bool> updateMonthlyIncome(double income) async {
     final user = getUserProfile();
     if (user == null || _currentUserId == null) return false;

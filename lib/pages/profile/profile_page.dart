@@ -717,6 +717,30 @@ class _ProfilePageState extends State<ProfilePage> {
                     : Text(AppStrings.t(context, 'save')),
               ),
             ),
+            const SizedBox(height: 16),
+            TextButton(
+              onPressed: () async {
+                final confirm = await showDialog<bool>(
+                  context: context,
+                  builder: (ctx) => AlertDialog(
+                    title: const Text('Excluir minha conta'),
+                    content: const Text('Deseja excluir sua conta permanentemente?'),
+                    actions: [
+                      TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Cancelar')),
+                      ElevatedButton(
+                        style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
+                        onPressed: () => Navigator.pop(ctx, true), 
+                        child: const Text('Excluir', style: TextStyle(color: Colors.white)),
+                      ),
+                    ],
+                  ),
+                );
+                if (confirm == true) {
+                  await LocalStorageService.deleteCurrentAccount();
+                }
+              },
+              child: const Text('Excluir minha conta', style: TextStyle(color: Colors.red)),
+            ),
           ],
         ),
       ),

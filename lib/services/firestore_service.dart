@@ -73,6 +73,16 @@ class FirestoreService {
     return _userDoc(uid).collection('investmentPlan').doc('current');
   }
 
+  static Future<void> deleteUserAccount(String uid) async {
+    try {
+      await _userDoc(uid).delete();
+      final user = _auth.currentUser;
+      if (user != null && user.uid == uid) {
+        await user.delete();
+      }
+    } catch (_) {}
+  }
+
   // --- FIXED SERIES (Recurring Monthly) ---
   static CollectionReference<Map<String, dynamic>> _fixedSeries(String uid) {
     return _userDoc(uid).collection('fixedSeries');
