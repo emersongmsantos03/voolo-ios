@@ -3,6 +3,7 @@ import 'package:lucide_icons/lucide_icons.dart';
 
 import '../../core/constants/app_colors.dart';
 import '../../core/localization/app_strings.dart';
+import '../../core/theme/app_theme.dart';
 import '../../core/ui/responsive.dart';
 import '../../models/goal.dart';
 import '../../services/firestore_service.dart';
@@ -141,6 +142,22 @@ class _GoalsPageState extends State<GoalsPage> {
     }
   }
 
+  BoxDecoration _cardDecoration({bool highlighted = false}) {
+    return AppTheme.premiumCardDecoration(context, highlighted: highlighted);
+  }
+
+  Widget _eyebrow(String text) {
+    return Text(
+      text.toUpperCase(),
+      style: TextStyle(
+        color: AppTheme.textMuted(context),
+        fontSize: 11,
+        fontWeight: FontWeight.w800,
+        letterSpacing: 1,
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final uid = _currentUid();
@@ -187,28 +204,46 @@ class _GoalsPageState extends State<GoalsPage> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                // HEADER
                 Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
-                    Text(
-                      AppStrings.t(context, 'goals_title'),
-                      style: const TextStyle(
-                        fontSize: 28,
-                        fontWeight: FontWeight.bold,
-                        color: Colors.white,
+                    if (Navigator.of(context).canPop()) ...[
+                      IconButton(
+                        onPressed: () => Navigator.of(context).maybePop(),
+                        style: IconButton.styleFrom(
+                          backgroundColor:
+                              Theme.of(context).colorScheme.surfaceContainerLow,
+                          foregroundColor: AppTheme.textPrimary(context),
+                          padding: const EdgeInsets.all(12),
+                        ),
+                        icon: const Icon(Icons.arrow_back_rounded, size: 18),
+                        tooltip: 'Voltar',
+                      ),
+                      const SizedBox(width: 12),
+                    ],
+                    Expanded(
+                      child: Text(
+                        AppStrings.t(context, 'goals_title'),
+                        style: TextStyle(
+                          fontSize: 28,
+                          fontWeight: FontWeight.w800,
+                          color: AppTheme.textPrimary(context),
+                          letterSpacing: -0.8,
+                        ),
                       ),
                     ),
                     IconButton(
                       onPressed: () => _showAddGoalModal(context),
                       icon: Container(
-                        padding: const EdgeInsets.all(8),
+                        padding: const EdgeInsets.all(10),
                         decoration: BoxDecoration(
-                          color: AppColors.primary,
-                          shape: BoxShape.circle,
+                          color: Theme.of(context).colorScheme.primary,
+                          borderRadius: BorderRadius.circular(16),
                         ),
-                        child: const Icon(LucideIcons.plus,
-                            color: Colors.white, size: 20),
+                        child: Icon(
+                          LucideIcons.plus,
+                          color: Theme.of(context).colorScheme.onPrimary,
+                          size: 18,
+                        ),
                       ),
                     ),
                   ],
@@ -216,22 +251,22 @@ class _GoalsPageState extends State<GoalsPage> {
                 const SizedBox(height: 24),
                 Container(
                   padding: const EdgeInsets.all(12),
-                  decoration: BoxDecoration(
-                    color: Colors.white.withValues(alpha: 0.05),
-                    borderRadius: BorderRadius.circular(12),
-                    border:
-                        Border.all(color: Colors.white.withValues(alpha: 0.1)),
-                  ),
+                  decoration: _cardDecoration(),
                   child: Row(
                     children: [
-                      const Icon(LucideIcons.sparkles,
-                          color: Colors.white70, size: 16),
+                      Icon(
+                        LucideIcons.sparkles,
+                        color: Theme.of(context).colorScheme.primary,
+                        size: 16,
+                      ),
                       const SizedBox(width: 8),
                       Expanded(
                         child: Text(
                           AppStrings.t(context, 'goals_quick_tip'),
-                          style: const TextStyle(
-                              color: Colors.white70, fontSize: 12),
+                          style: TextStyle(
+                            color: AppTheme.textSecondary(context),
+                            fontSize: 12,
+                          ),
                         ),
                       ),
                     ],
@@ -244,33 +279,32 @@ class _GoalsPageState extends State<GoalsPage> {
                   child: Container(
                     padding:
                         const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                    decoration: BoxDecoration(
-                      color: Colors.white.withValues(alpha: 0.05),
-                      borderRadius: BorderRadius.circular(30),
-                      border: Border.all(
-                          color: Colors.white.withValues(alpha: 0.1)),
-                    ),
+                    decoration: _cardDecoration(),
                     child: Row(
                       mainAxisSize: MainAxisSize.min,
                       children: [
                         IconButton(
-                          icon: const Icon(LucideIcons.chevronLeft,
-                              color: Colors.white70),
+                          icon: Icon(
+                            LucideIcons.chevronLeft,
+                            color: AppTheme.textSecondary(context),
+                          ),
                           onPressed: () => setState(() => _selectedYear--),
                         ),
                         const SizedBox(width: 16),
                         Text(
                           '$_selectedYear',
-                          style: const TextStyle(
+                          style: TextStyle(
                             fontSize: 20,
-                            fontWeight: FontWeight.bold,
-                            color: Colors.white,
+                            fontWeight: FontWeight.w800,
+                            color: AppTheme.textPrimary(context),
                           ),
                         ),
                         const SizedBox(width: 16),
                         IconButton(
-                          icon: const Icon(LucideIcons.chevronRight,
-                              color: Colors.white70),
+                          icon: Icon(
+                            LucideIcons.chevronRight,
+                            color: AppTheme.textSecondary(context),
+                          ),
                           onPressed: () => setState(() => _selectedYear++),
                         ),
                       ],
@@ -325,7 +359,6 @@ class _GoalsPageState extends State<GoalsPage> {
     );
 
     return Scaffold(
-      backgroundColor: AppColors.background,
       body: PremiumGate(
         isPremium: isPremium,
         title: AppStrings.t(context, 'goals_premium_title'),
@@ -343,10 +376,10 @@ class _GoalsPageState extends State<GoalsPage> {
   Widget _buildSectionTitle(String title) {
     return Text(
       title,
-      style: const TextStyle(
+      style: TextStyle(
         fontSize: 18,
-        fontWeight: FontWeight.w600,
-        color: Colors.white,
+        fontWeight: FontWeight.w700,
+        color: AppTheme.textPrimary(context),
       ),
     );
   }
@@ -354,21 +387,18 @@ class _GoalsPageState extends State<GoalsPage> {
   Widget _buildProgressCard(int completed, int total, double progress) {
     return Container(
       padding: const EdgeInsets.all(20),
-      decoration: BoxDecoration(
-        color: AppColors.surface,
-        borderRadius: BorderRadius.circular(18),
-        border: Border.all(color: Colors.white.withValues(alpha: 0.1)),
-      ),
+      decoration: _cardDecoration(),
       child: Column(
         children: [
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
               Text(AppStrings.t(context, 'completed_label'),
-                  style: const TextStyle(color: Colors.white70)),
+                  style: TextStyle(color: AppTheme.textSecondary(context))),
               Text('${(progress * 100).toInt()}%',
-                  style: const TextStyle(
-                      color: Colors.white, fontWeight: FontWeight.bold)),
+                  style: TextStyle(
+                      color: AppTheme.textPrimary(context),
+                      fontWeight: FontWeight.bold)),
             ],
           ),
           const SizedBox(height: 12),
@@ -376,8 +406,9 @@ class _GoalsPageState extends State<GoalsPage> {
             borderRadius: BorderRadius.circular(10),
             child: LinearProgressIndicator(
               value: progress,
-              backgroundColor: Colors.white.withValues(alpha: 0.1),
-              color: AppColors.primary,
+              backgroundColor:
+                  Theme.of(context).colorScheme.surfaceContainerHighest,
+              color: Theme.of(context).colorScheme.primary,
               minHeight: 8,
             ),
           ),
@@ -387,7 +418,10 @@ class _GoalsPageState extends State<GoalsPage> {
             child: Text(
               AppStrings.tr(context, 'goals_completed_count',
                   {'done': '$completed', 'total': '$total'}),
-              style: const TextStyle(color: Colors.white54, fontSize: 13),
+              style: TextStyle(
+                color: AppTheme.textSecondary(context),
+                fontSize: 13,
+              ),
             ),
           ),
         ],
@@ -406,11 +440,7 @@ class _GoalsPageState extends State<GoalsPage> {
     return Container(
       margin: const EdgeInsets.only(bottom: 12),
       padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: AppColors.surface,
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: Colors.white.withValues(alpha: 0.1)),
-      ),
+      decoration: _cardDecoration(),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -433,8 +463,8 @@ class _GoalsPageState extends State<GoalsPage> {
                         children: [
                           Text(
                             _translate(goal.title),
-                            style: const TextStyle(
-                              color: Colors.white,
+                            style: TextStyle(
+                              color: AppTheme.textPrimary(context),
                               fontWeight: FontWeight.w600,
                               fontSize: 16,
                             ),
@@ -465,8 +495,9 @@ class _GoalsPageState extends State<GoalsPage> {
                         goal.completed
                             ? LucideIcons.checkCircle
                             : LucideIcons.circle,
-                        color:
-                            goal.completed ? AppColors.green : Colors.white24,
+                        color: goal.completed
+                            ? AppColors.green
+                            : AppTheme.textMuted(context),
                       ),
                       onPressed: () async {
                         final newVal = !goal.completed;
@@ -491,8 +522,8 @@ class _GoalsPageState extends State<GoalsPage> {
                     if (!goal.id
                         .startsWith('income_')) // Prevent deleting mandatory
                       IconButton(
-                        icon: const Icon(LucideIcons.trash2,
-                            color: Colors.white24, size: 18),
+                        icon: Icon(LucideIcons.trash2,
+                            color: AppTheme.textMuted(context), size: 18),
                         onPressed: () =>
                             FirestoreService.deleteGoal(uid, goal.id),
                       ),
@@ -503,7 +534,10 @@ class _GoalsPageState extends State<GoalsPage> {
                     padding: const EdgeInsets.only(top: 4, right: 40),
                     child: Text(
                       _translate(goal.description),
-                      style: TextStyle(color: Colors.white60, fontSize: 13),
+                      style: TextStyle(
+                        color: AppTheme.textSecondary(context),
+                        fontSize: 13,
+                      ),
                     ),
                   ),
               ],
@@ -523,11 +557,7 @@ class _GoalsPageState extends State<GoalsPage> {
     return Container(
       margin: const EdgeInsets.only(bottom: 12),
       padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: AppColors.surface,
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: Colors.white.withValues(alpha: 0.1)),
-      ),
+      decoration: _cardDecoration(),
       child: Row(
         children: [
           Container(
@@ -545,14 +575,17 @@ class _GoalsPageState extends State<GoalsPage> {
               children: [
                 Text(
                   _translate(s['titleKey'] as String),
-                  style: const TextStyle(
-                      color: Colors.white,
+                  style: TextStyle(
+                      color: AppTheme.textPrimary(context),
                       fontWeight: FontWeight.bold,
                       fontSize: 15),
                 ),
                 Text(
                   _translate(s['descriptionKey'] as String),
-                  style: const TextStyle(color: Colors.white54, fontSize: 12),
+                  style: TextStyle(
+                    color: AppTheme.textSecondary(context),
+                    fontSize: 12,
+                  ),
                 ),
               ],
             ),
@@ -649,20 +682,15 @@ class _GoalsPageState extends State<GoalsPage> {
     return Container(
       width: double.infinity,
       padding: EdgeInsets.all(Responsive.isCompactPhone(context) ? 20 : 32),
-      decoration: BoxDecoration(
-        color: Colors.white.withValues(alpha: 0.02),
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(
-          color: Colors.white.withValues(alpha: 0.1),
-          style: BorderStyle
-              .none, // dashed border hard in flutter without packages
-        ),
-      ),
+      decoration: _cardDecoration(),
       child: Column(
         children: [
-          Icon(icon, color: Colors.white54, size: 32),
+          Icon(icon, color: AppTheme.textSecondary(context), size: 32),
           const SizedBox(height: 12),
-          Text(msg, style: TextStyle(color: Colors.white60)),
+          Text(
+            msg,
+            style: TextStyle(color: AppTheme.textSecondary(context)),
+          ),
         ],
       ),
     );
@@ -678,7 +706,7 @@ class _GoalsPageState extends State<GoalsPage> {
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
-      backgroundColor: AppColors.surface,
+      backgroundColor: Theme.of(context).colorScheme.surface,
       shape: const RoundedRectangleBorder(
           borderRadius: BorderRadius.vertical(top: Radius.circular(24))),
       builder: (_) => _AddGoalSheet(
@@ -733,21 +761,15 @@ class _AddGoalSheetState extends State<_AddGoalSheet> {
             style: TextStyle(
               fontSize: 20,
               fontWeight: FontWeight.bold,
-              color: Colors.white,
+              color: AppTheme.textPrimary(context),
             ),
           ),
           const SizedBox(height: 24),
           TextField(
             controller: _titleController,
-            style: const TextStyle(color: Colors.white),
             decoration: InputDecoration(
               labelText: AppStrings.t(context, 'goals_title_label'),
               hintText: AppStrings.t(context, 'goals_title_hint'),
-              labelStyle: const TextStyle(color: Colors.white60),
-              filled: true,
-              fillColor: Colors.white.withValues(alpha: 0.05),
-              border:
-                  OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
             ),
           ),
           const SizedBox(height: 16),
@@ -765,19 +787,24 @@ class _AddGoalSheetState extends State<_AddGoalSheet> {
                     decoration: BoxDecoration(
                       color: selected
                           ? AppColors.primary
-                          : Colors.white.withValues(alpha: 0.05),
+                          : Theme.of(context).colorScheme.surfaceContainerHigh,
                       borderRadius: BorderRadius.circular(20),
                       border: Border.all(
                         color: selected
                             ? AppColors.primary
-                            : Colors.white.withValues(alpha: 0.1),
+                            : Theme.of(context)
+                                .colorScheme
+                                .outline
+                                .withValues(alpha: 0.18),
                       ),
                     ),
                     child: Text(
                       AppStrings.t(context, 'goals_type_${type.name}')
                           .toUpperCase(),
                       style: TextStyle(
-                        color: selected ? Colors.white : Colors.white60,
+                        color: selected
+                            ? Theme.of(context).colorScheme.onPrimary
+                            : AppTheme.textSecondary(context),
                         fontSize: 12,
                         fontWeight: FontWeight.bold,
                       ),
@@ -790,15 +817,9 @@ class _AddGoalSheetState extends State<_AddGoalSheet> {
           const SizedBox(height: 16),
           TextField(
             controller: _descController,
-            style: const TextStyle(color: Colors.white),
             maxLines: 3,
             decoration: InputDecoration(
               labelText: AppStrings.t(context, 'goals_description_optional'),
-              labelStyle: const TextStyle(color: Colors.white60),
-              filled: true,
-              fillColor: Colors.white.withValues(alpha: 0.05),
-              border:
-                  OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
             ),
           ),
           const SizedBox(height: 24),
@@ -845,7 +866,7 @@ class _AddGoalSheetState extends State<_AddGoalSheet> {
                 style: const TextStyle(
                   fontSize: 16,
                   fontWeight: FontWeight.bold,
-                  color: Colors.white,
+                  color: Colors.black,
                 ),
               ),
             ),

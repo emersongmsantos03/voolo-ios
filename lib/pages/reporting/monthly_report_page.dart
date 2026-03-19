@@ -18,6 +18,7 @@ import '../../theme/app_colors.dart';
 import '../../utils/money_input.dart';
 import '../../utils/date_utils.dart';
 import '../../utils/expense_filter_utils.dart';
+import '../../utils/finance_overview_utils.dart';
 import '../../routes/app_routes.dart';
 import '../../core/plans/user_plan.dart';
 import '../../widgets/money_visibility_button.dart';
@@ -40,6 +41,8 @@ class _MonthlyReportPageState extends State<MonthlyReportPage> {
   bool _shouldOpenInsights = false;
   bool _didOpenInsights = false;
   bool _tourMode = false;
+  double _lifetimeInvestedTotal = 0.0;
+  bool _lifetimeInvestedLoading = false;
   late final VoidCallback _userListener;
   late final VoidCallback _dashboardListener;
   final Set<String> _dueDateBackfillDone = {};
@@ -72,6 +75,7 @@ class _MonthlyReportPageState extends State<MonthlyReportPage> {
     _resetFiltersToDefault(apply: true);
     _listenTransactions();
     _loadPrevExpenses();
+    unawaited(_loadLifetimeInvestedTotal());
     final user = LocalStorageService.getUserProfile();
     if (user != null && user.isPremium) {
       LocalStorageService.markReportViewed();
@@ -110,10 +114,54 @@ class _MonthlyReportPageState extends State<MonthlyReportPage> {
 
   void _load() {
     _dashboard = LocalStorageService.getDashboard(
-        _currentMonth.month, _currentMonth.year);
+      _currentMonth.month,
+      _currentMonth.year,
+    );
     _listenTransactions();
     _loadPrevExpenses();
+    unawaited(_loadLifetimeInvestedTotal());
     setState(() {});
+  }
+
+  Future<void> _loadLifetimeInvestedTotal() async {
+    final uid = LocalStorageService.currentUserId;
+    if (uid == null || uid.isEmpty) {
+      if (!mounted) return;
+      setState(() {
+        _lifetimeInvestedTotal = 0.0;
+        _lifetimeInvestedLoading = false;
+      });
+      return;
+    }
+
+    if (mounted) {
+      setState(() => _lifetimeInvestedLoading = true);
+    }
+    final total = await FirestoreService.getLifetimeInvestedTotal(uid);
+    if (!mounted) return;
+    setState(() {
+      _lifetimeInvestedTotal = total;
+      _lifetimeInvestedLoading = false;
+    });
+  }
+
+  void _showLifetimeInvestedInfo() {
+    showDialog<void>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Total investido'),
+        content: const Text(
+          'Este valor soma apenas o que foi investido ao longo dos meses. '
+          'Os rendimentos nao aparecem aqui.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(),
+            child: const Text('Entendi'),
+          ),
+        ],
+      ),
+    );
   }
 
   DateTime get _monthStart =>
@@ -150,8 +198,10 @@ class _MonthlyReportPageState extends State<MonthlyReportPage> {
         '${_currentMonth.year}-${_currentMonth.month.toString().padLeft(2, '0')}';
     if (!_dueDateBackfillDone.contains(monthYear)) {
       _dueDateBackfillDone.add(monthYear);
-      FirestoreService.backfillDueDatesForMonth(uid, monthYear)
-          .catchError((_) {});
+      FirestoreService.backfillDueDatesForMonth(
+        uid,
+        monthYear,
+      ).catchError((_) {});
     }
     final keys = _categoryFilters
         .map((c) => toCategoryKey(c.name))
@@ -193,8 +243,9 @@ class _MonthlyReportPageState extends State<MonthlyReportPage> {
 
   MonthlyDashboard? _currentView() {
     final base = _dashboard;
-    final salaryFallback =
-        LocalStorageService.incomeTotalForMonth(_currentMonth);
+    final salaryFallback = LocalStorageService.incomeTotalForMonth(
+      _currentMonth,
+    );
     final profileIncome =
         LocalStorageService.getUserProfile()?.monthlyIncome ?? 0;
     final resolvedFallback =
@@ -283,7 +334,10 @@ class _MonthlyReportPageState extends State<MonthlyReportPage> {
     await LocalStorageService.logout();
     if (!mounted) return;
     Navigator.pushNamedAndRemoveUntil(
-        context, AppRoutes.login, (route) => false);
+      context,
+      AppRoutes.login,
+      (route) => false,
+    );
   }
 
   Widget _logoutButton() {
@@ -308,9 +362,7 @@ class _MonthlyReportPageState extends State<MonthlyReportPage> {
   }
 
   void _snack(String msg) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text(msg)),
-    );
+    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(msg)));
   }
 
   void _resetFilters() {
@@ -389,8 +441,9 @@ class _MonthlyReportPageState extends State<MonthlyReportPage> {
           children: [
             TextField(
               controller: controller,
-              keyboardType:
-                  const TextInputType.numberWithOptions(decimal: true),
+              keyboardType: const TextInputType.numberWithOptions(
+                decimal: true,
+              ),
               inputFormatters: const [MoneyTextInputFormatter()],
               decoration: const InputDecoration(labelText: 'Valor (R\$)'),
             ),
@@ -421,8 +474,10 @@ class _MonthlyReportPageState extends State<MonthlyReportPage> {
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context, false),
-            child: Text('Cancelar',
-                style: TextStyle(color: AppTheme.textSecondary(context))),
+            child: Text(
+              'Cancelar',
+              style: TextStyle(color: AppTheme.textSecondary(context)),
+            ),
           ),
           ElevatedButton(
             onPressed: () => Navigator.pop(context, true),
@@ -473,6 +528,10 @@ class _MonthlyReportPageState extends State<MonthlyReportPage> {
         case ExpenseCategory.outros:
           return 'Outros';
       }
+    }
+
+    String localizedCategoryLabel(ExpenseCategory c) {
+      return localizedExpenseCategoryLabel(context, c);
     }
 
     final nameController = TextEditingController(text: expense.name);
@@ -584,18 +643,15 @@ class _MonthlyReportPageState extends State<MonthlyReportPage> {
                       title: const Text('Cartão de crédito'),
                       value: isCard,
                       activeColor: Theme.of(context).colorScheme.primary,
-                      activeTrackColor: Theme.of(context)
-                          .colorScheme
-                          .primary
-                          .withOpacity(0.35),
-                      inactiveThumbColor: Theme.of(context)
-                          .colorScheme
-                          .onSurface
-                          .withOpacity(0.55),
-                      inactiveTrackColor: Theme.of(context)
-                          .colorScheme
-                          .onSurface
-                          .withOpacity(0.20),
+                      activeTrackColor: Theme.of(
+                        context,
+                      ).colorScheme.primary.withOpacity(0.35),
+                      inactiveThumbColor: Theme.of(
+                        context,
+                      ).colorScheme.onSurface.withOpacity(0.55),
+                      inactiveTrackColor: Theme.of(
+                        context,
+                      ).colorScheme.onSurface.withOpacity(0.20),
                       onChanged: (v) {
                         if (v && cards.isEmpty) {
                           _snack('Cadastre um cartão primeiro.');
@@ -633,13 +689,15 @@ class _MonthlyReportPageState extends State<MonthlyReportPage> {
                                     c != ExpenseCategory.assinaturas ||
                                     category == ExpenseCategory.assinaturas),
                           )
-                          .map((c) => DropdownMenuItem(
-                                value: c,
-                                child: Text(
-                                  categoryLabel(c),
-                                  overflow: TextOverflow.ellipsis,
-                                ),
-                              ))
+                          .map(
+                            (c) => DropdownMenuItem(
+                              value: c,
+                              child: Text(
+                                categoryLabel(c),
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                            ),
+                          )
                           .toList(),
                       onChanged: (v) =>
                           setDialogState(() => category = v ?? category),
@@ -652,15 +710,17 @@ class _MonthlyReportPageState extends State<MonthlyReportPage> {
                         alignment: Alignment.centerLeft,
                         child: Text(
                           'Categoria: Investimento',
-                          style:
-                              TextStyle(color: AppTheme.textSecondary(context)),
+                          style: TextStyle(
+                            color: AppTheme.textSecondary(context),
+                          ),
                         ),
                       ),
                     ),
                   TextField(
                     controller: amountController,
-                    keyboardType:
-                        const TextInputType.numberWithOptions(decimal: true),
+                    keyboardType: const TextInputType.numberWithOptions(
+                      decimal: true,
+                    ),
                     inputFormatters: const [MoneyTextInputFormatter()],
                     decoration: const InputDecoration(labelText: 'Valor (R\$)'),
                   ),
@@ -669,8 +729,9 @@ class _MonthlyReportPageState extends State<MonthlyReportPage> {
                     DropdownButtonFormField<String?>(
                       isExpanded: true,
                       value: cards.isEmpty ? null : creditCardId,
-                      decoration:
-                          const InputDecoration(labelText: 'Cartão de crédito'),
+                      decoration: const InputDecoration(
+                        labelText: 'Cartão de crédito',
+                      ),
                       items: cards.isEmpty
                           ? const [
                               DropdownMenuItem<String?>(
@@ -682,13 +743,15 @@ class _MonthlyReportPageState extends State<MonthlyReportPage> {
                               ),
                             ]
                           : cards
-                              .map((c) => DropdownMenuItem<String?>(
-                                    value: c.id,
-                                    child: Text(
-                                      c.name,
-                                      overflow: TextOverflow.ellipsis,
-                                    ),
-                                  ))
+                              .map(
+                                (c) => DropdownMenuItem<String?>(
+                                  value: c.id,
+                                  child: Text(
+                                    c.name,
+                                    overflow: TextOverflow.ellipsis,
+                                  ),
+                                ),
+                              )
                               .toList(),
                       onChanged: (!isCard || cards.isEmpty)
                           ? null
@@ -696,8 +759,9 @@ class _MonthlyReportPageState extends State<MonthlyReportPage> {
                               if (v == null) return;
                               setDialogState(() {
                                 creditCardId = v;
-                                final selected =
-                                    cards.firstWhere((c) => c.id == v);
+                                final selected = cards.firstWhere(
+                                  (c) => c.id == v,
+                                );
                                 cardDueDay = selected.dueDay;
                               });
                             },
@@ -867,8 +931,10 @@ class _MonthlyReportPageState extends State<MonthlyReportPage> {
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context, false),
-            child: Text('Cancelar',
-                style: TextStyle(color: AppTheme.textSecondary(context))),
+            child: Text(
+              'Cancelar',
+              style: TextStyle(color: AppTheme.textSecondary(context)),
+            ),
           ),
           ElevatedButton(
             onPressed: () => Navigator.pop(context, true),
@@ -951,14 +1017,14 @@ class _MonthlyReportPageState extends State<MonthlyReportPage> {
       return Container(
         padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
         decoration: BoxDecoration(
-          color: Theme.of(context)
-              .colorScheme
-              .surfaceVariant
-              .withValues(alpha: 0.35),
+          color: Theme.of(
+            context,
+          ).colorScheme.surfaceVariant.withValues(alpha: 0.35),
           borderRadius: BorderRadius.circular(999),
           border: Border.all(
-            color:
-                Theme.of(context).colorScheme.outline.withValues(alpha: 0.25),
+            color: Theme.of(
+              context,
+            ).colorScheme.outline.withValues(alpha: 0.25),
           ),
         ),
         child: Row(
@@ -1005,7 +1071,7 @@ class _MonthlyReportPageState extends State<MonthlyReportPage> {
                 ),
               ),
               TextButton.icon(
-                onPressed: _openFiltersSheet,
+                onPressed: _openFiltersDialog,
                 icon: const Icon(Icons.tune_rounded),
                 label: const Text('Editar'),
               ),
@@ -1042,16 +1108,14 @@ class _MonthlyReportPageState extends State<MonthlyReportPage> {
                 child: Container(
                   padding: const EdgeInsets.all(12),
                   decoration: BoxDecoration(
-                    color: Theme.of(context)
-                        .colorScheme
-                        .surfaceVariant
-                        .withValues(alpha: 0.35),
+                    color: Theme.of(
+                      context,
+                    ).colorScheme.surfaceVariant.withValues(alpha: 0.35),
                     borderRadius: BorderRadius.circular(14),
                     border: Border.all(
-                      color: Theme.of(context)
-                          .colorScheme
-                          .outline
-                          .withValues(alpha: 0.25),
+                      color: Theme.of(
+                        context,
+                      ).colorScheme.outline.withValues(alpha: 0.25),
                     ),
                   ),
                   child: Row(
@@ -1083,16 +1147,14 @@ class _MonthlyReportPageState extends State<MonthlyReportPage> {
                 child: Container(
                   padding: const EdgeInsets.all(12),
                   decoration: BoxDecoration(
-                    color: Theme.of(context)
-                        .colorScheme
-                        .surfaceVariant
-                        .withValues(alpha: 0.35),
+                    color: Theme.of(
+                      context,
+                    ).colorScheme.surfaceVariant.withValues(alpha: 0.35),
                     borderRadius: BorderRadius.circular(14),
                     border: Border.all(
-                      color: Theme.of(context)
-                          .colorScheme
-                          .outline
-                          .withValues(alpha: 0.25),
+                      color: Theme.of(
+                        context,
+                      ).colorScheme.outline.withValues(alpha: 0.25),
                     ),
                   ),
                   child: Row(
@@ -1160,10 +1222,10 @@ class _MonthlyReportPageState extends State<MonthlyReportPage> {
 
     await showModalBottomSheet<void>(
       context: context,
+      useSafeArea: true,
       isScrollControlled: true,
-      showDragHandle: true,
-      backgroundColor: Theme.of(context).colorScheme.surface,
-      builder: (_) {
+      backgroundColor: Colors.transparent,
+      builder: (sheetContext) {
         DateTime? localFrom = _draftDueFrom;
         DateTime? localTo = _draftDueTo;
         Set<ExpenseCategory> localCats = {..._draftCategoryFilters};
@@ -1175,7 +1237,7 @@ class _MonthlyReportPageState extends State<MonthlyReportPage> {
           final initial = DateTimeRange(start: start, end: end);
 
           final range = await showDateRangePicker(
-            context: context,
+            context: sheetContext,
             firstDate: _monthStart,
             lastDate: _monthEnd,
             initialDateRange: initial,
@@ -1183,27 +1245,41 @@ class _MonthlyReportPageState extends State<MonthlyReportPage> {
           );
           if (range == null) return;
           setSheetState(() {
-            localFrom =
-                DateTime(range.start.year, range.start.month, range.start.day);
+            localFrom = DateTime(
+              range.start.year,
+              range.start.month,
+              range.start.day,
+            );
             localTo = DateTime(range.end.year, range.end.month, range.end.day);
           });
         }
 
         return StatefulBuilder(
-          builder: (context, setSheetState) {
+          builder: (sheetContext, setSheetState) {
             final periodText =
                 '${_fmtShortDate(localFrom)} – ${_fmtShortDate(localTo)}';
 
-            return SafeArea(
-              child: Padding(
+            return Container(
+              height: MediaQuery.sizeOf(sheetContext).height * 0.82,
+              decoration: BoxDecoration(
+                color: Theme.of(sheetContext).colorScheme.surface,
+                borderRadius: const BorderRadius.vertical(
+                  top: Radius.circular(28),
+                ),
+                border: Border.all(
+                  color: Theme.of(
+                    sheetContext,
+                  ).colorScheme.outline.withValues(alpha: 0.16),
+                ),
+              ),
+              child: SingleChildScrollView(
                 padding: EdgeInsets.only(
                   left: 16,
                   right: 16,
                   top: 8,
-                  bottom: 16 + MediaQuery.of(context).viewInsets.bottom,
+                  bottom: 16 + MediaQuery.of(sheetContext).viewInsets.bottom,
                 ),
                 child: Column(
-                  mainAxisSize: MainAxisSize.min,
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Row(
@@ -1219,7 +1295,7 @@ class _MonthlyReportPageState extends State<MonthlyReportPage> {
                           ),
                         ),
                         IconButton(
-                          onPressed: () => Navigator.pop(context),
+                          onPressed: () => Navigator.of(sheetContext).pop(),
                           icon: const Icon(Icons.close_rounded),
                           tooltip: 'Fechar',
                         ),
@@ -1238,7 +1314,7 @@ class _MonthlyReportPageState extends State<MonthlyReportPage> {
                     Text(
                       'Status',
                       style: TextStyle(
-                        color: AppTheme.textSecondary(context),
+                        color: AppTheme.textSecondary(sheetContext),
                         fontWeight: FontWeight.w600,
                       ),
                     ),
@@ -1266,7 +1342,7 @@ class _MonthlyReportPageState extends State<MonthlyReportPage> {
                     Text(
                       'Categorias',
                       style: TextStyle(
-                        color: AppTheme.textSecondary(context),
+                        color: AppTheme.textSecondary(sheetContext),
                         fontWeight: FontWeight.w600,
                       ),
                     ),
@@ -1324,7 +1400,7 @@ class _MonthlyReportPageState extends State<MonthlyReportPage> {
                               _draftPaidFilter = localPaid;
                               _applyDraftFilters();
                             });
-                            Navigator.pop(context);
+                            Navigator.of(sheetContext).pop();
                           },
                           icon: const Icon(Icons.check_rounded),
                           label: const Text('Aplicar'),
@@ -1332,6 +1408,281 @@ class _MonthlyReportPageState extends State<MonthlyReportPage> {
                       ],
                     ),
                   ],
+                ),
+              ),
+            );
+          },
+        );
+      },
+    );
+  }
+
+  Future<void> _openFiltersDialog() async {
+    String labelFor(ExpenseCategory c) {
+      switch (c) {
+        case ExpenseCategory.moradia:
+          return 'Moradia';
+        case ExpenseCategory.alimentacao:
+          return 'Alimentacao';
+        case ExpenseCategory.transporte:
+          return 'Transporte';
+        case ExpenseCategory.educacao:
+          return 'Educacao';
+        case ExpenseCategory.saude:
+          return 'Saude';
+        case ExpenseCategory.lazer:
+          return 'Lazer';
+        case ExpenseCategory.assinaturas:
+          return 'Assinaturas';
+        case ExpenseCategory.investment:
+          return 'Investimento';
+        case ExpenseCategory.dividas:
+          return 'Dividas';
+        case ExpenseCategory.outros:
+          return 'Outros';
+      }
+    }
+
+    DateTime localFrom = _draftDueFrom ?? _monthStart;
+    DateTime localTo = _draftDueTo ?? _monthEnd;
+    Set<ExpenseCategory> localCats = {..._draftCategoryFilters};
+    _PaidFilter localPaid = _draftPaidFilter;
+
+    await showDialog<void>(
+      context: context,
+      barrierDismissible: true,
+      builder: (dialogContext) {
+        return StatefulBuilder(
+          builder: (dialogContext, setDialogState) {
+            final periodText =
+                '${_fmtShortDate(localFrom)} - ${_fmtShortDate(localTo)}';
+            final scheme = Theme.of(dialogContext).colorScheme;
+
+            Future<void> pickRange() async {
+              final range = await showDateRangePicker(
+                context: dialogContext,
+                firstDate: _monthStart,
+                lastDate: _monthEnd,
+                initialDateRange: DateTimeRange(
+                  start: localFrom,
+                  end: localTo,
+                ),
+                helpText: 'Vencimento',
+              );
+              if (range == null) return;
+              setDialogState(() {
+                localFrom = DateTime(
+                  range.start.year,
+                  range.start.month,
+                  range.start.day,
+                );
+                localTo = DateTime(
+                  range.end.year,
+                  range.end.month,
+                  range.end.day,
+                );
+              });
+            }
+
+            return Dialog(
+              backgroundColor: Colors.transparent,
+              elevation: 0,
+              insetPadding: const EdgeInsets.symmetric(
+                horizontal: 24,
+                vertical: 32,
+              ),
+              child: Center(
+                child: ConstrainedBox(
+                  constraints: const BoxConstraints(
+                    maxWidth: 372,
+                    maxHeight: 520,
+                  ),
+                  child: Container(
+                    padding: const EdgeInsets.fromLTRB(18, 18, 18, 16),
+                    decoration: BoxDecoration(
+                      color:
+                          Theme.of(dialogContext).brightness == Brightness.dark
+                              ? scheme.surfaceContainerLow
+                              : Colors.white,
+                      borderRadius: BorderRadius.circular(26),
+                      border: Border.all(
+                        color: scheme.outline.withValues(alpha: 0.08),
+                      ),
+                      boxShadow: [
+                        BoxShadow(
+                          color: Colors.black.withValues(alpha: 0.10),
+                          blurRadius: 28,
+                          offset: const Offset(0, 16),
+                        ),
+                      ],
+                    ),
+                    child: SingleChildScrollView(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Row(
+                            children: [
+                              Expanded(
+                                child: Text(
+                                  'Filtros',
+                                  style: TextStyle(
+                                    color: AppTheme.textPrimary(dialogContext),
+                                    fontWeight: FontWeight.w800,
+                                    fontSize: 18,
+                                  ),
+                                ),
+                              ),
+                              Text(
+                                'Editar',
+                                style: TextStyle(
+                                  color: scheme.primary,
+                                  fontWeight: FontWeight.w700,
+                                  fontSize: 13,
+                                ),
+                              ),
+                              const SizedBox(width: 8),
+                              InkWell(
+                                borderRadius: BorderRadius.circular(999),
+                                onTap: () => Navigator.of(dialogContext).pop(),
+                                child: Container(
+                                  width: 28,
+                                  height: 28,
+                                  decoration: BoxDecoration(
+                                    color: scheme.surfaceContainerHigh,
+                                    shape: BoxShape.circle,
+                                  ),
+                                  child: Icon(
+                                    Icons.close_rounded,
+                                    size: 16,
+                                    color:
+                                        AppTheme.textSecondary(dialogContext),
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 14),
+                          _QuickFilterTile(
+                            icon: Icons.calendar_month_outlined,
+                            label: 'Periodo',
+                            value: periodText,
+                            onTap: pickRange,
+                          ),
+                          const SizedBox(height: 14),
+                          Text(
+                            'Status',
+                            style: TextStyle(
+                              color: AppTheme.textSecondary(dialogContext),
+                              fontWeight: FontWeight.w600,
+                              fontSize: 13,
+                            ),
+                          ),
+                          const SizedBox(height: 8),
+                          Wrap(
+                            spacing: 8,
+                            runSpacing: 8,
+                            children: [
+                              _QuickSelectableChip(
+                                label: 'Todos',
+                                selected: localPaid == _PaidFilter.all,
+                                onTap: () => setDialogState(
+                                  () => localPaid = _PaidFilter.all,
+                                ),
+                              ),
+                              _QuickSelectableChip(
+                                label: 'A pagar',
+                                selected: localPaid == _PaidFilter.pending,
+                                onTap: () => setDialogState(
+                                  () => localPaid = _PaidFilter.pending,
+                                ),
+                              ),
+                              _QuickSelectableChip(
+                                label: 'Pago',
+                                selected: localPaid == _PaidFilter.paid,
+                                onTap: () => setDialogState(
+                                  () => localPaid = _PaidFilter.paid,
+                                ),
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 14),
+                          Text(
+                            'Categorias',
+                            style: TextStyle(
+                              color: AppTheme.textSecondary(dialogContext),
+                              fontWeight: FontWeight.w600,
+                              fontSize: 13,
+                            ),
+                          ),
+                          const SizedBox(height: 8),
+                          Wrap(
+                            spacing: 8,
+                            runSpacing: 8,
+                            children: [
+                              _QuickSelectableChip(
+                                label: 'Todas',
+                                selected: localCats.isEmpty,
+                                onTap: () => setDialogState(
+                                  () => localCats = {},
+                                ),
+                              ),
+                              ...ExpenseCategory.values.map((c) {
+                                final selected = localCats.contains(c);
+                                return _QuickSelectableChip(
+                                  label: labelFor(c),
+                                  selected: selected,
+                                  onTap: () {
+                                    setDialogState(() {
+                                      final next = {...localCats};
+                                      if (!selected) {
+                                        next.add(c);
+                                      } else {
+                                        next.remove(c);
+                                      }
+                                      localCats = next;
+                                    });
+                                  },
+                                );
+                              }),
+                            ],
+                          ),
+                          const SizedBox(height: 18),
+                          Row(
+                            children: [
+                              Expanded(
+                                child: TextButton(
+                                  onPressed: () => setDialogState(() {
+                                    localFrom = _monthStart;
+                                    localTo = _monthEnd;
+                                    localCats = {};
+                                    localPaid = _PaidFilter.all;
+                                  }),
+                                  child: const Text('Limpar'),
+                                ),
+                              ),
+                              const SizedBox(width: 10),
+                              Expanded(
+                                child: ElevatedButton(
+                                  onPressed: () {
+                                    setState(() {
+                                      _draftDueFrom = localFrom;
+                                      _draftDueTo = localTo;
+                                      _draftCategoryFilters = {...localCats};
+                                      _draftPaidFilter = localPaid;
+                                      _applyDraftFilters();
+                                    });
+                                    Navigator.of(dialogContext).pop();
+                                  },
+                                  child: const Text('Aplicar'),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
                 ),
               ),
             );
@@ -1512,8 +1863,9 @@ class _MonthlyReportPageState extends State<MonthlyReportPage> {
         decoration: BoxDecoration(
           border: Border(
             bottom: BorderSide(
-              color:
-                  Theme.of(context).colorScheme.outline.withValues(alpha: 0.2),
+              color: Theme.of(
+                context,
+              ).colorScheme.outline.withValues(alpha: 0.2),
             ),
           ),
         ),
@@ -1525,8 +1877,10 @@ class _MonthlyReportPageState extends State<MonthlyReportPage> {
                 Container(
                   width: 10,
                   height: 10,
-                  decoration:
-                      BoxDecoration(color: color, shape: BoxShape.circle),
+                  decoration: BoxDecoration(
+                    color: color,
+                    shape: BoxShape.circle,
+                  ),
                 ),
                 const SizedBox(width: 8),
                 Text(
@@ -1606,11 +1960,11 @@ class _MonthlyReportPageState extends State<MonthlyReportPage> {
           row(
             label: 'Moradia',
             actual: housingTotal,
-            ideal: _idealAmount(current, 35),
+            ideal: _idealAmount(current, 30),
             previous: prevHousing,
             color: AppColors.fixedExpense,
             actualPct: _percentOf(current, housingTotal),
-            idealPct: 35,
+            idealPct: 30,
             prevPct: _percentOf(prev, prevHousing),
           ),
         ],
@@ -1685,7 +2039,9 @@ class _MonthlyReportPageState extends State<MonthlyReportPage> {
                 Text(
                   event.detail,
                   style: TextStyle(
-                      color: AppTheme.textSecondary(context), height: 1.3),
+                    color: AppTheme.textSecondary(context),
+                    height: 1.3,
+                  ),
                 ),
               ],
             ),
@@ -1753,7 +2109,9 @@ class _MonthlyReportPageState extends State<MonthlyReportPage> {
             child: Text(
               title,
               style: TextStyle(
-                  color: AppTheme.textSecondary(context), fontSize: 12),
+                color: AppTheme.textSecondary(context),
+                fontSize: 12,
+              ),
             ),
           ),
           IconButton(
@@ -1790,8 +2148,10 @@ class _MonthlyReportPageState extends State<MonthlyReportPage> {
                   icon: Icons.bar_chart_rounded,
                   title: AppStrings.t(context, 'premium_tour_reports_title'),
                   body: AppStrings.t(context, 'premium_tour_reports_body'),
-                  location:
-                      AppStrings.t(context, 'premium_tour_reports_location'),
+                  location: AppStrings.t(
+                    context,
+                    'premium_tour_reports_location',
+                  ),
                   tip: AppStrings.t(context, 'premium_tour_reports_tip'),
                 ),
                 child: ListView(
@@ -1812,8 +2172,10 @@ class _MonthlyReportPageState extends State<MonthlyReportPage> {
                           Expanded(
                             child: _summaryCard(
                               title: 'Fixos',
-                              value:
-                                  SensitiveDisplay.money(context, _fixedTotal),
+                              value: SensitiveDisplay.money(
+                                context,
+                                _fixedTotal,
+                              ),
                               color: AppColors.fixedExpense,
                             ),
                           ),
@@ -1822,7 +2184,9 @@ class _MonthlyReportPageState extends State<MonthlyReportPage> {
                             child: _summaryCard(
                               title: 'Variáveis',
                               value: SensitiveDisplay.money(
-                                  context, _variableTotal),
+                                context,
+                                _variableTotal,
+                              ),
                               color: AppColors.variableExpense,
                             ),
                           ),
@@ -1840,6 +2204,18 @@ class _MonthlyReportPageState extends State<MonthlyReportPage> {
                       title: 'Investimentos',
                       value: SensitiveDisplay.money(context, _investmentTotal),
                       color: AppColors.investment,
+                    ),
+                    const SizedBox(height: 10),
+                    _summaryCard(
+                      title: 'Total investido',
+                      value: _lifetimeInvestedLoading
+                          ? 'Carregando...'
+                          : SensitiveDisplay.money(
+                              context,
+                              _lifetimeInvestedTotal,
+                            ),
+                      color: AppColors.investment,
+                      onInfoTap: _showLifetimeInvestedInfo,
                     ),
                     const SizedBox(height: 10),
                     _summaryCard(
@@ -1913,31 +2289,63 @@ class _MonthlyReportPageState extends State<MonthlyReportPage> {
     required String title,
     required String value,
     required Color color,
+    VoidCallback? onInfoTap,
   }) {
     return Container(
-      padding: const EdgeInsets.all(14),
-      decoration: BoxDecoration(
-        color: Theme.of(context).colorScheme.surface,
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(
-          color: Theme.of(context).brightness == Brightness.dark
-              ? Colors.white10
-              : Theme.of(context).colorScheme.outline.withValues(alpha: 0.25),
-        ),
+      padding: const EdgeInsets.all(18),
+      decoration: AppTheme.premiumCardDecoration(
+        context,
+        highlighted: color == Theme.of(context).colorScheme.primary,
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(title,
-              style: TextStyle(
-                  color: AppTheme.textSecondary(context), fontSize: 12)),
-          const SizedBox(height: 8),
+          Row(
+            children: [
+              Expanded(
+                child: Text(
+                  title,
+                  style: TextStyle(
+                    color: AppTheme.textMuted(context),
+                    fontSize: 12,
+                    fontWeight: FontWeight.w700,
+                    letterSpacing: 0.5,
+                  ),
+                ),
+              ),
+              if (onInfoTap != null)
+                InkWell(
+                  onTap: onInfoTap,
+                  borderRadius: BorderRadius.circular(999),
+                  child: Container(
+                    width: 22,
+                    height: 22,
+                    alignment: Alignment.center,
+                    decoration: BoxDecoration(
+                      shape: BoxShape.circle,
+                      color: Theme.of(
+                        context,
+                      ).colorScheme.surfaceContainerHighest,
+                    ),
+                    child: Text(
+                      '?',
+                      style: TextStyle(
+                        color: AppTheme.textPrimary(context),
+                        fontWeight: FontWeight.w800,
+                        fontSize: 12,
+                      ),
+                    ),
+                  ),
+                ),
+            ],
+          ),
+          const SizedBox(height: 10),
           Text(
             value,
             style: TextStyle(
               color: color,
-              fontWeight: FontWeight.bold,
-              fontSize: 16,
+              fontWeight: FontWeight.w800,
+              fontSize: 18,
             ),
             overflow: TextOverflow.ellipsis,
           ),
@@ -1961,15 +2369,11 @@ class _MonthlyReportPageState extends State<MonthlyReportPage> {
     }
 
     return Container(
-      padding: const EdgeInsets.all(14),
-      decoration: BoxDecoration(
-        color: Theme.of(context).colorScheme.surface,
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(
-          color: Theme.of(context).brightness == Brightness.dark
-              ? Colors.white10
-              : Theme.of(context).colorScheme.outline.withValues(alpha: 0.25),
-        ),
+      padding: const EdgeInsets.all(18),
+      decoration: AppTheme.premiumCardDecoration(
+        context,
+        borderColor:
+            Theme.of(context).colorScheme.primary.withValues(alpha: 0.20),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -1978,67 +2382,63 @@ class _MonthlyReportPageState extends State<MonthlyReportPage> {
             AppStrings.t(context, 'credit_card_bills_title'),
             style: TextStyle(
               color: AppTheme.textPrimary(context),
-              fontWeight: FontWeight.w600,
+              fontWeight: FontWeight.w800,
             ),
           ),
           const SizedBox(height: 8),
-          ...totals.entries.map(
-            (entry) {
-              final id = entry.key;
-              final name =
-                  nameById[id] ?? AppStrings.t(context, 'card_unknown');
-              final dueDay = dueById[id];
-              final paid = d.creditCardPayments[id] ?? false;
-              return Padding(
-                padding: const EdgeInsets.only(bottom: 6),
-                child: Row(
-                  children: [
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            name,
-                            style:
-                                TextStyle(color: AppTheme.textPrimary(context)),
+          ...totals.entries.map((entry) {
+            final id = entry.key;
+            final name = nameById[id] ?? AppStrings.t(context, 'card_unknown');
+            final dueDay = dueById[id];
+            final paid = d.creditCardPayments[id] ?? false;
+            return Padding(
+              padding: const EdgeInsets.only(bottom: 6),
+              child: Row(
+                children: [
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          name,
+                          style: TextStyle(
+                            color: AppTheme.textPrimary(context),
                           ),
-                          if (dueDay != null)
-                            Text(
-                              AppStrings.tr(
-                                context,
-                                'card_due_day_label',
-                                {'day': '$dueDay'},
-                              ),
-                              style: TextStyle(
-                                color: AppTheme.textSecondary(context),
-                                fontSize: 12,
-                              ),
-                            ),
-                        ],
-                      ),
-                    ),
-                    if (paid)
-                      Text(
-                        AppStrings.t(context, 'card_paid_badge'),
-                        style: TextStyle(
-                          color: AppTheme.success,
-                          fontSize: 12,
-                          fontWeight: FontWeight.w600,
                         ),
-                      ),
-                    const SizedBox(width: 8),
+                        if (dueDay != null)
+                          Text(
+                            AppStrings.tr(context, 'card_due_day_label', {
+                              'day': '$dueDay',
+                            }),
+                            style: TextStyle(
+                              color: AppTheme.textSecondary(context),
+                              fontSize: 12,
+                            ),
+                          ),
+                      ],
+                    ),
+                  ),
+                  if (paid)
                     Text(
-                      SensitiveDisplay.money(context, entry.value),
+                      AppStrings.t(context, 'card_paid_badge'),
                       style: TextStyle(
-                        color: AppTheme.textPrimary(context),
+                        color: AppTheme.success,
+                        fontSize: 12,
                         fontWeight: FontWeight.w600,
                       ),
                     ),
-                  ],
-                ),
-              );
-            },
-          ),
+                  const SizedBox(width: 8),
+                  Text(
+                    SensitiveDisplay.money(context, entry.value),
+                    style: TextStyle(
+                      color: AppTheme.textPrimary(context),
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ],
+              ),
+            );
+          }),
         ],
       ),
     );
@@ -2047,15 +2447,7 @@ class _MonthlyReportPageState extends State<MonthlyReportPage> {
   Widget _barChart() {
     return Container(
       padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: Theme.of(context).colorScheme.surface,
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(
-          color: Theme.of(context).brightness == Brightness.dark
-              ? Colors.white10
-              : Theme.of(context).colorScheme.outline.withValues(alpha: 0.25),
-        ),
-      ),
+      decoration: AppTheme.premiumCardDecoration(context),
       child: SizedBox(
         height: 170,
         child: BarChart(
@@ -2063,12 +2455,15 @@ class _MonthlyReportPageState extends State<MonthlyReportPage> {
             gridData: const FlGridData(show: false),
             borderData: FlBorderData(show: false),
             titlesData: FlTitlesData(
-              topTitles:
-                  const AxisTitles(sideTitles: SideTitles(showTitles: false)),
-              rightTitles:
-                  const AxisTitles(sideTitles: SideTitles(showTitles: false)),
-              leftTitles:
-                  const AxisTitles(sideTitles: SideTitles(showTitles: false)),
+              topTitles: const AxisTitles(
+                sideTitles: SideTitles(showTitles: false),
+              ),
+              rightTitles: const AxisTitles(
+                sideTitles: SideTitles(showTitles: false),
+              ),
+              leftTitles: const AxisTitles(
+                sideTitles: SideTitles(showTitles: false),
+              ),
               bottomTitles: AxisTitles(
                 sideTitles: SideTitles(
                   showTitles: true,
@@ -2080,10 +2475,13 @@ class _MonthlyReportPageState extends State<MonthlyReportPage> {
                             : 'Invest.';
                     return Padding(
                       padding: const EdgeInsets.only(top: 8),
-                      child: Text(label,
-                          style: TextStyle(
-                              color: AppTheme.textSecondary(context),
-                              fontSize: 12)),
+                      child: Text(
+                        label,
+                        style: TextStyle(
+                          color: AppTheme.textSecondary(context),
+                          fontSize: 12,
+                        ),
+                      ),
                     );
                   },
                 ),
@@ -2136,41 +2534,36 @@ class _MonthlyReportPageState extends State<MonthlyReportPage> {
     required List<Expense> items,
   }) {
     return Container(
-      padding: const EdgeInsets.all(14),
-      decoration: BoxDecoration(
-        color: Theme.of(context).colorScheme.surface,
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(
-          color: Theme.of(context).brightness == Brightness.dark
-              ? Colors.white10
-              : Theme.of(context).colorScheme.outline.withValues(alpha: 0.25),
-        ),
-      ),
+      padding: const EdgeInsets.all(16),
+      decoration: AppTheme.premiumCardDecoration(context),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Row(
             children: [
               Container(
-                  width: 10,
-                  height: 10,
-                  decoration:
-                      BoxDecoration(color: color, shape: BoxShape.circle)),
+                width: 10,
+                height: 10,
+                decoration: BoxDecoration(color: color, shape: BoxShape.circle),
+              ),
               const SizedBox(width: 10),
               Text(
                 title,
                 style: TextStyle(
-                    color: AppTheme.textPrimary(context),
-                    fontWeight: FontWeight.bold),
+                  color: AppTheme.textPrimary(context),
+                  fontWeight: FontWeight.w800,
+                ),
               ),
             ],
           ),
           const SizedBox(height: 12),
           if (items.isEmpty)
-            Text('Nenhum lançamento.',
-                style: TextStyle(color: AppTheme.textMuted(context)))
+            Text(
+              'Nenhum lançamento.',
+              style: TextStyle(color: AppTheme.textMuted(context)),
+            )
           else
-            ...items.map((e) => _itemTile(e)),
+            ...items.map((e) => _localizedItemTile(e)),
         ],
       ),
     );
@@ -2204,11 +2597,12 @@ class _MonthlyReportPageState extends State<MonthlyReportPage> {
 
     final dueDate = _dueDateFor(e);
     final dueText = _fmtShortDate(dueDate);
+    final localizedDueLabel = localizedExpenseDueLabel(context, e);
     final dueSuffix =
         (e.type == ExpenseType.fixed || e.isCreditCard) && e.dueDay != null
             ? e.isCreditCard
-                ? ' ? fatura dia ${e.dueDay}'
-                : ' ? vence dia ${e.dueDay}'
+                ? ' • fatura dia ${e.dueDay}'
+                : ' • vence dia ${e.dueDay}'
             : '';
     final canTogglePaid = e.type == ExpenseType.fixed && !e.isCreditCard;
     return Padding(
@@ -2220,13 +2614,13 @@ class _MonthlyReportPageState extends State<MonthlyReportPage> {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  '${e.name}$dueSuffix',
+                  '${e.name}${localizedDueLabel.isEmpty ? '' : ' • $localizedDueLabel'}',
                   style: TextStyle(color: AppTheme.textPrimary(context)),
                   overflow: TextOverflow.ellipsis,
                 ),
                 const SizedBox(height: 2),
                 Text(
-                  '${categoryLabel(e.category)} ? venc: $dueText',
+                  '${categoryLabel(e.category)} • ${paymentMethodLabel(e)} • ${paymentImpactLabel(e)} • venc: $dueText',
                   style: TextStyle(
                     color: AppTheme.textSecondary(context),
                     fontSize: 12,
@@ -2240,8 +2634,9 @@ class _MonthlyReportPageState extends State<MonthlyReportPage> {
           Text(
             SensitiveDisplay.money(context, e.amount),
             style: TextStyle(
-                color: AppTheme.textSecondary(context),
-                fontWeight: FontWeight.w600),
+              color: AppTheme.textSecondary(context),
+              fontWeight: FontWeight.w600,
+            ),
           ),
           const SizedBox(width: 8),
           if (canTogglePaid)
@@ -2257,16 +2652,79 @@ class _MonthlyReportPageState extends State<MonthlyReportPage> {
             ),
           IconButton(
             onPressed: () => _editExpense(e),
-            icon: Icon(Icons.edit,
-                size: 18, color: AppTheme.textSecondary(context)),
+            icon: Icon(
+              Icons.edit,
+              size: 18,
+              color: AppTheme.textSecondary(context),
+            ),
             tooltip: 'Editar',
           ),
           IconButton(
             onPressed: () => _removeExpense(e),
-            icon: Icon(Icons.delete_outline,
-                size: 18, color: AppTheme.textMuted(context)),
+            icon: Icon(
+              Icons.delete_outline,
+              size: 18,
+              color: AppTheme.textMuted(context),
+            ),
             tooltip: 'Remover',
           ),
+        ],
+      ),
+    );
+  }
+
+  Widget _localizedItemTile(Expense e) {
+    final dueDate = _dueDateFor(e);
+    final dueText = _fmtShortDate(dueDate);
+    final dueLabel = localizedExpenseDueLabel(context, e);
+    final canTogglePaid = e.type == ExpenseType.fixed && !e.isCreditCard;
+
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 6),
+      child: Row(
+        children: [
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  '${e.name}${dueLabel.isEmpty ? '' : ' • $dueLabel'}',
+                  style: TextStyle(color: AppTheme.textPrimary(context)),
+                  overflow: TextOverflow.ellipsis,
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  '${localizedExpenseCategoryLabel(context, e.category)} • ${localizedPaymentMethodLabel(context, e)} • ${localizedPaymentImpactLabel(context, e)} • $dueText',
+                  style: TextStyle(
+                    color: AppTheme.textSecondary(context),
+                    fontSize: 12,
+                  ),
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(width: 12),
+          Text(
+            SensitiveDisplay.money(context, e.amount),
+            style: TextStyle(
+              color: AppTheme.textSecondary(context),
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+          const SizedBox(width: 12),
+          if (canTogglePaid)
+            IconButton(
+              tooltip: e.isPaid
+                  ? AppStrings.t(context, 'paid')
+                  : AppStrings.t(context, 'bills_pay_cta'),
+              onPressed: () => _togglePaid(e),
+              icon: Icon(
+                e.isPaid ? Icons.check_circle_rounded : Icons.circle_outlined,
+                color:
+                    e.isPaid ? AppTheme.success : AppTheme.textMuted(context),
+              ),
+            ),
         ],
       ),
     );
@@ -2293,6 +2751,147 @@ class _TimelineEvent {
     required this.icon,
     required this.color,
   });
+}
+
+class _QuickFilterTile extends StatelessWidget {
+  final IconData icon;
+  final String label;
+  final String value;
+  final VoidCallback onTap;
+
+  const _QuickFilterTile({
+    required this.icon,
+    required this.label,
+    required this.value,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final isDark = theme.brightness == Brightness.dark;
+    return InkWell(
+      borderRadius: BorderRadius.circular(18),
+      onTap: onTap,
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 13),
+        decoration: BoxDecoration(
+          color: isDark
+              ? theme.colorScheme.surfaceContainer
+              : theme.colorScheme.surfaceContainerLowest,
+          borderRadius: BorderRadius.circular(18),
+          border: Border.all(
+            color: theme.colorScheme.outline.withValues(alpha: 0.08),
+          ),
+          boxShadow: isDark
+              ? const []
+              : [
+                  BoxShadow(
+                    color: Colors.black.withValues(alpha: 0.03),
+                    blurRadius: 12,
+                    offset: const Offset(0, 4),
+                  ),
+                ],
+        ),
+        child: Row(
+          children: [
+            Icon(icon, size: 18, color: AppTheme.textSecondary(context)),
+            const SizedBox(width: 10),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    label,
+                    style: TextStyle(
+                      color: AppTheme.textMuted(context),
+                      fontSize: 12,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                  const SizedBox(height: 2),
+                  Text(
+                    value,
+                    style: TextStyle(
+                      color: AppTheme.textPrimary(context),
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            Icon(
+              Icons.chevron_right_rounded,
+              color: AppTheme.textMuted(context),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _QuickSelectableChip extends StatelessWidget {
+  final String label;
+  final bool selected;
+  final VoidCallback onTap;
+
+  const _QuickSelectableChip({
+    required this.label,
+    required this.selected,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final scheme = theme.colorScheme;
+    final isDark = theme.brightness == Brightness.dark;
+    final background = selected ? scheme.primary : scheme.surfaceContainerLow;
+    final border =
+        selected ? scheme.primary : scheme.outline.withValues(alpha: 0.08);
+    final foreground = selected
+        ? scheme.onPrimary
+        : (isDark
+            ? AppTheme.textPrimary(context)
+            : AppTheme.textSecondary(context));
+
+    return InkWell(
+      borderRadius: BorderRadius.circular(999),
+      onTap: onTap,
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 160),
+        curve: Curves.easeOut,
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+        decoration: BoxDecoration(
+          color: background,
+          borderRadius: BorderRadius.circular(999),
+          border: Border.all(color: border),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            if (selected) ...[
+              Icon(
+                Icons.check_rounded,
+                size: 14,
+                color: foreground,
+              ),
+              const SizedBox(width: 6),
+            ],
+            Text(
+              label,
+              style: TextStyle(
+                color: foreground,
+                fontWeight: FontWeight.w700,
+                fontSize: 13,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
 }
 
 enum _PaidFilter { all, pending, paid }

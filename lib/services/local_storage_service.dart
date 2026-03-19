@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
 import 'package:google_sign_in/google_sign_in.dart';
@@ -18,18 +19,10 @@ import 'local_database_service.dart';
 import 'firestore_service.dart';
 import 'notification_service.dart';
 
-class AccountDeletionException implements Exception {
-  AccountDeletionException(this.code, {this.details});
-
-  final String code;
-  final Object? details;
-
-  @override
-  String toString() => 'AccountDeletionException($code)';
-}
-
 class LocalStorageService {
   LocalStorageService._();
+
+  static const String _kCurrentUserEmail = 'current_user_email';
 
   /// Web client ID (OAuth 2.0) from Google Cloud / Firebase project.
   /// Used on Android to request an ID token when needed.
@@ -39,6 +32,7 @@ class LocalStorageService {
       String.fromEnvironment('GOOGLE_WEB_CLIENT_ID', defaultValue: '');
 
   static bool _initialized = false;
+  static bool _cloudEnabled = true;
   static final ValueNotifier<UserProfile?> userNotifier =
       ValueNotifier<UserProfile?>(null);
   static final ValueNotifier<bool> syncNotifier = ValueNotifier<bool>(false);
@@ -49,7 +43,6 @@ class LocalStorageService {
   static String? _currentUserEmail;
   static String? _currentUserId;
   static bool _loggedOut = false;
-  static final FirebaseAuth _auth = FirebaseAuth.instance;
   static StreamSubscription<UserProfile?>? _userSubscription;
   static StreamSubscription<UserProfile?>? _legacyUserSubscription;
   static bool _hasPrimaryProfile = false;
@@ -62,6 +55,14 @@ class LocalStorageService {
   static final List<Goal> _goals = [];
   static final List<IncomeSource> _incomes = [];
   static GoogleSignIn? _googleSignIn;
+  static FirebaseAuth? get _auth =>
+      _cloudEnabled && Firebase.apps.isNotEmpty ? FirebaseAuth.instance : null;
+
+  static void configureCloud({required bool enabled}) {
+    _cloudEnabled = enabled;
+  }
+
+  static bool get cloudEnabled => _cloudEnabled;
 
   static GoogleSignIn _googleSignInClient() {
     return _googleSignIn ??= GoogleSignIn(
@@ -73,33 +74,43 @@ class LocalStorageService {
 
   static Future<void> init() async {
     if (_initialized) return;
-    final authUser = _auth.currentUser;
+    syncNotifier.value = !_cloudEnabled;
+    await _loadAccounts(remote: false);
+
+    final authUser = _auth?.currentUser;
     if (authUser != null && (authUser.email ?? '').isNotEmpty) {
       _currentUserEmail = authUser.email;
       _currentUserId = authUser.uid;
       _loggedOut = false;
     } else {
-      _currentUserEmail = null;
+      _currentUserEmail = await _restoreLocalCurrentUserEmail();
       _currentUserId = null;
-      _loggedOut = true;
+      _loggedOut = _currentUserEmail == null;
     }
-
-    // Load local accounts first to show UI quickly
-    await _loadAccounts(remote: false);
     userNotifier.value = getUserProfile();
 
     if (_loggedOut) {
       _stopUserListener();
       _dashboards.clear();
       _goals.clear();
-    } else {
+      syncNotifier.value = true;
+    } else if (_cloudEnabled &&
+        _currentUserId != null &&
+        _currentUserId!.isNotEmpty) {
       // Start background tasks without awaiting them to unblock main()
       _startBackgroundInitialization();
+    } else {
+      await _loadLocalUserData();
+      syncNotifier.value = true;
     }
     _initialized = true;
   }
 
   static Future<void> _startBackgroundInitialization() async {
+    if (!_cloudEnabled || _currentUserId == null || _currentUserId!.isEmpty) {
+      syncNotifier.value = true;
+      return;
+    }
     syncNotifier.value = false;
     _listenToCurrentUser();
 
@@ -121,6 +132,9 @@ class LocalStorageService {
   }
 
   static Future<void> waitForSync({int timeoutSeconds = 5}) async {
+    if (!_cloudEnabled || _currentUserId == null || _currentUserId!.isEmpty) {
+      return;
+    }
     if (syncNotifier.value) return;
 
     final completer = Completer<void>();
@@ -152,10 +166,81 @@ class LocalStorageService {
     return null;
   }
 
+  static String? _resolvedUid() {
+    final authUid = _auth?.currentUser?.uid;
+    if (authUid != null && authUid.isNotEmpty) {
+      _currentUserId = authUid;
+      return authUid;
+    }
+    if (_currentUserId != null && _currentUserId!.isNotEmpty) {
+      return _currentUserId;
+    }
+    return null;
+  }
+
+  static void _upsertLocalIncome(IncomeSource income) {
+    final idx = _incomes.indexWhere((i) => i.id == income.id);
+    if (idx >= 0) {
+      _incomes[idx] = income;
+    } else {
+      _incomes.add(income);
+    }
+    incomeNotifier.value++;
+  }
+
   static Future<void> _ensureInit() async {
     if (!_initialized) {
       await init();
     }
+  }
+
+  static UserProfile? _findLocalUser(String email) {
+    final normalized = email.trim().toLowerCase();
+    try {
+      return _accounts.firstWhere(
+        (u) => u.email.toLowerCase() == normalized,
+      );
+    } catch (_) {
+      return null;
+    }
+  }
+
+  static Future<String?> _restoreLocalCurrentUserEmail() async {
+    final saved = (await LocalDatabaseService.getSetting(_kCurrentUserEmail))
+        ?.trim()
+        .toLowerCase();
+    if (saved != null && saved.isNotEmpty && _findLocalUser(saved) != null) {
+      return saved;
+    }
+    if (!_cloudEnabled && _accounts.length == 1) {
+      return _accounts.first.email.trim().toLowerCase();
+    }
+    return null;
+  }
+
+  static Future<void> _persistCurrentUserEmail(String? email) async {
+    await LocalDatabaseService.setSetting(
+      _kCurrentUserEmail,
+      email?.trim().toLowerCase(),
+    );
+  }
+
+  static Future<void> _loadLocalUserData() async {
+    final localKey = _localUserKey();
+    if (localKey == null || localKey.isEmpty) return;
+
+    final localDashboards = await LocalDatabaseService.getDashboards(localKey);
+    final localGoals = await LocalDatabaseService.getGoals(localKey);
+
+    _dashboards
+      ..clear()
+      ..addAll(localDashboards);
+    _goals
+      ..clear()
+      ..addAll(localGoals);
+
+    dashboardNotifier.value++;
+    goalNotifier.value++;
   }
 
   static String _essentialGuideKey() {
@@ -180,13 +265,6 @@ class LocalStorageService {
   static String? get currentUserId => _currentUserId;
   static String? get lastSyncError => _lastSyncError;
   static String? get lastLoginError => _lastLoginError;
-  static bool get currentUserUsesPasswordProvider =>
-      _auth.currentUser?.providerData.any((p) => p.providerId == 'password') ??
-      false;
-  static bool get currentUserUsesGoogleProvider =>
-      _auth.currentUser?.providerData
-          .any((p) => p.providerId == 'google.com') ??
-      false;
   static UserProfile? getUserProfile() {
     if (_loggedOut) return null;
     if (_currentUserEmail == null || _currentUserEmail!.isEmpty) {
@@ -210,9 +288,19 @@ class LocalStorageService {
     final normalizedEmail = email.trim().toLowerCase();
     if (normalizedEmail.isEmpty) return null;
 
+    if (!_cloudEnabled) {
+      final localUser = _findLocalUser(normalizedEmail);
+      if (localUser == null || localUser.password != password) {
+        _lastLoginError = 'login_invalid_credentials';
+        return null;
+      }
+      await setCurrentUser(localUser.email);
+      return getUserProfile();
+    }
+
     try {
       debugPrint('LocalStorageService: Attempting login for $normalizedEmail');
-      await _auth.signInWithEmailAndPassword(
+      await _auth!.signInWithEmailAndPassword(
         email: normalizedEmail,
         password: password,
       );
@@ -237,7 +325,7 @@ class LocalStorageService {
       return null;
     }
 
-    final authUser = _auth.currentUser;
+    final authUser = _auth?.currentUser;
     if (authUser == null) return null;
     _currentUserId = authUser.uid;
     _currentUserEmail = authUser.email ?? normalizedEmail;
@@ -253,12 +341,23 @@ class LocalStorageService {
     await _ensureInit();
     _lastLoginError = null;
     syncNotifier.value = false;
+    if (!_cloudEnabled) {
+      _lastLoginError = 'login_google_not_ready';
+      syncNotifier.value = true;
+      return null;
+    }
     try {
+      final auth = _auth;
+      if (auth == null) {
+        _lastLoginError = 'login_google_not_ready';
+        syncNotifier.value = true;
+        return null;
+      }
       if (kIsWeb) {
         final provider = GoogleAuthProvider()
           ..addScope('email')
           ..addScope('profile');
-        await _auth.signInWithPopup(provider);
+        await auth.signInWithPopup(provider);
       } else {
         final googleSignIn = _googleSignInClient();
 
@@ -287,7 +386,7 @@ class LocalStorageService {
           accessToken: googleAuth.accessToken,
           idToken: googleAuth.idToken,
         );
-        await _auth.signInWithCredential(credential);
+        await auth.signInWithCredential(credential);
       }
     } on FirebaseAuthException catch (e) {
       debugPrint(
@@ -322,7 +421,7 @@ class LocalStorageService {
       return null;
     }
 
-    final authUser = _auth.currentUser;
+    final authUser = _auth?.currentUser;
     if (authUser == null) return null;
 
     _currentUserId = authUser.uid;
@@ -361,10 +460,17 @@ class LocalStorageService {
   static Future<void> setCurrentUser(String email) async {
     await _ensureInit();
     _lastLoginError = null;
-    final authUser = _auth.currentUser;
-    _currentUserEmail = authUser?.email ?? email.trim();
+    final authUser = _auth?.currentUser;
+    _currentUserEmail = (authUser?.email ?? email.trim()).toLowerCase();
     _currentUserId = authUser?.uid;
     _loggedOut = false;
+    await _persistCurrentUserEmail(_currentUserEmail);
+    if (!_cloudEnabled || _currentUserId == null || _currentUserId!.isEmpty) {
+      await _loadLocalUserData();
+      syncNotifier.value = true;
+      userNotifier.value = getUserProfile();
+      return;
+    }
     try {
       await _startBackgroundInitialization().timeout(
         const Duration(seconds: 10),
@@ -384,10 +490,20 @@ class LocalStorageService {
     await _ensureInit();
     _lastLoginError = null;
     profile.isPremium = false;
-    final existsRemote = await FirestoreService.userExists(profile.email);
-    if (existsRemote == true) return false;
+    final existsLocal = _findLocalUser(profile.email) != null;
+    if (existsLocal) return false;
+    if (_cloudEnabled) {
+      final existsRemote = await FirestoreService.userExists(profile.email);
+      if (existsRemote == true) return false;
+    }
+    if (!_cloudEnabled) {
+      _accounts.add(profile);
+      await _persistAccounts();
+      await setCurrentUser(profile.email);
+      return true;
+    }
     try {
-      final credential = await _auth.createUserWithEmailAndPassword(
+      final credential = await _auth!.createUserWithEmailAndPassword(
         email: profile.email.trim(),
         password: profile.password,
       );
@@ -436,11 +552,17 @@ class LocalStorageService {
       _accounts.add(finalUser);
     }
     await _persistAccounts();
+    final uid = _resolvedUid();
+    if (!_cloudEnabled || uid == null || uid.isEmpty) {
+      _setSyncError(false);
+      userNotifier.value = finalUser;
+      return true;
+    }
     final ok = await FirestoreService.upsertUser(finalUser);
     _setSyncError(ok);
     // Optimized: instead of setCurrentUser (which reloads EVERYTHING), just update the notifier
     userNotifier.value = finalUser;
-    return ok;
+    return true;
   }
 
   static Future<bool> updateUserProfile({
@@ -453,9 +575,17 @@ class LocalStorageService {
     final newEmail = updated.email.toLowerCase();
 
     if (newEmail != prevEmail) {
-      final conflict = await FirestoreService.userExists(updated.email);
-      if (conflict == true) return false;
-      final authUser = _auth.currentUser;
+      final localConflict = _accounts.any(
+        (u) =>
+            u.email.toLowerCase() == newEmail &&
+            u.email.toLowerCase() != prevEmail,
+      );
+      if (localConflict) return false;
+      if (_cloudEnabled) {
+        final conflict = await FirestoreService.userExists(updated.email);
+        if (conflict == true) return false;
+      }
+      final authUser = _auth?.currentUser;
       if (authUser != null && authUser.email?.toLowerCase() == prevEmail) {
         try {
           await authUser.updateEmail(updated.email);
@@ -463,7 +593,10 @@ class LocalStorageService {
           return false;
         }
       }
-      await FirestoreService.renameUserEmail(previous.email, updated.email);
+      await LocalDatabaseService.renameUserEmail(previous.email, updated.email);
+      if (_cloudEnabled) {
+        await FirestoreService.renameUserEmail(previous.email, updated.email);
+      }
     }
 
     final idx = _accounts.indexWhere((u) => u.email.toLowerCase() == prevEmail);
@@ -492,7 +625,7 @@ class LocalStorageService {
       _accounts.add(finalUser);
     }
 
-    final authUser = _auth.currentUser;
+    final authUser = _auth?.currentUser;
     if (authUser != null && updated.password.isNotEmpty) {
       if (updated.password != previous.password) {
         try {
@@ -504,6 +637,16 @@ class LocalStorageService {
     }
 
     await _persistAccounts();
+    final uid = _resolvedUid();
+    if (!_cloudEnabled || uid == null || uid.isEmpty) {
+      _setSyncError(false);
+      if (newEmail != prevEmail) {
+        await setCurrentUser(newEmail);
+      } else {
+        userNotifier.value = finalUser;
+      }
+      return true;
+    }
     final ok = await FirestoreService.upsertUser(finalUser);
     _setSyncError(ok);
 
@@ -521,6 +664,7 @@ class LocalStorageService {
     _currentUserEmail = null;
     _currentUserId = null;
     _loggedOut = true;
+    await _persistCurrentUserEmail(null);
     _stopUserListener();
     _dashboards.clear();
     _goals.clear();
@@ -528,89 +672,7 @@ class LocalStorageService {
     try {
       await _googleSignInClient().signOut();
     } catch (_) {}
-    await _auth.signOut();
-  }
-
-  static Future<void> deleteCurrentAccount({String? password}) async {
-    await _ensureInit();
-
-    final authUser = _auth.currentUser;
-    final uid = authUser?.uid ?? _currentUserId;
-    final email = (authUser?.email ?? _currentUserEmail ?? '').trim();
-    if (authUser == null || uid == null || uid.isEmpty || email.isEmpty) {
-      throw AccountDeletionException('not-authenticated');
-    }
-
-    final providers = authUser.providerData.map((p) => p.providerId).toSet();
-    if (providers.contains('password')) {
-      final normalizedPassword = password ?? '';
-      if (normalizedPassword.isEmpty) {
-        throw AccountDeletionException('password-required');
-      }
-      try {
-        final credential = EmailAuthProvider.credential(
-          email: email,
-          password: normalizedPassword,
-        );
-        await authUser.reauthenticateWithCredential(credential);
-      } on FirebaseAuthException catch (e) {
-        throw AccountDeletionException(e.code, details: e);
-      }
-    } else if (providers.contains('google.com')) {
-      try {
-        final googleSignIn = _googleSignInClient();
-        try {
-          await googleSignIn.signOut();
-        } catch (_) {}
-
-        final googleUser = await googleSignIn.signIn();
-        if (googleUser == null) {
-          throw AccountDeletionException('reauth-cancelled');
-        }
-
-        final googleAuth = await googleUser.authentication;
-        final credential = GoogleAuthProvider.credential(
-          accessToken: googleAuth.accessToken,
-          idToken: googleAuth.idToken,
-        );
-        await authUser.reauthenticateWithCredential(credential);
-      } on AccountDeletionException {
-        rethrow;
-      } on FirebaseAuthException catch (e) {
-        throw AccountDeletionException(e.code, details: e);
-      } on PlatformException catch (e) {
-        throw AccountDeletionException(e.code, details: e);
-      } catch (e) {
-        throw AccountDeletionException('reauth-failed', details: e);
-      }
-    } else {
-      throw AccountDeletionException('unsupported-provider');
-    }
-
-    try {
-      await FirestoreService.deleteUserAccount(uid: uid, email: email);
-      await LocalDatabaseService.deleteUserData(email: email, uid: uid);
-      await authUser.delete();
-    } on FirebaseAuthException catch (e) {
-      throw AccountDeletionException(e.code, details: e);
-    } catch (e) {
-      throw AccountDeletionException('delete-failed', details: e);
-    }
-
-    _accounts.removeWhere((u) => u.email.toLowerCase() == email.toLowerCase());
-    _currentUserEmail = null;
-    _currentUserId = null;
-    _loggedOut = true;
-    _stopUserListener();
-    _dashboards.clear();
-    _goals.clear();
-    _incomes.clear();
-    userNotifier.value = null;
-    syncNotifier.value = true;
-
-    try {
-      await _googleSignInClient().signOut();
-    } catch (_) {}
+    await _auth?.signOut();
   }
 
   static Future<bool> updateMonthlyIncome(double income) async {
@@ -753,8 +815,65 @@ class LocalStorageService {
 
   static Future<bool> saveIncome(IncomeSource income) async {
     await _ensureInit();
-    if (_currentUserId == null) return false;
-    await FirestoreService.saveIncome(_currentUserId!, income);
+    final uid = _resolvedUid();
+
+    if (income.isPrimary) {
+      final demotedIncomes = _incomes
+          .where((item) => item.id != income.id && item.isPrimary)
+          .map((item) => item.copyWith(isPrimary: false))
+          .toList();
+      for (final demoted in demotedIncomes) {
+        _upsertLocalIncome(demoted);
+      }
+      if (uid != null && uid.isNotEmpty) {
+        for (final demoted in demotedIncomes) {
+          await FirestoreService.saveIncome(uid, demoted);
+        }
+      }
+    }
+
+    _upsertLocalIncome(income);
+    if (uid == null || uid.isEmpty) {
+      final currentProfile = getUserProfile();
+      if (currentProfile != null) {
+        final baseline = fixedIncomeBaseline();
+        final idx = _accounts.indexWhere(
+          (u) => u.email.toLowerCase() == currentProfile.email.toLowerCase(),
+        );
+        final updatedProfile = currentProfile.copyWith(monthlyIncome: baseline);
+        if (idx >= 0) {
+          _accounts[idx] = updatedProfile;
+        }
+        userNotifier.value = updatedProfile;
+      }
+      _ensureDashboardWindow();
+      _updateDashboardsIncome();
+      _setSyncError(false);
+      return true;
+    }
+
+    await FirestoreService.saveIncome(uid, income);
+    final monthYear = _monthKey(DateTime.now());
+    final ok = await FirestoreService.updateUserIncomeSync(
+      uid: uid,
+      monthYear: monthYear,
+      incomes: List.of(_incomes),
+    );
+    _setSyncError(ok);
+    final currentProfile = getUserProfile();
+    if (currentProfile != null) {
+      final baseline = fixedIncomeBaseline();
+      final idx = _accounts.indexWhere(
+        (u) => u.email.toLowerCase() == currentProfile.email.toLowerCase(),
+      );
+      final updatedProfile = currentProfile.copyWith(monthlyIncome: baseline);
+      if (idx >= 0) {
+        _accounts[idx] = updatedProfile;
+      }
+      userNotifier.value = updatedProfile;
+    }
+    _ensureDashboardWindow();
+    _updateDashboardsIncome();
     return true;
   }
 
@@ -925,7 +1044,7 @@ class LocalStorageService {
 
   static Future<bool> saveExpense(Expense expense) async {
     await _ensureInit();
-    final uid = _currentUserId ?? _auth.currentUser?.uid;
+    final uid = _currentUserId ?? _auth?.currentUser?.uid;
     if (uid == null || uid.isEmpty) {
       debugPrint(
           'LocalStorageService: Cannot save expense because uid is missing.');
@@ -1002,7 +1121,7 @@ class LocalStorageService {
     required DateTime month,
   }) async {
     await _ensureInit();
-    final uid = _currentUserId ?? _auth.currentUser?.uid;
+    final uid = _currentUserId ?? _auth?.currentUser?.uid;
     if (uid == null || uid.isEmpty) return false;
 
     final candidates = _candidateSeriesIdsForFixedExpense(expense);
@@ -1066,7 +1185,7 @@ class LocalStorageService {
     required DateTime fromMonth,
   }) async {
     await _ensureInit();
-    final uid = _currentUserId ?? _auth.currentUser?.uid;
+    final uid = _currentUserId ?? _auth?.currentUser?.uid;
     if (uid == null || uid.isEmpty) return false;
 
     final candidates = _candidateSeriesIdsForFixedExpense(expense);
@@ -1113,7 +1232,7 @@ class LocalStorageService {
     required List<Expense> monthTransactions,
   }) async {
     await _ensureInit();
-    final uid = _currentUserId ?? _auth.currentUser?.uid;
+    final uid = _currentUserId ?? _auth?.currentUser?.uid;
     if (uid == null || uid.isEmpty) return;
 
     final monthYear =
@@ -1324,6 +1443,8 @@ class LocalStorageService {
       return;
     }
 
+    if (!_cloudEnabled) return;
+
     if (_currentUserId == null || _currentUserId!.isEmpty) return;
 
     // 2. Tenta carregar do Firestore (fonte da verdade)
@@ -1352,6 +1473,11 @@ class LocalStorageService {
   }
 
   static Future<UserProfile?> _ensureUserProfile() async {
+    if (!_cloudEnabled || _currentUserId == null || _currentUserId!.isEmpty) {
+      final email = (_currentUserEmail ?? '').trim().toLowerCase();
+      if (email.isEmpty) return null;
+      return _findLocalUser(email);
+    }
     if (_currentUserId == null || _currentUserId!.isEmpty) return null;
     final normalizedEmail = (_currentUserEmail ?? '').trim().toLowerCase();
 
@@ -1433,7 +1559,7 @@ class LocalStorageService {
     _goals.clear();
     userNotifier.value = null;
     try {
-      await _auth.signOut();
+      await _auth?.signOut();
     } on FirebaseAuthException {
       // ignore
     }
@@ -1441,6 +1567,7 @@ class LocalStorageService {
 
   static void _listenToCurrentUser() {
     _stopUserListener();
+    if (!_cloudEnabled) return;
     if (_currentUserId == null || _currentUserId!.isEmpty) return;
 
     // Keep daily habits synced across devices (Dashboard <-> Insights and Web <-> Flutter).
@@ -1673,8 +1800,10 @@ class LocalStorageService {
       await LocalDatabaseService.upsertUser(user);
 
       // Tenta salvar no Firestore
-      final saved = await FirestoreService.upsertUser(user);
-      if (!saved) ok = false;
+      if (_cloudEnabled) {
+        final saved = await FirestoreService.upsertUser(user);
+        if (!saved) ok = false;
+      }
     }
     _setSyncError(ok);
   }

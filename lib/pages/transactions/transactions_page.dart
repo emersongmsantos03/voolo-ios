@@ -10,7 +10,10 @@ import '../../models/credit_card.dart';
 import '../../models/expense.dart';
 import '../../services/local_storage_service.dart';
 import '../../utils/currency_utils.dart';
+import '../../utils/finance_overview_utils.dart';
 import '../../utils/money_input.dart';
+
+enum _TransactionFilter { all, debit, credit, investment }
 
 class TransactionsPage extends StatefulWidget {
   const TransactionsPage({super.key});
@@ -25,6 +28,7 @@ class _TransactionsPageState extends State<TransactionsPage> {
   List<Expense> _items = const [];
   int _page = 1;
   static const int _pageSize = 10;
+  _TransactionFilter _filter = _TransactionFilter.all;
 
   @override
   void initState() {
@@ -64,6 +68,23 @@ class _TransactionsPageState extends State<TransactionsPage> {
     if (start >= _items.length) return const [];
     final end = (start + _pageSize).clamp(0, _items.length);
     return _items.sublist(start, end);
+  }
+
+  bool _matchesFilter(Expense tx) {
+    switch (_filter) {
+      case _TransactionFilter.debit:
+        return !tx.isCreditCard && !tx.isInvestment;
+      case _TransactionFilter.credit:
+        return tx.isCreditCard;
+      case _TransactionFilter.investment:
+        return tx.isInvestment;
+      case _TransactionFilter.all:
+        return true;
+    }
+  }
+
+  List<Expense> _filteredItems() {
+    return _items.where(_matchesFilter).toList();
   }
 
   List<Expense> _dedupeExpenses(List<Expense> items) {
@@ -149,6 +170,10 @@ class _TransactionsPageState extends State<TransactionsPage> {
       case ExpenseCategory.outros:
         return 'Outros';
     }
+  }
+
+  String _localizedCategoryLabel(ExpenseCategory c) {
+    return localizedExpenseCategoryLabel(context, c);
   }
 
   Color _typeColor(Expense tx) {
@@ -340,23 +365,21 @@ class _TransactionsPageState extends State<TransactionsPage> {
                       title: const Text('Cartão de crédito'),
                       value: isCard,
                       activeThumbColor: Theme.of(context).colorScheme.primary,
-                      activeTrackColor: Theme.of(context)
-                          .colorScheme
-                          .primary
-                          .withValues(alpha: 0.35),
-                      inactiveThumbColor: Theme.of(context)
-                          .colorScheme
-                          .onSurface
-                          .withValues(alpha: 0.55),
-                      inactiveTrackColor: Theme.of(context)
-                          .colorScheme
-                          .onSurface
-                          .withValues(alpha: 0.20),
+                      activeTrackColor: Theme.of(
+                        context,
+                      ).colorScheme.primary.withValues(alpha: 0.35),
+                      inactiveThumbColor: Theme.of(
+                        context,
+                      ).colorScheme.onSurface.withValues(alpha: 0.55),
+                      inactiveTrackColor: Theme.of(
+                        context,
+                      ).colorScheme.onSurface.withValues(alpha: 0.20),
                       onChanged: (v) {
                         if (v && cards.isEmpty) {
                           ScaffoldMessenger.of(context).showSnackBar(
                             const SnackBar(
-                                content: Text('Cadastre um cartão primeiro.')),
+                              content: Text('Cadastre um cartão primeiro.'),
+                            ),
                           );
                           return;
                         }
@@ -410,15 +433,17 @@ class _TransactionsPageState extends State<TransactionsPage> {
                         alignment: Alignment.centerLeft,
                         child: Text(
                           'Categoria: Investimento',
-                          style:
-                              TextStyle(color: AppTheme.textSecondary(context)),
+                          style: TextStyle(
+                            color: AppTheme.textSecondary(context),
+                          ),
                         ),
                       ),
                     ),
                   TextField(
                     controller: amountController,
-                    keyboardType:
-                        const TextInputType.numberWithOptions(decimal: true),
+                    keyboardType: const TextInputType.numberWithOptions(
+                      decimal: true,
+                    ),
                     inputFormatters: const [MoneyTextInputFormatter()],
                     decoration: const InputDecoration(labelText: 'Valor (R\$)'),
                   ),
@@ -441,13 +466,15 @@ class _TransactionsPageState extends State<TransactionsPage> {
                               ),
                             ]
                           : cards
-                              .map((c) => DropdownMenuItem<String?>(
-                                    value: c.id,
-                                    child: Text(
-                                      c.name,
-                                      overflow: TextOverflow.ellipsis,
-                                    ),
-                                  ))
+                              .map(
+                                (c) => DropdownMenuItem<String?>(
+                                  value: c.id,
+                                  child: Text(
+                                    c.name,
+                                    overflow: TextOverflow.ellipsis,
+                                  ),
+                                ),
+                              )
                               .toList(),
                       onChanged: (!isCard || cards.isEmpty)
                           ? null
@@ -455,8 +482,9 @@ class _TransactionsPageState extends State<TransactionsPage> {
                               if (v == null) return;
                               setDialogState(() {
                                 creditCardId = v;
-                                final selected =
-                                    cards.firstWhere((c) => c.id == v);
+                                final selected = cards.firstWhere(
+                                  (c) => c.id == v,
+                                );
                                 cardDueDay = selected.dueDay;
                               });
                             },
@@ -565,25 +593,41 @@ class _TransactionsPageState extends State<TransactionsPage> {
 
   @override
   Widget build(BuildContext context) {
-    final items = _pageItems();
-    final totalPages = _totalPages(_items);
+    final filtered = _filteredItems();
+    final totalPages = _totalPages(filtered);
+    final start = (_page - 1) * _pageSize;
+    final items = start >= filtered.length
+        ? const <Expense>[]
+        : filtered.sublist(
+            start, (start + _pageSize).clamp(0, filtered.length));
     final hasPrev = _page > 1;
     final hasNext = _page < totalPages;
+    final user = LocalStorageService.getUserProfile();
+    final dashboard =
+        LocalStorageService.getDashboard(_month.month, _month.year);
+    final salary =
+        dashboard?.salary ?? LocalStorageService.incomeTotalForMonth(_month);
+    final overview = buildFinanceOverview(
+      salary: salary > 0 ? salary : (user?.monthlyIncome ?? 0),
+      expenses: _items,
+      cards: user?.creditCards ?? const <CreditCard>[],
+      creditCardPayments: dashboard?.creditCardPayments ?? const {},
+    );
 
     return Scaffold(
-      appBar: AppBar(
-        title: Text(AppStrings.t(context, 'timeline_title')),
-      ),
+      appBar: AppBar(title: Text(AppStrings.t(context, 'timeline_title'))),
       body: Padding(
         padding: Responsive.pagePadding(context),
         child: Column(
           children: [
+            _summaryCard(overview),
+            const SizedBox(height: 14),
+            _filterBar(filtered.length),
+            const SizedBox(height: 14),
             Expanded(
               child: items.isEmpty
                   ? _emptyState()
-                  : ListView(
-                      children: items.map(_transactionTile).toList(),
-                    ),
+                  : ListView(children: items.map(_transactionTile).toList()),
             ),
             const SizedBox(height: 10),
             _paginationFooter(
@@ -608,8 +652,8 @@ class _TransactionsPageState extends State<TransactionsPage> {
         color: Theme.of(context).colorScheme.surface,
         borderRadius: BorderRadius.circular(20),
         border: Border.all(
-            color:
-                Theme.of(context).colorScheme.outline.withValues(alpha: 0.3)),
+          color: Theme.of(context).colorScheme.outline.withValues(alpha: 0.3),
+        ),
       ),
       child: Center(
         child: Column(
@@ -628,8 +672,9 @@ class _TransactionsPageState extends State<TransactionsPage> {
             Text(
               AppStrings.t(context, 'no_entries_found_title'),
               style: TextStyle(
-                  color: AppTheme.textPrimary(context),
-                  fontWeight: FontWeight.w700),
+                color: AppTheme.textPrimary(context),
+                fontWeight: FontWeight.w700,
+              ),
               textAlign: TextAlign.center,
             ),
             const SizedBox(height: 6),
@@ -641,6 +686,162 @@ class _TransactionsPageState extends State<TransactionsPage> {
           ],
         ),
       ),
+    );
+  }
+
+  Widget _summaryCard(FinanceOverview overview) {
+    final scheme = Theme.of(context).colorScheme;
+    final headline = _filter == _TransactionFilter.credit
+        ? 'Credito entra na fatura e compromete o mes imediatamente.'
+        : _filter == _TransactionFilter.debit
+            ? 'Debito sai do saldo agora e mostra seu consumo imediato.'
+            : _filter == _TransactionFilter.investment
+                ? 'Investimento fica separado do consumo para voce ver evolucao real.'
+                : 'Use os filtros para entender o que saiu do saldo e o que ficou na fatura.';
+
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(20),
+      decoration: AppTheme.premiumCardDecoration(context),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            'Leitura do mes',
+            style: TextStyle(
+              color: AppTheme.textPrimary(context),
+              fontWeight: FontWeight.w800,
+              fontSize: 18,
+            ),
+          ),
+          const SizedBox(height: 6),
+          Text(
+            headline,
+            style: TextStyle(
+              color: AppTheme.textSecondary(context),
+              height: 1.4,
+            ),
+          ),
+          const SizedBox(height: 16),
+          Wrap(
+            spacing: 10,
+            runSpacing: 10,
+            children: [
+              _summaryMetric(
+                'Debito',
+                CurrencyUtils.format(overview.debitSpent),
+                AppTheme.warning,
+              ),
+              _summaryMetric(
+                'Credito',
+                CurrencyUtils.format(overview.creditSpent),
+                scheme.primary,
+              ),
+              _summaryMetric(
+                'Investido',
+                CurrencyUtils.format(overview.invested),
+                AppTheme.info,
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _summaryMetric(String label, String value, Color color) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+      decoration: BoxDecoration(
+        color: Theme.of(context).colorScheme.surfaceContainerLow,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(
+          color: Theme.of(context).colorScheme.outline.withValues(alpha: 0.08),
+        ),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Container(
+            width: 8,
+            height: 8,
+            decoration: BoxDecoration(color: color, shape: BoxShape.circle),
+          ),
+          const SizedBox(width: 8),
+          Text(
+            label,
+            style: TextStyle(
+              color: AppTheme.textSecondary(context),
+              fontSize: 12,
+            ),
+          ),
+          const SizedBox(width: 6),
+          Text(
+            value,
+            style: TextStyle(
+              color: AppTheme.textPrimary(context),
+              fontWeight: FontWeight.w800,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _filterBar(int count) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          'Filtrar para entender melhor',
+          style: TextStyle(
+            color: AppTheme.textPrimary(context),
+            fontWeight: FontWeight.w700,
+          ),
+        ),
+        const SizedBox(height: 10),
+        Wrap(
+          spacing: 10,
+          runSpacing: 10,
+          children: [
+            _filterChip(_TransactionFilter.all, 'Tudo'),
+            _filterChip(_TransactionFilter.debit, 'Debito'),
+            _filterChip(_TransactionFilter.credit, 'Credito'),
+            _filterChip(_TransactionFilter.investment, 'Investimentos'),
+          ],
+        ),
+        const SizedBox(height: 8),
+        Text(
+          '$count lancamentos no filtro atual.',
+          style: TextStyle(
+            color: AppTheme.textSecondary(context),
+            fontSize: 12,
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _filterChip(_TransactionFilter value, String label) {
+    final selected = _filter == value;
+    final scheme = Theme.of(context).colorScheme;
+    return ChoiceChip(
+      label: Text(label),
+      selected: selected,
+      onSelected: (_) {
+        setState(() {
+          _filter = value;
+          _page = 1;
+        });
+      },
+      labelStyle: TextStyle(
+        color: selected ? scheme.onPrimary : AppTheme.textPrimary(context),
+        fontWeight: FontWeight.w700,
+      ),
+      selectedColor: scheme.primary,
+      backgroundColor: scheme.surfaceContainerLow,
+      side: BorderSide(color: scheme.outline.withValues(alpha: 0.08)),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(999)),
     );
   }
 
@@ -660,9 +861,10 @@ class _TransactionsPageState extends State<TransactionsPage> {
           Text(
             text,
             style: TextStyle(
-                color: AppTheme.textSecondary(context),
-                fontSize: 12,
-                fontWeight: FontWeight.w600),
+              color: AppTheme.textSecondary(context),
+              fontSize: 12,
+              fontWeight: FontWeight.w600,
+            ),
           ),
         ],
       ),
@@ -683,18 +885,15 @@ class _TransactionsPageState extends State<TransactionsPage> {
           color: Theme.of(context).colorScheme.surface,
           borderRadius: BorderRadius.circular(18),
           border: Border.all(
-              color: Theme.of(context)
-                  .colorScheme
-                  .outline
-                  .withValues(alpha: 0.25)),
+            color: Theme.of(
+              context,
+            ).colorScheme.outline.withValues(alpha: 0.25),
+          ),
         ),
         child: Row(
           children: [
             if (showPaid) ...[
-              Checkbox(
-                value: tx.isPaid,
-                onChanged: (_) => _togglePaid(tx),
-              ),
+              Checkbox(value: tx.isPaid, onChanged: (_) => _togglePaid(tx)),
               const SizedBox(width: 4),
             ],
             Container(
@@ -714,8 +913,9 @@ class _TransactionsPageState extends State<TransactionsPage> {
                   Text(
                     tx.name,
                     style: TextStyle(
-                        color: AppTheme.textPrimary(context),
-                        fontWeight: FontWeight.w700),
+                      color: AppTheme.textPrimary(context),
+                      fontWeight: FontWeight.w700,
+                    ),
                     overflow: TextOverflow.ellipsis,
                   ),
                   const SizedBox(height: 6),
@@ -724,17 +924,26 @@ class _TransactionsPageState extends State<TransactionsPage> {
                     runSpacing: 8,
                     children: [
                       _badge(
-                          icon: Icons.tag_rounded,
-                          text: _categoryLabel(tx.category)),
+                        icon: Icons.tag_rounded,
+                        text: _localizedCategoryLabel(tx.category),
+                      ),
+                      _badge(
+                        icon: tx.isCreditCard
+                            ? Icons.credit_card_rounded
+                            : Icons.account_balance_wallet_outlined,
+                        text: localizedPaymentMethodLabel(context, tx),
+                      ),
                       if (tx.dueDay != null)
                         _badge(
                           icon: Icons.calendar_month_rounded,
                           text: '${AppStrings.t(context, 'day')} ${tx.dueDay}',
                         ),
-                      if (tx.isCreditCard)
-                        _badge(
-                            icon: Icons.credit_card_rounded,
-                            text: AppStrings.t(context, 'card')),
+                      _badge(
+                        icon: tx.isCreditCard
+                            ? Icons.receipt_long_outlined
+                            : Icons.south_west_rounded,
+                        text: localizedPaymentImpactLabel(context, tx),
+                      ),
                       if ((tx.installments ?? 0) > 1)
                         _badge(
                           icon: Icons.layers_rounded,
@@ -761,30 +970,39 @@ class _TransactionsPageState extends State<TransactionsPage> {
                   Text(
                     AppStrings.t(context, 'paid'),
                     style: TextStyle(
-                        color: AppTheme.success,
-                        fontSize: 12,
-                        fontWeight: FontWeight.w700),
+                      color: AppTheme.success,
+                      fontSize: 12,
+                      fontWeight: FontWeight.w700,
+                    ),
                   ),
                 const SizedBox(height: 6),
                 IconButton(
                   onPressed: () => _editExpense(tx),
-                  icon: Icon(Icons.edit_outlined,
-                      color: AppTheme.textMuted(context)),
+                  icon: Icon(
+                    Icons.edit_outlined,
+                    color: AppTheme.textMuted(context),
+                  ),
                   tooltip: AppStrings.t(context, 'edit_entry'),
                   visualDensity: VisualDensity.compact,
                   padding: EdgeInsets.zero,
-                  constraints:
-                      const BoxConstraints.tightFor(width: 36, height: 36),
+                  constraints: const BoxConstraints.tightFor(
+                    width: 36,
+                    height: 36,
+                  ),
                 ),
                 IconButton(
                   onPressed: () => _deleteExpense(tx),
-                  icon: Icon(Icons.delete_outline,
-                      color: AppTheme.textMuted(context)),
+                  icon: Icon(
+                    Icons.delete_outline,
+                    color: AppTheme.textMuted(context),
+                  ),
                   tooltip: AppStrings.t(context, 'delete_entry'),
                   visualDensity: VisualDensity.compact,
                   padding: EdgeInsets.zero,
-                  constraints:
-                      const BoxConstraints.tightFor(width: 36, height: 36),
+                  constraints: const BoxConstraints.tightFor(
+                    width: 36,
+                    height: 36,
+                  ),
                 ),
               ],
             ),
@@ -814,16 +1032,17 @@ class _TransactionsPageState extends State<TransactionsPage> {
             color: Theme.of(context).colorScheme.surface,
             borderRadius: BorderRadius.circular(999),
             border: Border.all(
-                color: Theme.of(context)
-                    .colorScheme
-                    .outline
-                    .withValues(alpha: 0.25)),
+              color: Theme.of(
+                context,
+              ).colorScheme.outline.withValues(alpha: 0.25),
+            ),
           ),
           child: Text(
             '$page',
             style: TextStyle(
-                color: AppTheme.textSecondary(context),
-                fontWeight: FontWeight.w700),
+              color: AppTheme.textSecondary(context),
+              fontWeight: FontWeight.w700,
+            ),
           ),
         ),
         IconButton(

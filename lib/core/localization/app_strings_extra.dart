@@ -30,6 +30,61 @@ const Map<String, Map<String, String>> appStringsExtra = {
     'ratio_fixed': 'Fixos',
     'ratio_invest': 'Invest.',
     'ratio_buffer': 'Sobra',
+    'ratio_distribution_title': 'Distribuicao do mes',
+    'ratio_distribution_subtitle':
+        'Fixo, variavel, investimento e sobra em uma leitura rapida.',
+    'ratio_tip_fixed': 'Aqui entram as despesas mais recorrentes do seu mes.',
+    'ratio_tip_variable':
+        'Aqui entra o que oscila conforme seu consumo no mes.',
+    'ratio_tip_invest': 'Tente investir pelo menos 15-20% de sua renda mensal.',
+    'ratio_tip_buffer':
+        'Este e o valor que ainda esta livre no fim do seu mes.',
+    'dashboard_base_income': 'Entrada base do mes',
+    'edit_short': 'Editar',
+    'financial_position_available': 'Restante do mes',
+    'financial_position_with_invoice':
+        'Considerando a fatura atual, ficam {value} livres no mes.',
+    'financial_position_invoice_note':
+        'Ja considera a fatura em aberto deste mes.',
+    'financial_position_without_invoice':
+        'Sem pressao relevante de cartao neste mes.',
+    'financial_position_paid_out': 'Comprometido',
+    'financial_position_current_invoice': 'Fatura atual',
+    'financial_position_invested': 'Investido',
+    'bills_home_title': 'Faturas em aberto',
+    'bills_home_subtitle':
+        'Acompanhe o que esta pendente no cartao e marque quando pagar.',
+    'bills_compact_title': 'Cartoes e faturas',
+    'bills_compact_subtitle':
+        'Veja, adicione e acompanhe suas faturas sem sair da home.',
+    'bills_add_card': 'Adicionar cartao',
+    'bills_empty_title': 'Nenhum cartao cadastrado',
+    'bills_empty_subtitle': 'Adicione um cartao para acompanhar a fatura aqui.',
+    'bills_selected_due': 'Vence dia {day}',
+    'bills_selected_clear': 'Sem fatura aberta neste ciclo.',
+    'bills_selected_open': 'Em aberto',
+    'bills_pay_popup_title': 'Pagar fatura',
+    'bills_pay_popup_body': 'Marcar a fatura de {card} como paga por {value}?',
+    'bills_installments': 'Parcelas neste mes: {value}',
+    'bills_pay_cta': 'Pagar',
+    'bills_paid_badge': 'Paga',
+    'bills_reopen_cta': 'Reabrir',
+    'bills_help_title': 'Cartoes e faturas',
+    'bills_help_body':
+        'O app nao paga a fatura por voce. Aqui voce acompanha o valor do ciclo e pode apenas marcar se a fatura esta aberta ou ja foi paga fora do app.',
+    'financial_position_committed_help_title': 'Comprometido',
+    'financial_position_committed_help_body':
+        'Mostra tudo que ja comprometeu sua renda no mes, incluindo debito, credito e investimentos.',
+    'financial_position_current_invoice_help_title': 'Fatura atual',
+    'financial_position_current_invoice_help_body':
+        'Soma tudo o que foi lancado no cartao neste mes, considerando todos os cartoes.',
+    'financial_position_invested_help_title': 'Investido',
+    'financial_position_invested_help_body':
+        'Mostra apenas o valor aportado neste mes. Rendimentos nao entram aqui.',
+    'drawer_shortcuts': 'Atalhos',
+    'drawer_preferences': 'Preferencias',
+    'drawer_premium_active': 'Conta premium ativa',
+    'drawer_essential_plan': 'Plano essencial do Voolo',
     'ratio_housing': 'Moradia',
     'essential_balance_title': 'Saldo do mes',
     'essential_balance_entries': 'Entradas: {value}',
@@ -46,6 +101,7 @@ const Map<String, Map<String, String>> appStringsExtra = {
     'essential_guide_skip': 'Pular',
     'essential_guide_finish': 'Concluir trilha',
     'essential_guide_later': 'Fazer depois',
+    'essential_guide_never_again': 'Nao ver novamente',
     'essential_guide_action_expense_title': 'Registrar gasto',
     'essential_guide_action_expense_subtitle':
         'Adicione um gasto simples do dia.',
@@ -75,6 +131,10 @@ const Map<String, Map<String, String>> appStringsExtra = {
     'dashboard_empty_message':
         'Ainda nao temos dados suficientes. Registre seu primeiro gasto para iniciar a analise.',
     'dashboard_empty_cta': 'Adicionar primeiro gasto',
+    'dashboard_premium_health_title':
+        'Descubra onde seu mes aperta antes de faltar dinheiro',
+    'dashboard_premium_health_subtitle':
+        'No Premium, sua saude financeira e a distribuicao do mes mostram rapido o que esta pesado e onde ajustar para sobrar mais.',
     'score_health_label': 'Saude financeira',
     'score_tip_add_income':
         'Cadastre sua renda para calcular sua saude financeira.',
@@ -127,6 +187,88 @@ const Map<String, Map<String, String>> appStringsExtra = {
     'debts_plan_perk_1': 'Prioridade inteligente (Avalanche ou Snowball)',
     'debts_plan_perk_2': 'Parcela maxima recomendada baseada no seu orcamento',
     'debts_plan_perk_3': 'Etapas conectadas a missoes e relatorios',
+    'weekly_plan_title': 'Plano da semana',
+    'weekly_plan_subtitle':
+        'Seu proximo melhor passo para manter o mes sob controle.',
+    'weekly_plan_actions_label': 'Acoes',
+    'weekly_plan_streak_label': 'Streak',
+    'weekly_plan_insights_label': 'Insights',
+    'weekly_plan_follow_cta': 'Seguir passo da semana',
+    'weekly_plan_add_income_title': 'Cadastrar renda base',
+    'weekly_plan_add_income_desc': 'Sem renda ativa o plano perde precisao.',
+    'weekly_plan_negative_balance_title': 'Voltar para saldo positivo',
+    'weekly_plan_negative_balance_desc':
+        'Seu mes esta no vermelho. Priorize corte de variaveis e renegociacao de fixos.',
+    'weekly_plan_trim_variable_title': 'Reduzir gastos variaveis',
+    'weekly_plan_trim_variable_desc':
+        'Variaveis em {pct}% da renda. Defina teto semanal.',
+    'weekly_plan_increase_invest_title': 'Aumentar aporte de investimento',
+    'weekly_plan_increase_invest_desc':
+        'Seu aporte esta abaixo de 10% da renda. Simule um valor inicial sustentavel.',
+    'weekly_plan_create_goal_title': 'Criar uma meta principal',
+    'weekly_plan_create_goal_desc':
+        'Uma meta clara direciona decisoes da semana e aumenta consistencia.',
+    'weekly_plan_checkin_consistency_title': 'Subir consistencia do check-in',
+    'weekly_plan_checkin_consistency_desc':
+        'Voce fez {days}/7 check-ins. Meta da semana: pelo menos 5 dias.',
+    'weekly_plan_maintain_routine_title': 'Manter rotina e revisar categorias',
+    'weekly_plan_maintain_routine_desc':
+        'Seu plano esta saudavel. Revise categorias 1x na semana para prevenir desvios.',
+    'dashboard_premium_plan_title':
+        'Receba o proximo passo certo para melhorar seu mes',
+    'dashboard_premium_plan_subtitle':
+        'Desbloqueie o plano da semana e insights que apontam prioridades, riscos e oportunidades para voce agir na hora certa.',
+    'insight_high_commitment_message':
+        'Voce ja comprometeu mais de 80% da sua renda neste mes. Atencao aos proximos gastos.',
+    'insight_credit_red_message':
+        'Seu saldo ainda parece positivo, mas a fatura atual deixaria o mes no vermelho. Revise o credito antes da proxima compra.',
+    'insight_credit_over_debit_message':
+        'Neste mes, o credito passou o debito. Vale acompanhar antes que a fatura cresca mais rapido que sua sobra.',
+    'insight_installments_weight_message':
+        'Mais da metade da sua fatura atual vem de parcelas. Veja quanto ja esta comprometido antes de assumir novas compras.',
+    'insight_category_concentration_message':
+        'Uma unica categoria ja concentra boa parte do seu mes. Revise onde esse peso esta ficando maior.',
+    'insight_spending_speed_message':
+        'Seu ritmo de gasto esta mais rapido que o ritmo do mes. Vale segurar variaveis nos proximos dias.',
+    'insight_food_high_message':
+        'Seus gastos com alimentacao estao acima da media (25% da renda). Que tal cozinhar mais em casa?',
+    'insight_emergency_goal_message':
+        'Ainda nao identificamos uma meta de reserva de emergencia. Esse e o primeiro passo para sua seguranca.',
+    'insight_invest_free_cash_message':
+        'Ainda existe saldo livre neste mes. Que tal direcionar uma parte para investimento em vez de deixar parado?',
+    'insight_empty_dashboard_message':
+        'Seu dashboard esta vazio. Registre seu primeiro gasto para comecarmos a analise.',
+    'insight_action_review_spend': 'Revisar gastos',
+    'insight_action_view_bill': 'Ver fatura',
+    'insight_action_view_entries': 'Ver lancamentos',
+    'insight_action_review_installments': 'Revisar parcelas',
+    'insight_action_review_category': 'Revisar categoria',
+    'insight_action_hold_spending': 'Segurar gastos',
+    'insight_action_see_expenses': 'Ver gastos',
+    'insight_action_create_reserve': 'Criar reserva',
+    'insight_action_simulate_now': 'Simular agora',
+    'insight_action_add_expense': 'Adicionar gasto',
+    'notif_channel_reminders_name': 'Lembretes do Voolo',
+    'notif_channel_reminders_desc': 'Avisos de vencimento e revisao de gastos.',
+    'notif_channel_engagement_name': 'Check-ins do Voolo',
+    'notif_channel_engagement_desc': 'Lembretes gentis para manter o controle.',
+    'notif_due_today_title': 'Vence hoje',
+    'notif_due_today_body': '{name} vence hoje. Confira o pagamento.',
+    'notif_due_soon_title': 'Vencimento chegando',
+    'notif_due_soon_body':
+        '{name} vence em 3 dias. Antecipe para evitar juros.',
+    'notif_card_due_today_title': 'Fatura vence hoje',
+    'notif_card_due_today_body':
+        'A fatura do cartao {name} vence hoje. Confira o pagamento.',
+    'notif_card_due_soon_title': 'Fatura chegando',
+    'notif_card_due_soon_body':
+        'A fatura do cartao {name} vence em 3 dias. Evite juros.',
+    'notif_weekly_review_title': 'Fechamento da semana',
+    'notif_weekly_review_body':
+        'Confira seu resumo e ajuste o que for necessario.',
+    'notif_monthly_invest_title': 'Lembrete de investimento',
+    'notif_monthly_invest_body':
+        'Se fizer sentido, defina um valor para investir este mes.',
     'goals_title_hint': 'Ex: Quitar cartao em 6 meses',
     'goals_title_required':
         'Digite um titulo claro para a meta. Exemplo: Guardar R\$ 200 por mes.',
@@ -179,6 +321,61 @@ const Map<String, Map<String, String>> appStringsExtra = {
     'ratio_fixed': 'Fixed',
     'ratio_invest': 'Invest.',
     'ratio_buffer': 'Buffer',
+    'ratio_distribution_title': 'Month distribution',
+    'ratio_distribution_subtitle':
+        'Fixed, variable, investment, and leftover in one quick view.',
+    'ratio_tip_fixed': 'These are your most recurring monthly expenses.',
+    'ratio_tip_variable':
+        'This is the part that changes according to your spending during the month.',
+    'ratio_tip_invest': 'Try to invest at least 15-20% of your monthly income.',
+    'ratio_tip_buffer':
+        'This is the amount still free at the end of your month.',
+    'dashboard_base_income': 'Base income for the month',
+    'edit_short': 'Edit',
+    'financial_position_available': 'Left for the month',
+    'financial_position_with_invoice':
+        'Considering the current bill, {value} remains free this month.',
+    'financial_position_invoice_note':
+        'This already includes the open bill for this month.',
+    'financial_position_without_invoice':
+        'No meaningful card pressure this month.',
+    'financial_position_paid_out': 'Committed',
+    'financial_position_current_invoice': 'Current bill',
+    'financial_position_invested': 'Invested',
+    'bills_home_title': 'Open bills',
+    'bills_home_subtitle':
+        'Track what is still pending on your card and mark it when paid.',
+    'bills_compact_title': 'Cards and bills',
+    'bills_compact_subtitle':
+        'View, add, and track your bills without leaving the home screen.',
+    'bills_add_card': 'Add card',
+    'bills_empty_title': 'No cards added',
+    'bills_empty_subtitle': 'Add a credit card to track its bill here.',
+    'bills_selected_due': 'Due on day {day}',
+    'bills_selected_clear': 'No open bill in this cycle.',
+    'bills_selected_open': 'Open',
+    'bills_pay_popup_title': 'Pay bill',
+    'bills_pay_popup_body': 'Mark the {card} bill as paid for {value}?',
+    'bills_installments': 'Installments this month: {value}',
+    'bills_pay_cta': 'Pay',
+    'bills_paid_badge': 'Paid',
+    'bills_reopen_cta': 'Reopen',
+    'bills_help_title': 'Cards and bills',
+    'bills_help_body':
+        'The app does not pay the bill for you. Here you track the bill amount for the cycle and only mark whether it is still open or already paid outside the app.',
+    'financial_position_committed_help_title': 'Committed',
+    'financial_position_committed_help_body':
+        'Shows everything that already committed your income this month, including debit, credit, and investments.',
+    'financial_position_current_invoice_help_title': 'Current bill',
+    'financial_position_current_invoice_help_body':
+        'Adds up everything launched on credit cards this month, across all cards.',
+    'financial_position_invested_help_title': 'Invested',
+    'financial_position_invested_help_body':
+        'Shows only the amount contributed this month. Returns are not included here.',
+    'drawer_shortcuts': 'Shortcuts',
+    'drawer_preferences': 'Preferences',
+    'drawer_premium_active': 'Premium account active',
+    'drawer_essential_plan': 'Voolo essential plan',
     'ratio_housing': 'Housing',
     'essential_balance_title': 'Monthly balance',
     'essential_balance_entries': 'Income: {value}',
@@ -195,6 +392,7 @@ const Map<String, Map<String, String>> appStringsExtra = {
     'essential_guide_skip': 'Skip',
     'essential_guide_finish': 'Finish guide',
     'essential_guide_later': 'Do later',
+    'essential_guide_never_again': 'Do not show again',
     'essential_guide_action_expense_title': 'Add an expense',
     'essential_guide_action_expense_subtitle':
         'Log one simple expense from today.',
@@ -223,6 +421,10 @@ const Map<String, Map<String, String>> appStringsExtra = {
     'dashboard_empty_message':
         'There is not enough data yet. Add your first expense to start analysis.',
     'dashboard_empty_cta': 'Add first expense',
+    'dashboard_premium_health_title':
+        'See where your month gets tight before money runs short',
+    'dashboard_premium_health_subtitle':
+        'In Premium, your financial health and month distribution show what is heavy and where to adjust so more money stays free.',
     'score_health_label': 'Financial health',
     'score_tip_add_income':
         'Add your income to calculate your financial health.',
@@ -276,6 +478,90 @@ const Map<String, Map<String, String>> appStringsExtra = {
     'debts_plan_perk_1': 'Smart priority (Avalanche or Snowball)',
     'debts_plan_perk_2': 'Recommended max installment based on your budget',
     'debts_plan_perk_3': 'Steps connected to missions and reports',
+    'weekly_plan_title': 'Weekly plan',
+    'weekly_plan_subtitle':
+        'Your next best step to keep the month under control.',
+    'weekly_plan_actions_label': 'Actions',
+    'weekly_plan_streak_label': 'Streak',
+    'weekly_plan_insights_label': 'Insights',
+    'weekly_plan_follow_cta': 'Follow weekly step',
+    'weekly_plan_add_income_title': 'Add base income',
+    'weekly_plan_add_income_desc':
+        'Without active income, the plan loses accuracy.',
+    'weekly_plan_negative_balance_title': 'Return to positive balance',
+    'weekly_plan_negative_balance_desc':
+        'Your month is in the red. Prioritize cutting variable spending and renegotiating fixed costs.',
+    'weekly_plan_trim_variable_title': 'Reduce variable spending',
+    'weekly_plan_trim_variable_desc':
+        'Variable spending is at {pct}% of income. Set a weekly cap.',
+    'weekly_plan_increase_invest_title': 'Increase investment contribution',
+    'weekly_plan_increase_invest_desc':
+        'Your contribution is below 10% of income. Simulate a sustainable starting amount.',
+    'weekly_plan_create_goal_title': 'Create a main goal',
+    'weekly_plan_create_goal_desc':
+        'A clear goal guides weekly decisions and improves consistency.',
+    'weekly_plan_checkin_consistency_title': 'Improve check-in consistency',
+    'weekly_plan_checkin_consistency_desc':
+        'You completed {days}/7 check-ins. Weekly target: at least 5 days.',
+    'weekly_plan_maintain_routine_title':
+        'Keep the routine and review categories',
+    'weekly_plan_maintain_routine_desc':
+        'Your plan is healthy. Review categories once a week to prevent drift.',
+    'dashboard_premium_plan_title':
+        'Get the right next step to improve your month',
+    'dashboard_premium_plan_subtitle':
+        'Unlock the weekly plan and insights that point to priorities, risks, and opportunities so you can act at the right time.',
+    'insight_high_commitment_message':
+        'You have already committed more than 80% of your income this month. Be careful with upcoming spending.',
+    'insight_credit_red_message':
+        'Your balance still looks positive, but the current bill would push the month into the red. Review credit before the next purchase.',
+    'insight_credit_over_debit_message':
+        'This month, credit has surpassed debit. It is worth watching before the bill grows faster than your leftover money.',
+    'insight_installments_weight_message':
+        'More than half of your current bill comes from installments. Check how much is already committed before taking on new purchases.',
+    'insight_category_concentration_message':
+        'A single category already concentrates a large part of your month. Review where this weight is growing.',
+    'insight_spending_speed_message':
+        'Your spending pace is faster than the pace of the month. It is worth slowing variable expenses over the next few days.',
+    'insight_food_high_message':
+        'Your food spending is above average (25% of income). How about cooking more at home?',
+    'insight_emergency_goal_message':
+        'We still have not identified an emergency fund goal. That is the first step toward your financial safety.',
+    'insight_invest_free_cash_message':
+        'There is still free cash this month. How about directing part of it to investing instead of leaving it idle?',
+    'insight_empty_dashboard_message':
+        'Your dashboard is empty. Add your first expense so we can start the analysis.',
+    'insight_action_review_spend': 'Review spending',
+    'insight_action_view_bill': 'View bill',
+    'insight_action_view_entries': 'View entries',
+    'insight_action_review_installments': 'Review installments',
+    'insight_action_review_category': 'Review category',
+    'insight_action_hold_spending': 'Hold spending',
+    'insight_action_see_expenses': 'See expenses',
+    'insight_action_create_reserve': 'Create reserve',
+    'insight_action_simulate_now': 'Simulate now',
+    'insight_action_add_expense': 'Add expense',
+    'notif_channel_reminders_name': 'Voolo reminders',
+    'notif_channel_reminders_desc':
+        'Due date alerts and spending review reminders.',
+    'notif_channel_engagement_name': 'Voolo check-ins',
+    'notif_channel_engagement_desc': 'Gentle reminders to stay in control.',
+    'notif_due_today_title': 'Due today',
+    'notif_due_today_body': '{name} is due today. Check the payment.',
+    'notif_due_soon_title': 'Due date coming up',
+    'notif_due_soon_body':
+        '{name} is due in 3 days. Plan ahead to avoid interest.',
+    'notif_card_due_today_title': 'Card bill due today',
+    'notif_card_due_today_body':
+        'Your {name} card bill is due today. Check the payment.',
+    'notif_card_due_soon_title': 'Card bill coming up',
+    'notif_card_due_soon_body':
+        'Your {name} card bill is due in 3 days. Avoid interest.',
+    'notif_weekly_review_title': 'Weekly review',
+    'notif_weekly_review_body': 'Check your summary and adjust what is needed.',
+    'notif_monthly_invest_title': 'Investment reminder',
+    'notif_monthly_invest_body':
+        'If it makes sense, define an amount to invest this month.',
     'goals_title_hint': 'Ex: Pay off card in 6 months',
     'goals_title_required':
         'Enter a clear goal title. Example: Save R\$ 200 per month.',
@@ -328,6 +614,63 @@ const Map<String, Map<String, String>> appStringsExtra = {
     'ratio_fixed': 'Fijos',
     'ratio_invest': 'Inv.',
     'ratio_buffer': 'Sobra',
+    'ratio_distribution_title': 'Distribucion del mes',
+    'ratio_distribution_subtitle':
+        'Fijo, variable, inversion y sobra en una lectura rapida.',
+    'ratio_tip_fixed': 'Aqui entran los gastos mas recurrentes de tu mes.',
+    'ratio_tip_variable':
+        'Aqui entra lo que cambia segun tu consumo durante el mes.',
+    'ratio_tip_invest':
+        'Intenta invertir al menos 15-20% de tu ingreso mensual.',
+    'ratio_tip_buffer':
+        'Este es el valor que todavia queda libre al final del mes.',
+    'dashboard_base_income': 'Ingreso base del mes',
+    'edit_short': 'Editar',
+    'financial_position_available': 'Restante del mes',
+    'financial_position_with_invoice':
+        'Considerando la factura actual, quedan {value} libres este mes.',
+    'financial_position_invoice_note':
+        'Esto ya considera la factura abierta de este mes.',
+    'financial_position_without_invoice':
+        'Sin presion relevante de tarjeta este mes.',
+    'financial_position_paid_out': 'Comprometido',
+    'financial_position_current_invoice': 'Factura actual',
+    'financial_position_invested': 'Invertido',
+    'bills_home_title': 'Facturas abiertas',
+    'bills_home_subtitle':
+        'Sigue lo pendiente en la tarjeta y marcalo cuando pagues.',
+    'bills_compact_title': 'Tarjetas y facturas',
+    'bills_compact_subtitle':
+        'Ve, agrega y acompana tus facturas sin salir del inicio.',
+    'bills_add_card': 'Agregar tarjeta',
+    'bills_empty_title': 'Ninguna tarjeta registrada',
+    'bills_empty_subtitle': 'Agrega una tarjeta para seguir su factura aqui.',
+    'bills_selected_due': 'Vence el dia {day}',
+    'bills_selected_clear': 'No hay factura abierta en este ciclo.',
+    'bills_selected_open': 'Abierta',
+    'bills_pay_popup_title': 'Pagar factura',
+    'bills_pay_popup_body':
+        'Marcar la factura de {card} como pagada por {value}?',
+    'bills_installments': 'Cuotas este mes: {value}',
+    'bills_pay_cta': 'Pagar',
+    'bills_paid_badge': 'Pagada',
+    'bills_reopen_cta': 'Reabrir',
+    'bills_help_title': 'Tarjetas y facturas',
+    'bills_help_body':
+        'La app no paga la factura por ti. Aqui acompanias el valor del ciclo y solo marcas si la factura sigue abierta o si ya fue pagada fuera de la app.',
+    'financial_position_committed_help_title': 'Comprometido',
+    'financial_position_committed_help_body':
+        'Muestra todo lo que ya comprometio tu ingreso del mes, incluyendo debito, credito e inversiones.',
+    'financial_position_current_invoice_help_title': 'Factura actual',
+    'financial_position_current_invoice_help_body':
+        'Suma todo lo lanzado en tarjeta este mes, considerando todas las tarjetas.',
+    'financial_position_invested_help_title': 'Invertido',
+    'financial_position_invested_help_body':
+        'Muestra solo lo aportado en este mes. Los rendimientos no entran aqui.',
+    'drawer_shortcuts': 'Atajos',
+    'drawer_preferences': 'Preferencias',
+    'drawer_premium_active': 'Cuenta premium activa',
+    'drawer_essential_plan': 'Plan esencial de Voolo',
     'ratio_housing': 'Vivienda',
     'essential_balance_title': 'Saldo del mes',
     'essential_balance_entries': 'Entradas: {value}',
@@ -344,6 +687,7 @@ const Map<String, Map<String, String>> appStringsExtra = {
     'essential_guide_skip': 'Saltar',
     'essential_guide_finish': 'Finalizar guia',
     'essential_guide_later': 'Hacer despues',
+    'essential_guide_never_again': 'No mostrar de nuevo',
     'essential_guide_action_expense_title': 'Registrar gasto',
     'essential_guide_action_expense_subtitle':
         'Registra un gasto simple de hoy.',
@@ -373,6 +717,10 @@ const Map<String, Map<String, String>> appStringsExtra = {
     'dashboard_empty_message':
         'Aun no hay datos suficientes. Registra tu primer gasto para iniciar el analisis.',
     'dashboard_empty_cta': 'Agregar primer gasto',
+    'dashboard_premium_health_title':
+        'Mira donde tu mes se aprieta antes de quedarte sin margen',
+    'dashboard_premium_health_subtitle':
+        'En Premium, tu salud financiera y la distribucion del mes muestran rapido que esta pesado y donde ajustar para que sobre mas.',
     'score_health_label': 'Salud financiera',
     'score_tip_add_income':
         'Registra tu ingreso para calcular tu salud financiera.',
@@ -425,6 +773,93 @@ const Map<String, Map<String, String>> appStringsExtra = {
     'debts_plan_perk_1': 'Prioridad inteligente (Avalanche o Snowball)',
     'debts_plan_perk_2': 'Cuota maxima recomendada basada en tu presupuesto',
     'debts_plan_perk_3': 'Etapas conectadas a misiones y reportes',
+    'weekly_plan_title': 'Plan de la semana',
+    'weekly_plan_subtitle':
+        'Tu siguiente mejor paso para mantener el mes bajo control.',
+    'weekly_plan_actions_label': 'Acciones',
+    'weekly_plan_streak_label': 'Racha',
+    'weekly_plan_insights_label': 'Insights',
+    'weekly_plan_follow_cta': 'Seguir paso semanal',
+    'weekly_plan_add_income_title': 'Registrar ingreso base',
+    'weekly_plan_add_income_desc':
+        'Sin un ingreso activo, el plan pierde precision.',
+    'weekly_plan_negative_balance_title': 'Volver al saldo positivo',
+    'weekly_plan_negative_balance_desc':
+        'Tu mes esta en rojo. Prioriza recortar variables y renegociar fijos.',
+    'weekly_plan_trim_variable_title': 'Reducir gastos variables',
+    'weekly_plan_trim_variable_desc':
+        'Los variables estan en {pct}% del ingreso. Define un limite semanal.',
+    'weekly_plan_increase_invest_title': 'Aumentar aporte de inversion',
+    'weekly_plan_increase_invest_desc':
+        'Tu aporte esta por debajo del 10% del ingreso. Simula un valor inicial sostenible.',
+    'weekly_plan_create_goal_title': 'Crear una meta principal',
+    'weekly_plan_create_goal_desc':
+        'Una meta clara orienta las decisiones de la semana y aumenta la consistencia.',
+    'weekly_plan_checkin_consistency_title':
+        'Mejorar consistencia del check-in',
+    'weekly_plan_checkin_consistency_desc':
+        'Hiciste {days}/7 check-ins. Meta semanal: al menos 5 dias.',
+    'weekly_plan_maintain_routine_title':
+        'Mantener la rutina y revisar categorias',
+    'weekly_plan_maintain_routine_desc':
+        'Tu plan esta saludable. Revisa categorias una vez por semana para prevenir desvios.',
+    'dashboard_premium_plan_title':
+        'Recibe el siguiente paso correcto para mejorar tu mes',
+    'dashboard_premium_plan_subtitle':
+        'Desbloquea el plan de la semana y los insights que muestran prioridades, riesgos y oportunidades para actuar en el momento correcto.',
+    'insight_high_commitment_message':
+        'Ya comprometiste mas del 80% de tu ingreso este mes. Atencion a los proximos gastos.',
+    'insight_credit_red_message':
+        'Tu saldo aun parece positivo, pero la factura actual dejaria el mes en rojo. Revisa el credito antes de la proxima compra.',
+    'insight_credit_over_debit_message':
+        'Este mes, el credito supero al debito. Vale la pena seguirlo antes de que la factura crezca mas rapido que tu sobrante.',
+    'insight_installments_weight_message':
+        'Mas de la mitad de tu factura actual viene de cuotas. Mira cuanto ya esta comprometido antes de asumir nuevas compras.',
+    'insight_category_concentration_message':
+        'Una sola categoria ya concentra buena parte de tu mes. Revisa donde ese peso esta creciendo mas.',
+    'insight_spending_speed_message':
+        'Tu ritmo de gasto va mas rapido que el ritmo del mes. Vale la pena frenar variables en los proximos dias.',
+    'insight_food_high_message':
+        'Tus gastos con alimentacion estan por encima del promedio (25% del ingreso). Que tal cocinar mas en casa?',
+    'insight_emergency_goal_message':
+        'Aun no identificamos una meta de fondo de emergencia. Ese es el primer paso para tu seguridad financiera.',
+    'insight_invest_free_cash_message':
+        'Todavia hay saldo libre este mes. Que tal dirigir una parte a inversion en lugar de dejarlo parado?',
+    'insight_empty_dashboard_message':
+        'Tu dashboard esta vacio. Registra tu primer gasto para empezar el analisis.',
+    'insight_action_review_spend': 'Revisar gastos',
+    'insight_action_view_bill': 'Ver factura',
+    'insight_action_view_entries': 'Ver movimientos',
+    'insight_action_review_installments': 'Revisar cuotas',
+    'insight_action_review_category': 'Revisar categoria',
+    'insight_action_hold_spending': 'Frenar gastos',
+    'insight_action_see_expenses': 'Ver gastos',
+    'insight_action_create_reserve': 'Crear reserva',
+    'insight_action_simulate_now': 'Simular ahora',
+    'insight_action_add_expense': 'Agregar gasto',
+    'notif_channel_reminders_name': 'Recordatorios de Voolo',
+    'notif_channel_reminders_desc':
+        'Avisos de vencimiento y revision de gastos.',
+    'notif_channel_engagement_name': 'Check-ins de Voolo',
+    'notif_channel_engagement_desc':
+        'Recordatorios suaves para mantener el control.',
+    'notif_due_today_title': 'Vence hoy',
+    'notif_due_today_body': '{name} vence hoy. Revisa el pago.',
+    'notif_due_soon_title': 'Vencimiento cerca',
+    'notif_due_soon_body':
+        '{name} vence en 3 dias. Anticipate para evitar intereses.',
+    'notif_card_due_today_title': 'La factura vence hoy',
+    'notif_card_due_today_body':
+        'La factura de la tarjeta {name} vence hoy. Revisa el pago.',
+    'notif_card_due_soon_title': 'Factura por vencer',
+    'notif_card_due_soon_body':
+        'La factura de la tarjeta {name} vence en 3 dias. Evita intereses.',
+    'notif_weekly_review_title': 'Cierre de la semana',
+    'notif_weekly_review_body':
+        'Revisa tu resumen y ajusta lo que sea necesario.',
+    'notif_monthly_invest_title': 'Recordatorio de inversion',
+    'notif_monthly_invest_body':
+        'Si tiene sentido, define un valor para invertir este mes.',
     'goals_title_hint': 'Ej: Pagar tarjeta en 6 meses',
     'goals_title_required':
         'Escribe un titulo claro para la meta. Ejemplo: Ahorrar R\$ 200 por mes.',

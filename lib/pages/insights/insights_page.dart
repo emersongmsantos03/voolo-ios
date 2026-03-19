@@ -9,7 +9,9 @@ import '../../models/monthly_dashboard.dart';
 import '../../services/engagement_analytics_service.dart';
 import '../../services/habits_service.dart';
 import '../../services/local_storage_service.dart';
+import '../../utils/budget_rule_utils.dart';
 import '../../utils/currency_utils.dart';
+import '../../utils/finance_overview_utils.dart';
 import '../../widgets/premium_tour_widgets.dart';
 
 class InsightsPage extends StatefulWidget {
@@ -120,10 +122,20 @@ class _InsightsPageState extends State<InsightsPage> {
 
   Future<void> _toggleHabit(String habitId, int total) async {
     setState(() => _habitLoading = true);
+    final previous = _habitState;
     final next = await HabitsService.toggleHabit(
       habitId: habitId,
       totalHabits: total,
     );
+    final previousDone = previous?.done.length ?? 0;
+    final nextDone = next.done.length;
+    if (nextDone > previousDone) {
+      var reward = 6;
+      if (nextDone == total && previousDone < total) {
+        reward += 14 + ((next.streak - 1).clamp(0, 5) * 2);
+      }
+      await LocalStorageService.addXp(reward);
+    }
     if (!mounted) return;
     setState(() {
       _habitState = next;
@@ -150,8 +162,9 @@ class _InsightsPageState extends State<InsightsPage> {
 
   MonthlyDashboard? _currentView() {
     final base = _dashboard;
-    final salaryFallback =
-        LocalStorageService.incomeTotalForMonth(_currentMonth);
+    final salaryFallback = LocalStorageService.incomeTotalForMonth(
+      _currentMonth,
+    );
     if (base == null && salaryFallback <= 0 && _currentExpenses.isEmpty) {
       return null;
     }
@@ -208,30 +221,42 @@ class _InsightsPageState extends State<InsightsPage> {
     final fixedPct = (d.fixedExpensesTotal / d.salary) * 100;
     final variablePct = (d.variableExpensesTotal / d.salary) * 100;
     final investPct = (d.investmentsTotal / d.salary) * 100;
+    final leisurePct = d.expenses
+            .where(
+              (e) => e.category == ExpenseCategory.lazer && !e.isInvestment,
+            )
+            .fold(0.0, (a, b) => a + b.amount) /
+        d.salary *
+        100;
     final housingPct = d.expenses
             .where(
-                (e) => e.category == ExpenseCategory.moradia && !e.isInvestment)
+              (e) => e.category == ExpenseCategory.moradia && !e.isInvestment,
+            )
             .fold(0.0, (a, b) => a + b.amount) /
         d.salary *
         100;
 
     final tips = <String>[];
 
-    if (fixedPct > 50) {
+    if (fixedPct >= fixedBudgetRule.alertShare * 100) {
       tips.add(AppStrings.t(context, 'alert_fixed_high'));
     } else {
       tips.add(AppStrings.t(context, 'plan_action_ok'));
     }
 
-    if (variablePct > 30) {
+    if (variablePct >= variableBudgetRule.alertShare * 100) {
       tips.add(AppStrings.t(context, 'alert_variable_high'));
     }
 
-    if (investPct < 15) {
+    if (leisurePct >= leisureBudgetRule.alertShare * 100) {
+      tips.add(AppStrings.t(context, 'alert_leisure_high'));
+    }
+
+    if (investPct < investmentBudgetRule.idealShare * 100) {
       tips.add(AppStrings.t(context, 'alert_invest_low'));
     }
 
-    if (housingPct > 35) {
+    if (housingPct >= housingBudgetRule.alertShare * 100) {
       tips.add(AppStrings.t(context, 'tip_housing_high'));
     }
 
@@ -243,22 +268,79 @@ class _InsightsPageState extends State<InsightsPage> {
       text,
       style: TextStyle(
         color: AppTheme.textPrimary(context),
-        fontWeight: FontWeight.w700,
+        fontWeight: FontWeight.w800,
+        fontSize: 18,
       ),
     );
   }
 
   Widget _cardShell({required Widget child}) {
     return Container(
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: Theme.of(context).colorScheme.surface,
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(
-          color: Theme.of(context).colorScheme.outline.withValues(alpha: 0.6),
-        ),
-      ),
+      padding: const EdgeInsets.all(20),
+      decoration: AppTheme.premiumCardDecoration(context),
       child: child,
+    );
+  }
+
+  Widget _heroCard(MonthlyDashboard d, FinanceOverview overview) {
+    final projected = CurrencyUtils.format(overview.projectedAfterInvoices);
+    final cardTotal = CurrencyUtils.format(overview.currentInvoice);
+    final insight = overview.currentInvoice > 0
+        ? 'O cartao ja comprometeu $cardTotal do mes e deixa $projected livres.'
+        : 'Seu mes ainda nao tem pressao relevante de cartao.';
+
+    return Container(
+      padding: const EdgeInsets.all(24),
+      decoration: AppTheme.premiumCardDecoration(context),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            'Resumo inteligente',
+            style: TextStyle(
+              color: AppTheme.textMuted(context),
+              fontSize: 11,
+              fontWeight: FontWeight.w800,
+              letterSpacing: 1,
+            ),
+          ),
+          const SizedBox(height: 10),
+          Text(
+            overview.projectedAfterInvoices >= 0
+                ? 'Seu mes esta sob controle'
+                : 'Seu mes pede ajuste agora',
+            style: TextStyle(
+              color: AppTheme.textPrimary(context),
+              fontSize: 26,
+              fontWeight: FontWeight.w900,
+              letterSpacing: -0.7,
+            ),
+          ),
+          const SizedBox(height: 8),
+          Text(
+            insight,
+            style: TextStyle(
+              color: AppTheme.textSecondary(context),
+              height: 1.35,
+            ),
+          ),
+          const SizedBox(height: 16),
+          Wrap(
+            spacing: 10,
+            runSpacing: 10,
+            children: [
+              _moneyMetric(
+                  'Disponivel', overview.availableNow, AppTheme.success),
+              _moneyMetric(
+                'Fatura',
+                overview.currentInvoice,
+                Theme.of(context).colorScheme.primary,
+              ),
+              _moneyMetric('Investido', overview.invested, AppTheme.info),
+            ],
+          ),
+        ],
+      ),
     );
   }
 
@@ -271,11 +353,35 @@ class _InsightsPageState extends State<InsightsPage> {
       final fixedPct = (d.fixedExpensesTotal / salary) * 100;
       final variablePct = (d.variableExpensesTotal / salary) * 100;
       final investPct = (d.investmentsTotal / salary) * 100;
-      if (fixedPct > 55) alerts.add(AppStrings.t(context, 'alert_fixed_high'));
-      if (variablePct > 35) {
+      final housingPct = d.expenses
+              .where(
+                (e) => e.category == ExpenseCategory.moradia && !e.isInvestment,
+              )
+              .fold(0.0, (sum, e) => sum + e.amount) /
+          salary *
+          100;
+      final leisurePct = d.expenses
+              .where(
+                (e) => e.category == ExpenseCategory.lazer && !e.isInvestment,
+              )
+              .fold(0.0, (sum, e) => sum + e.amount) /
+          salary *
+          100;
+      if (fixedPct >= fixedBudgetRule.alertShare * 100) {
+        alerts.add(AppStrings.t(context, 'alert_fixed_high'));
+      }
+      if (variablePct >= variableBudgetRule.alertShare * 100) {
         alerts.add(AppStrings.t(context, 'alert_variable_high'));
       }
-      if (investPct < 10) alerts.add(AppStrings.t(context, 'alert_invest_low'));
+      if (leisurePct >= leisureBudgetRule.alertShare * 100) {
+        alerts.add(AppStrings.t(context, 'alert_leisure_high'));
+      }
+      if (housingPct >= housingBudgetRule.alertShare * 100) {
+        alerts.add(AppStrings.t(context, 'tip_housing_high'));
+      }
+      if (investPct < investmentBudgetRule.alertShare * 100) {
+        alerts.add(AppStrings.t(context, 'alert_invest_low'));
+      }
       if (d.remainingSalary < 0) {
         alerts.add(AppStrings.t(context, 'alert_negative_balance'));
       }
@@ -320,12 +426,13 @@ class _InsightsPageState extends State<InsightsPage> {
     String action;
     if (salary <= 0) {
       action = AppStrings.t(context, 'score_add_income');
-    } else if (variablePct > 30) {
+    } else if (variablePct > variableBudgetRule.idealShare * 100) {
       action = AppStrings.t(context, 'plan_action_variable');
-    } else if (fixedPct > 50) {
+    } else if (fixedPct > fixedBudgetRule.idealShare * 100) {
       action = AppStrings.t(context, 'plan_action_fixed');
-    } else if (investPct < 15) {
-      final target = (salary * 0.15) - d.investmentsTotal;
+    } else if (investPct < investmentBudgetRule.idealShare * 100) {
+      final target =
+          (salary * investmentBudgetRule.idealShare) - d.investmentsTotal;
       final value =
           target > 0 ? CurrencyUtils.format(target) : CurrencyUtils.format(0);
       action = AppStrings.tr(context, 'plan_action_invest', {'value': value});
@@ -348,19 +455,30 @@ class _InsightsPageState extends State<InsightsPage> {
             spacing: 10,
             runSpacing: 10,
             children: [
-              _planMetric(AppStrings.t(context, 'summary_fixed'), fixedPct,
-                  AppTheme.danger),
-              _planMetric(AppStrings.t(context, 'summary_variable'),
-                  variablePct, AppTheme.warning),
-              _planMetric(AppStrings.t(context, 'summary_invest'), investPct,
-                  AppTheme.info),
+              _planMetric(
+                AppStrings.t(context, 'summary_fixed'),
+                fixedPct,
+                AppTheme.danger,
+              ),
+              _planMetric(
+                AppStrings.t(context, 'summary_variable'),
+                variablePct,
+                AppTheme.warning,
+              ),
+              _planMetric(
+                AppStrings.t(context, 'summary_invest'),
+                investPct,
+                AppTheme.info,
+              ),
             ],
           ),
           const SizedBox(height: 12),
           Text(
             AppStrings.t(context, 'plan_next_action'),
-            style:
-                TextStyle(color: AppTheme.textSecondary(context), fontSize: 12),
+            style: TextStyle(
+              color: AppTheme.textSecondary(context),
+              fontSize: 12,
+            ),
           ),
           const SizedBox(height: 6),
           Text(
@@ -384,22 +502,14 @@ class _InsightsPageState extends State<InsightsPage> {
     final salary = d.salary;
     final pct = salary > 0 ? (total / salary) * 100 : 0.0;
     final message = pct >= 30
-        ? AppStrings.tr(
-            context,
-            'card_insight_high',
-            {
-              'value': CurrencyUtils.format(total),
-              'pct': pct.toStringAsFixed(0),
-            },
-          )
-        : AppStrings.tr(
-            context,
-            'card_insight_ok',
-            {
-              'value': CurrencyUtils.format(total),
-              'pct': pct.toStringAsFixed(0),
-            },
-          );
+        ? AppStrings.tr(context, 'card_insight_high', {
+            'value': CurrencyUtils.format(total),
+            'pct': pct.toStringAsFixed(0),
+          })
+        : AppStrings.tr(context, 'card_insight_ok', {
+            'value': CurrencyUtils.format(total),
+            'pct': pct.toStringAsFixed(0),
+          });
 
     return _cardShell(
       child: Column(
@@ -416,14 +526,69 @@ class _InsightsPageState extends State<InsightsPage> {
     );
   }
 
+  Widget _paymentFlowCard(FinanceOverview overview) {
+    final share = (overview.creditShareOfCommitments * 100).toStringAsFixed(0);
+    final salary = _dashboard?.salary ?? 0;
+    final cardPct = salary > 0 ? (overview.currentInvoice / salary) * 100 : 0.0;
+    String headline;
+    if (overview.currentInvoice <= 0) {
+      headline = 'Tudo que voce lancou ate agora saiu direto do saldo.';
+    } else if (overview.projectedAfterInvoices < 0) {
+      headline =
+          'Hoje ainda existe saldo, mas a fatura atual levaria o mes para ${CurrencyUtils.format(overview.projectedAfterInvoices)}.';
+    } else if (cardPct >= variableBudgetRule.alertShare * 100) {
+      headline =
+          'O cartao sozinho ja compromete ${cardPct.toStringAsFixed(0)}% do seu orcamento do mes.';
+    } else {
+      headline =
+          'Seu credito representa $share% do que ja esta comprometido no mes.';
+    }
+
+    return _cardShell(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          _sectionTitle('Credito x debito'),
+          const SizedBox(height: 8),
+          Text(
+            headline,
+            style: TextStyle(color: AppTheme.textSecondary(context)),
+          ),
+          const SizedBox(height: 12),
+          Wrap(
+            spacing: 10,
+            runSpacing: 10,
+            children: [
+              _moneyMetric(
+                'Comprometido',
+                overview.totalCommitted,
+                AppTheme.warning,
+              ),
+              _moneyMetric(
+                'Fatura atual',
+                overview.currentInvoice,
+                Theme.of(context).colorScheme.primary,
+              ),
+              _moneyMetric(
+                'Parcelas',
+                overview.installmentBurden,
+                AppTheme.info,
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
   Widget _planMetric(String label, double pct, Color color) {
     return Container(
       padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 12),
       decoration: BoxDecoration(
-        color: Theme.of(context).colorScheme.surfaceContainerHighest,
-        borderRadius: BorderRadius.circular(12),
+        color: Theme.of(context).colorScheme.surfaceContainerLow,
+        borderRadius: BorderRadius.circular(16),
         border: Border.all(
-          color: Theme.of(context).colorScheme.outline.withValues(alpha: 0.4),
+          color: Theme.of(context).colorScheme.outline.withValues(alpha: 0.08),
         ),
       ),
       child: Row(
@@ -437,12 +602,54 @@ class _InsightsPageState extends State<InsightsPage> {
           const SizedBox(width: 8),
           Text(
             label,
-            style:
-                TextStyle(color: AppTheme.textSecondary(context), fontSize: 12),
+            style: TextStyle(
+              color: AppTheme.textSecondary(context),
+              fontSize: 12,
+            ),
           ),
           const SizedBox(width: 6),
           Text(
             '${pct.toStringAsFixed(0)}%',
+            style: TextStyle(
+              color: AppTheme.textPrimary(context),
+              fontWeight: FontWeight.w700,
+              fontSize: 12,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _moneyMetric(String label, double value, Color color) {
+    return Container(
+      padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 12),
+      decoration: BoxDecoration(
+        color: Theme.of(context).colorScheme.surfaceContainerLow,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(
+          color: Theme.of(context).colorScheme.outline.withValues(alpha: 0.08),
+        ),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Container(
+            width: 8,
+            height: 8,
+            decoration: BoxDecoration(color: color, shape: BoxShape.circle),
+          ),
+          const SizedBox(width: 8),
+          Text(
+            label,
+            style: TextStyle(
+              color: AppTheme.textSecondary(context),
+              fontSize: 12,
+            ),
+          ),
+          const SizedBox(width: 6),
+          Text(
+            CurrencyUtils.format(value),
             style: TextStyle(
               color: AppTheme.textPrimary(context),
               fontWeight: FontWeight.w700,
@@ -503,20 +710,33 @@ class _InsightsPageState extends State<InsightsPage> {
         children: [
           _sectionTitle(AppStrings.t(context, 'compare_title')),
           const SizedBox(height: 10),
-          row(AppStrings.t(context, 'summary_fixed'), d.fixedExpensesTotal,
-              prev.fixedExpensesTotal, AppTheme.danger),
+          row(
+            AppStrings.t(context, 'summary_fixed'),
+            d.fixedExpensesTotal,
+            prev.fixedExpensesTotal,
+            AppTheme.danger,
+          ),
           const SizedBox(height: 6),
           row(
-              AppStrings.t(context, 'summary_variable'),
-              d.variableExpensesTotal,
-              prev.variableExpensesTotal,
-              AppTheme.warning),
+            AppStrings.t(context, 'summary_variable'),
+            d.variableExpensesTotal,
+            prev.variableExpensesTotal,
+            AppTheme.warning,
+          ),
           const SizedBox(height: 6),
-          row(AppStrings.t(context, 'summary_invest'), d.investmentsTotal,
-              prev.investmentsTotal, AppTheme.info),
+          row(
+            AppStrings.t(context, 'summary_invest'),
+            d.investmentsTotal,
+            prev.investmentsTotal,
+            AppTheme.info,
+          ),
           const SizedBox(height: 6),
-          row(AppStrings.t(context, 'summary_free'), d.remainingSalary,
-              prev.remainingSalary, AppTheme.success),
+          row(
+            AppStrings.t(context, 'summary_free'),
+            d.remainingSalary,
+            prev.remainingSalary,
+            AppTheme.success,
+          ),
         ],
       ),
     );
@@ -580,7 +800,9 @@ class _InsightsPageState extends State<InsightsPage> {
               Text(
                 AppStrings.tr(context, 'habit_streak', {'days': '$streak'}),
                 style: TextStyle(
-                    color: AppTheme.textSecondary(context), fontSize: 12),
+                  color: AppTheme.textSecondary(context),
+                  fontSize: 12,
+                ),
               ),
             ],
           ),
@@ -638,6 +860,11 @@ class _InsightsPageState extends State<InsightsPage> {
     }
 
     final hasCardExpenses = d.expenses.any((e) => e.isCreditCard);
+    final overview = buildFinanceOverview(
+      salary: d.salary,
+      expenses: d.expenses,
+      creditCardPayments: d.creditCardPayments,
+    );
 
     final content = Padding(
       padding: Responsive.pagePadding(context),
@@ -648,9 +875,16 @@ class _InsightsPageState extends State<InsightsPage> {
             style: TextStyle(color: AppTheme.textSecondary(context)),
           ),
           const SizedBox(height: 16),
+          PremiumTourHighlight(
+            active: _tourMode,
+            child: _heroCard(d, overview),
+          ),
+          const SizedBox(height: 16),
           PremiumTourHighlight(active: _tourMode, child: _alertsCard(d)),
           const SizedBox(height: 16),
           _planCard(d),
+          const SizedBox(height: 16),
+          _paymentFlowCard(overview),
           if (hasCardExpenses) ...[
             const SizedBox(height: 16),
             _cardStatementsInsight(d),
@@ -665,9 +899,7 @@ class _InsightsPageState extends State<InsightsPage> {
     );
 
     return Scaffold(
-      appBar: AppBar(
-        title: Text(AppStrings.t(context, 'insights_title')),
-      ),
+      appBar: AppBar(title: Text(AppStrings.t(context, 'insights_title'))),
       body: PremiumTourOverlay(
         active: _tourMode,
         spotlight: PremiumTourSpotlight(

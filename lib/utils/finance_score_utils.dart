@@ -50,10 +50,10 @@ class FinanceScoreUtils {
     }
 
     const targets = (
-      housingMax: 0.35,
+      housingMax: 0.30,
       fixedMax: 0.50,
-      variableMax: 0.30,
-      investMin: 0.10,
+      variableMax: 0.25,
+      investMin: 0.15,
       bufferMin: 0.10,
     );
 

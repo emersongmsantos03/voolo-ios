@@ -430,12 +430,17 @@ class AppStrings {
           'Compras parceladas comprometem sua renda futura. Use com cuidado.',
       'expense_high_tip':
           'Esse gasto representa {pct}% do seu orçamento mensal. Ideal é até {ideal}%.',
+      'expense_low_tip':
+          'Com esse lançamento, essa área fica em {pct}% do seu orçamento mensal. O ideal é pelo menos {ideal}%.',
       'expense_name_required': 'Digite o nome.',
       'expense_value_required': 'Digite um valor válido.',
       'installments_required': 'Informe a quantidade de parcelas.',
       'expense_type_fixed': 'Gasto fixo',
       'expense_type_variable': 'Gasto variável',
       'expense_type_investment': 'Investimento',
+      'expense_type_fixed_short': 'Fixo',
+      'expense_type_variable_short': 'Variavel',
+      'expense_type_investment_short': 'Investimento',
       'expense_category_housing': 'Moradia',
       'expense_category_food': 'Alimentação',
       'expense_category_transport': 'Transporte',
@@ -444,7 +449,16 @@ class AppStrings {
       'expense_category_leisure': 'Lazer',
       'expense_category_subscriptions': 'Assinaturas',
       'expense_category_investment': 'Investimento',
+      'expense_category_debts': 'Dividas',
       'expense_category_other': 'Outros',
+      'payment_method_debit': 'Debito',
+      'payment_method_credit': 'Credito',
+      'payment_method_investment': 'Investimento',
+      'payment_impact_balance_now': 'Sai do saldo agora',
+      'payment_impact_invoice': 'Entra na fatura',
+      'payment_impact_invoice_installment':
+          'Entra na fatura ({current}/{total})',
+      'expense_due_statement_day': 'Fatura dia {day}',
       'mission_complete_title': 'Concluir missão',
       'mission_complete_note_label': 'Comentário de conclusão (opcional)',
       'mission_complete_note_hint': 'Conte o que você fez e como fez.',
@@ -506,15 +520,16 @@ class AppStrings {
       'plan_title': 'Plano do mês',
       'plan_subtitle': 'Ações rápidas para melhorar seu mês.',
       'plan_next_action': 'Próxima ação',
-      'plan_action_variable': 'Reduza gastos variáveis para até 30% da renda.',
+      'plan_action_variable': 'Reduza gastos variáveis para até 25% da renda.',
       'plan_action_fixed': 'Traga os gastos fixos para no máximo 50% da renda.',
       'plan_action_invest': 'Direcione {value} para investimentos.',
       'plan_action_ok': 'Você está equilibrado. Mantenha o ritmo.',
       'alert_title': 'Alertas inteligentes',
       'alert_add_income': 'Cadastre sua renda para liberar alertas.',
-      'alert_fixed_high': 'Gastos fixos acima de 55% da renda.',
+      'alert_fixed_high': 'Gastos fixos acima de 60% da renda.',
       'alert_variable_high': 'Gastos variáveis acima de 35% da renda.',
-      'alert_invest_low': 'Investimentos abaixo do ideal este mês.',
+      'alert_leisure_high': 'Lazer acima de 25% da renda.',
+      'alert_invest_low': 'Investimentos abaixo de 10% da renda.',
       'alert_negative_balance': 'Seu saldo do mês está negativo.',
       'alert_ok': 'Tudo certo por aqui. Continue consistente.',
       'tips_title': 'Dicas do mês',
@@ -972,12 +987,17 @@ class AppStrings {
           'Installments affect your future income. Use with care.',
       'expense_high_tip':
           'This expense is {pct}% of your monthly budget. Ideal is up to {ideal}%.',
+      'expense_low_tip':
+          'With this entry, this area reaches {pct}% of your monthly budget. The ideal is at least {ideal}%.',
       'expense_name_required': 'Enter the name.',
       'expense_value_required': 'Enter a valid amount.',
       'installments_required': 'Enter the installments quantity.',
       'expense_type_fixed': 'Fixed expense',
       'expense_type_variable': 'Variable expense',
       'expense_type_investment': 'Investment',
+      'expense_type_fixed_short': 'Fixed',
+      'expense_type_variable_short': 'Variable',
+      'expense_type_investment_short': 'Investment',
       'expense_category_housing': 'Housing',
       'expense_category_food': 'Food',
       'expense_category_transport': 'Transport',
@@ -986,7 +1006,16 @@ class AppStrings {
       'expense_category_leisure': 'Leisure',
       'expense_category_subscriptions': 'Subscriptions',
       'expense_category_investment': 'Investment',
+      'expense_category_debts': 'Debts',
       'expense_category_other': 'Other',
+      'payment_method_debit': 'Debit',
+      'payment_method_credit': 'Credit',
+      'payment_method_investment': 'Investment',
+      'payment_impact_balance_now': 'Leaves balance now',
+      'payment_impact_invoice': 'Goes to statement',
+      'payment_impact_invoice_installment':
+          'Goes to statement ({current}/{total})',
+      'expense_due_statement_day': 'Statement day {day}',
       'mission_complete_title': 'Complete mission',
       'mission_complete_note_label': 'Completion note (optional)',
       'mission_complete_note_hint': 'Describe what you did and how you did it.',
@@ -1041,15 +1070,16 @@ class AppStrings {
       'plan_title': 'Monthly plan',
       'plan_subtitle': 'Quick actions to improve this month.',
       'plan_next_action': 'Next action',
-      'plan_action_variable': 'Reduce variable spending to 30% of income.',
+      'plan_action_variable': 'Reduce variable spending to 25% of income.',
       'plan_action_fixed': 'Bring fixed costs down to at most 50% of income.',
       'plan_action_invest': 'Allocate {value} to investments.',
       'plan_action_ok': 'You are balanced. Keep the momentum.',
       'alert_title': 'Smart alerts',
       'alert_add_income': 'Add your income to unlock alerts.',
-      'alert_fixed_high': 'Fixed costs are above 55% of income.',
+      'alert_fixed_high': 'Fixed costs are above 60% of income.',
       'alert_variable_high': 'Variable spending is above 35% of income.',
-      'alert_invest_low': 'Investments are below target this month.',
+      'alert_leisure_high': 'Leisure spending is above 25% of income.',
+      'alert_invest_low': 'Investments are below 10% of income.',
       'alert_negative_balance': 'Your monthly balance is negative.',
       'alert_ok': 'All good here. Stay consistent.',
       'tips_title': 'Tips of the month',
@@ -1517,12 +1547,17 @@ class AppStrings {
       'credit_card_tip':
           'Las cuotas comprometen tu ingreso futuro. Úsalas con cuidado.',
       'expense_high_tip':
-          'Este gasto representa {pct}% de tu presupuesto mensal. Lo ideal es hasta {ideal}%.',
+          'Este gasto representa {pct}% de tu presupuesto mensual. Lo ideal es hasta {ideal}%.',
+      'expense_low_tip':
+          'Con este registro, esta área queda en {pct}% de tu presupuesto mensual. Lo ideal es al menos {ideal}%.',
       'expense_name_required': 'Escribe el nombre.',
       'expense_value_required': 'Escribe un valor válido.',
       'installments_required': 'Informa la cantidad de cuotas.',
       'expense_type_fixed': 'Gasto fijo',
       'expense_type_variable': 'Gasto variable',
+      'expense_type_fixed_short': 'Fijo',
+      'expense_type_variable_short': 'Variable',
+      'expense_type_investment_short': 'Inversion',
       'expense_type_investment': 'Inversión',
       'expense_category_housing': 'Vivienda',
       'expense_category_food': 'Alimentación',
@@ -1532,7 +1567,16 @@ class AppStrings {
       'expense_category_leisure': 'Ocio',
       'expense_category_subscriptions': 'Suscripciones',
       'expense_category_investment': 'Inversion',
+      'expense_category_debts': 'Deudas',
       'expense_category_other': 'Otros',
+      'payment_method_debit': 'Debito',
+      'payment_method_credit': 'Credito',
+      'payment_method_investment': 'Inversion',
+      'payment_impact_balance_now': 'Sale del saldo ahora',
+      'payment_impact_invoice': 'Va a la factura',
+      'payment_impact_invoice_installment':
+          'Va a la factura ({current}/{total})',
+      'expense_due_statement_day': 'Factura dia {day}',
       'mission_complete_title': 'Completar misión',
       'mission_complete_note_label': 'Comentario de finalización (opcional)',
       'mission_complete_note_hint': 'Cuenta qué hiciste y cómo lo hiciste.',
@@ -1591,16 +1635,17 @@ class AppStrings {
       'plan_title': 'Plan del mes',
       'plan_subtitle': 'Acciones rápidas para mejorar este mes.',
       'plan_next_action': 'Próxima acción',
-      'plan_action_variable': 'Reduce gastos variables al 30% del ingreso.',
+      'plan_action_variable': 'Reduce gastos variables al 25% del ingreso.',
       'plan_action_fixed':
           'Baja los gastos fijos a un máximo de 50% del ingreso.',
       'plan_action_invest': 'Destina {value} a inversiones.',
       'plan_action_ok': 'Estás equilibrado. Mantente así.',
       'alert_title': 'Alertas inteligentes',
       'alert_add_income': 'Registra tu ingreso para activar alertas.',
-      'alert_fixed_high': 'Gastos fijos por encima de 55% del ingreso.',
+      'alert_fixed_high': 'Gastos fijos por encima de 60% del ingreso.',
       'alert_variable_high': 'Gastos variables por encima de 35% del ingreso.',
-      'alert_invest_low': 'Inversiones por debajo del ideal este mes.',
+      'alert_leisure_high': 'Ocio por encima de 25% del ingreso.',
+      'alert_invest_low': 'Inversiones por debajo de 10% del ingreso.',
       'alert_negative_balance': 'Tu saldo del mes es negativo.',
       'alert_ok': 'Todo bien por aquí. Sigue constante.',
       'tips_title': 'Consejos del mes',
@@ -1776,13 +1821,29 @@ class AppStrings {
 
   static String t(BuildContext context, String key) {
     final code = Localizations.localeOf(context).languageCode;
+    return byCode(code, key);
+  }
+
+  static String tr(BuildContext context, String key, Map<String, String> vars) {
+    var value = t(context, key);
+    vars.forEach((k, v) {
+      value = value.replaceAll('{$k}', v);
+    });
+    return value;
+  }
+
+  static String byCode(String code, String key) {
     final raw = _values[code]?[key] ?? _values['pt']?[key] ?? key;
     final extra = appStringsExtra[code]?[key] ?? appStringsExtra['pt']?[key];
     return _fixEncodingIfNeeded(raw == key && extra != null ? extra : raw);
   }
 
-  static String tr(BuildContext context, String key, Map<String, String> vars) {
-    var value = t(context, key);
+  static String trByCode(
+    String code,
+    String key,
+    Map<String, String> vars,
+  ) {
+    var value = byCode(code, key);
     vars.forEach((k, v) {
       value = value.replaceAll('{$k}', v);
     });

@@ -36,16 +36,17 @@ class WeeklyPlanService {
     required MonthlyDashboard? currentDashboard,
     required List<Goal> goals,
     required int checkInDaysLast7,
+    required String Function(String key, [Map<String, String>? vars]) tr,
   }) {
     final items = <WeeklyPlanItem>[];
     final d = currentDashboard;
 
     if (d == null || d.salary <= 0) {
       items.add(
-        const WeeklyPlanItem(
+        WeeklyPlanItem(
           id: 'add_income',
-          title: 'Cadastrar renda base',
-          description: 'Sem renda ativa o plano perde precisão.',
+          title: tr('weekly_plan_add_income_title'),
+          description: tr('weekly_plan_add_income_desc'),
           actionKey: 'profile_income',
           priority: 1,
         ),
@@ -60,11 +61,10 @@ class WeeklyPlanService {
 
     if (remaining < 0) {
       items.add(
-        const WeeklyPlanItem(
+        WeeklyPlanItem(
           id: 'negative_balance',
-          title: 'Voltar para saldo positivo',
-          description:
-              'Seu mês está no vermelho. Priorize corte de variáveis e renegociação de fixos.',
+          title: tr('weekly_plan_negative_balance_title'),
+          description: tr('weekly_plan_negative_balance_desc'),
           actionKey: 'budgets',
           priority: 1,
         ),
@@ -75,9 +75,10 @@ class WeeklyPlanService {
       items.add(
         WeeklyPlanItem(
           id: 'trim_variable',
-          title: 'Reduzir gastos variáveis',
-          description:
-              'Variáveis em ${(variableRatio * 100).toStringAsFixed(0)}% da renda. Defina teto semanal.',
+          title: tr('weekly_plan_trim_variable_title'),
+          description: tr('weekly_plan_trim_variable_desc', {
+            'pct': (variableRatio * 100).toStringAsFixed(0),
+          }),
           actionKey: 'transactions',
           priority: 2,
         ),
@@ -88,9 +89,8 @@ class WeeklyPlanService {
       items.add(
         WeeklyPlanItem(
           id: 'increase_invest',
-          title: 'Aumentar aporte de investimento',
-          description:
-              'Seu aporte está abaixo de 10% da renda. Simule um valor inicial sustentável.',
+          title: tr('weekly_plan_increase_invest_title'),
+          description: tr('weekly_plan_increase_invest_desc'),
           actionKey: 'investment_plan',
           priority: 3,
         ),
@@ -99,11 +99,10 @@ class WeeklyPlanService {
 
     if (goals.isEmpty) {
       items.add(
-        const WeeklyPlanItem(
+        WeeklyPlanItem(
           id: 'create_goal',
-          title: 'Criar uma meta principal',
-          description:
-              'Uma meta clara direciona decisões da semana e aumenta consistência.',
+          title: tr('weekly_plan_create_goal_title'),
+          description: tr('weekly_plan_create_goal_desc'),
           actionKey: 'goals',
           priority: 2,
         ),
@@ -114,9 +113,10 @@ class WeeklyPlanService {
       items.add(
         WeeklyPlanItem(
           id: 'checkin_consistency',
-          title: 'Subir consistência do check-in',
-          description:
-              'Você fez $checkInDaysLast7/7 check-ins. Meta da semana: pelo menos 5 dias.',
+          title: tr('weekly_plan_checkin_consistency_title'),
+          description: tr('weekly_plan_checkin_consistency_desc', {
+            'days': '$checkInDaysLast7',
+          }),
           actionKey: 'insights',
           priority: 4,
         ),
@@ -125,11 +125,10 @@ class WeeklyPlanService {
 
     if (items.isEmpty) {
       items.add(
-        const WeeklyPlanItem(
+        WeeklyPlanItem(
           id: 'maintain_routine',
-          title: 'Manter rotina e revisar categorias',
-          description:
-              'Seu plano está saudável. Revise categorias 1x na semana para prevenir desvios.',
+          title: tr('weekly_plan_maintain_routine_title'),
+          description: tr('weekly_plan_maintain_routine_desc'),
           actionKey: 'insights',
           priority: 5,
         ),

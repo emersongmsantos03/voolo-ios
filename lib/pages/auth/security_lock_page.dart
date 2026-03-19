@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../../core/theme/app_theme.dart';
 import '../../core/ui/responsive.dart';
 import '../../routes/app_routes.dart';
 import '../../services/local_storage_service.dart';
@@ -54,7 +55,8 @@ class _SecurityLockPageState extends State<SecurityLockPage> {
   Future<void> _logout() async {
     await LocalStorageService.logout();
     if (!mounted) return;
-    Navigator.pushNamedAndRemoveUntil(context, AppRoutes.login, (route) => false);
+    Navigator.pushNamedAndRemoveUntil(
+        context, AppRoutes.login, (route) => false);
   }
 
   @override
@@ -65,32 +67,91 @@ class _SecurityLockPageState extends State<SecurityLockPage> {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
     final scheme = Theme.of(context).colorScheme;
 
     return Scaffold(
-      body: SafeArea(
-        child: Center(
-          child: SingleChildScrollView(
-            padding: Responsive.pagePadding(context),
-            child: ConstrainedBox(
-              constraints: const BoxConstraints(maxWidth: 460),
-              child: Card(
-                child: Padding(
-                  padding: const EdgeInsets.all(20),
+      body: Container(
+        decoration: BoxDecoration(
+          gradient: LinearGradient(
+            colors: [
+              theme.scaffoldBackgroundColor,
+              scheme.surfaceContainerLow,
+            ],
+            begin: Alignment.topCenter,
+            end: Alignment.bottomCenter,
+          ),
+        ),
+        child: SafeArea(
+          child: Center(
+            child: SingleChildScrollView(
+              padding: Responsive.pagePadding(context),
+              child: ConstrainedBox(
+                constraints: const BoxConstraints(maxWidth: 460),
+                child: Container(
+                  padding: const EdgeInsets.all(24),
+                  decoration: AppTheme.premiumCardDecoration(context),
                   child: Column(
                     mainAxisSize: MainAxisSize.min,
                     children: [
-                      Icon(Icons.lock_rounded, size: 42, color: scheme.primary),
-                      const SizedBox(height: 12),
-                      const Text(
+                      Container(
+                        width: 64,
+                        height: 64,
+                        decoration: BoxDecoration(
+                          color: scheme.primary.withValues(alpha: 0.10),
+                          borderRadius: BorderRadius.circular(20),
+                        ),
+                        child: Icon(
+                          Icons.verified_user_outlined,
+                          size: 34,
+                          color: scheme.primary,
+                        ),
+                      ),
+                      const SizedBox(height: 18),
+                      Text(
                         'Area protegida',
-                        style: TextStyle(fontSize: 20, fontWeight: FontWeight.w700),
+                        style: theme.textTheme.titleLarge?.copyWith(
+                          fontWeight: FontWeight.w800,
+                        ),
                       ),
                       const SizedBox(height: 8),
                       Text(
-                        'Use digital, Face ID ou a senha do aparelho para acessar suas financas.',
+                        'Use digital, Face ID ou a senha do aparelho para acessar suas financas com seguranca.',
                         textAlign: TextAlign.center,
                         style: TextStyle(color: scheme.onSurfaceVariant),
+                      ),
+                      const SizedBox(height: 14),
+                      Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 14,
+                          vertical: 12,
+                        ),
+                        decoration: BoxDecoration(
+                          color: scheme.surfaceContainerLow,
+                          borderRadius: BorderRadius.circular(18),
+                          border: Border.all(
+                            color: scheme.outline.withValues(alpha: 0.10),
+                          ),
+                        ),
+                        child: Row(
+                          children: [
+                            Icon(
+                              Icons.lock_clock_outlined,
+                              size: 18,
+                              color: scheme.primary,
+                            ),
+                            const SizedBox(width: 10),
+                            Expanded(
+                              child: Text(
+                                'Seu app continua exatamente de onde voce parou apos a validacao.',
+                                style: TextStyle(
+                                  color: AppTheme.textSecondary(context),
+                                  height: 1.35,
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
                       ),
                       if (_error != null) ...[
                         const SizedBox(height: 12),
@@ -109,9 +170,11 @@ class _SecurityLockPageState extends State<SecurityLockPage> {
                               ? const SizedBox(
                                   height: 16,
                                   width: 16,
-                                  child: CircularProgressIndicator(strokeWidth: 2),
+                                  child: CircularProgressIndicator(
+                                    strokeWidth: 2,
+                                  ),
                                 )
-                              : const Icon(Icons.fingerprint),
+                              : const Icon(Icons.fingerprint_rounded),
                           label: Text(
                             _loading ? 'Validando...' : 'Desbloquear',
                           ),

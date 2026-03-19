@@ -72,10 +72,9 @@ void main() {
       );
 
       expect(penalized.score, (base.score * 0.8).round());
-      expect(
-        penalized.tip,
-        contains('Dívidas em aberto reduzem seu score em 20%'),
-      );
+      expect(penalized.hasDebtPenalty, isTrue);
+      expect(penalized.tipKey, 'score_tip_invest_low');
+      expect(penalized.tip, contains('Open debts reduce your score by 20%'));
     });
   });
 
@@ -108,7 +107,9 @@ void main() {
       expect(decoded.minimumPaymentsTotal, plan.minimumPaymentsTotal);
       expect(decoded.extraBudget, plan.extraBudget);
       expect(
-          decoded.estimatedDebtFreeMonthYear, plan.estimatedDebtFreeMonthYear);
+        decoded.estimatedDebtFreeMonthYear,
+        plan.estimatedDebtFreeMonthYear,
+      );
       expect(decoded.debts.length, 1);
       expect(decoded.firstMonthPayments.length, 1);
       expect(decoded.scheduleSummary.length, 1);

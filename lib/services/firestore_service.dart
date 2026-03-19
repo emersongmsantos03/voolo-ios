@@ -1109,6 +1109,24 @@ class FirestoreService {
     }
   }
 
+  static Future<double> getLifetimeInvestedTotal(String uid) async {
+    try {
+      final snapshot = await _transactions(uid).get();
+      var total = 0.0;
+      for (final doc in snapshot.docs) {
+        final expense = Expense.fromJson({
+          ...doc.data(),
+          'id': doc.id,
+        });
+        if (!expense.isInvestment) continue;
+        total += expense.amount;
+      }
+      return total;
+    } on FirebaseException {
+      return 0.0;
+    }
+  }
+
   static Stream<List<MonthlyDashboard>> watchDashboards(String uid) {
     return _dashboards(uid).snapshots().map((snapshot) {
       final dashboards = <MonthlyDashboard>[];
@@ -1429,62 +1447,13 @@ class FirestoreService {
       final snapshot = await ref.get();
       if (snapshot.docs.isEmpty) return;
 
-      const chunkSize = 450;
-      for (var i = 0; i < snapshot.docs.length; i += chunkSize) {
-        final batch = _db.batch();
-        final chunk = snapshot.docs.sublist(
-          i,
-          min(i + chunkSize, snapshot.docs.length),
-        );
-        for (final doc in chunk) {
-          batch.delete(doc.reference);
-        }
-        await batch.commit();
+      final batch = _db.batch();
+      for (final doc in snapshot.docs) {
+        batch.delete(doc.reference);
       }
+      await batch.commit();
     } on FirebaseException {
       // ignore to avoid crashing UI when permissions are not ready
-    }
-  }
-
-  static Future<void> deleteUserAccount({
-    required String uid,
-    String? email,
-  }) async {
-    if (uid.trim().isEmpty) return;
-
-    await _deleteSubcollection(_dashboards(uid));
-    await _deleteSubcollection(_incomes(uid));
-    await _deleteSubcollection(_goals(uid));
-    await _deleteSubcollection(_budgets(uid));
-    await _deleteSubcollection(_budgetSuggestionRuns(uid));
-    await _deleteSubcollection(_debts(uid));
-    await _deleteSubcollection(_debtPlans(uid));
-    await _deleteSubcollection(_fixedSeries(uid));
-    await _deleteSubcollection(_transactions(uid));
-    await _deleteSubcollection(_userDoc(uid).collection('habits'));
-    await _deleteSubcollection(_userDoc(uid).collection('engagementEvents'));
-    await _deleteSubcollection(_userDoc(uid).collection('investmentProfile'));
-    await _deleteSubcollection(_userDoc(uid).collection('investmentPlan'));
-
-    try {
-      await _userDoc(uid).delete();
-    } on FirebaseException {
-      // ignore to keep deletion flow best-effort
-    }
-
-    final normalizedEmail = email?.trim().toLowerCase() ?? '';
-    if (normalizedEmail.isEmpty ||
-        normalizedEmail == uid.trim().toLowerCase()) {
-      return;
-    }
-
-    await _deleteSubcollection(_legacyDashboards(normalizedEmail));
-    await _deleteSubcollection(_legacyGoals(normalizedEmail));
-
-    try {
-      await _legacyUserDoc(normalizedEmail).delete();
-    } on FirebaseException {
-      // ignore to keep deletion flow best-effort
     }
   }
 

@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:jetx/core/localization/app_strings.dart';
+import 'package:jetx/core/theme/app_theme.dart';
 import 'package:jetx/core/ui/responsive.dart';
 import 'package:jetx/core/utils/password_reset_validators.dart';
 import 'package:jetx/services/password_reset_service.dart';
@@ -90,75 +91,132 @@ class _ResetPasswordPageState extends State<ResetPasswordPage> {
       appBar: AppBar(
         title: Text(AppStrings.t(context, 'reset_title')),
       ),
-      body: Center(
-        child: SingleChildScrollView(
-          padding: Responsive.pagePadding(context),
-          child: ConstrainedBox(
-            constraints: const BoxConstraints(maxWidth: 460),
-            child: Card(
-              child: Padding(
-                padding: EdgeInsets.all(Responsive.isCompactPhone(context) ? 16 : 22),
-                child: Form(
-                  key: _formKey,
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.stretch,
-                    children: [
-                      Text(
-                        AppStrings.t(context, 'reset_subtitle'),
-                        style: theme.textTheme.bodyMedium?.copyWith(
-                          color: scheme.onSurfaceVariant,
-                        ),
-                      ),
-                      const SizedBox(height: 18),
-                      TextFormField(
-                        controller: _emailController,
-                        keyboardType: TextInputType.emailAddress,
-                        textInputAction: TextInputAction.done,
-                        validator: _validateEmail,
-                        onFieldSubmitted: (_) {
-                          if (!_loading) _sendLink();
-                        },
-                        decoration: InputDecoration(
-                          labelText: AppStrings.t(context, 'email'),
-                          prefixIcon: const Icon(Icons.alternate_email_rounded),
-                        ),
-                      ),
-                      const SizedBox(height: 18),
-                      SizedBox(
-                        height: 52,
-                        child: ElevatedButton(
-                          onPressed: _loading ? null : _sendLink,
-                          child: _loading
-                              ? SizedBox(
-                                  height: 18,
-                                  width: 18,
-                                  child: CircularProgressIndicator(
-                                    strokeWidth: 2,
-                                    color: scheme.onPrimary,
-                                  ),
-                                )
-                              : Text(AppStrings.t(context, 'reset_send_button')),
-                        ),
-                      ),
-                      if (_feedback != null) ...[
-                        const SizedBox(height: 14),
+      body: Container(
+        decoration: BoxDecoration(
+          gradient: LinearGradient(
+            colors: [
+              theme.scaffoldBackgroundColor,
+              scheme.surfaceContainerLow,
+            ],
+            begin: Alignment.topCenter,
+            end: Alignment.bottomCenter,
+          ),
+        ),
+        child: Center(
+          child: SingleChildScrollView(
+            padding: Responsive.pagePadding(context),
+            child: ConstrainedBox(
+              constraints: const BoxConstraints(maxWidth: 460),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  Container(
+                    padding: const EdgeInsets.all(22),
+                    decoration: AppTheme.premiumCardDecoration(context),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
                         Container(
-                          padding: const EdgeInsets.all(12),
+                          width: 54,
+                          height: 54,
                           decoration: BoxDecoration(
-                            color: scheme.primaryContainer.withValues(alpha: 0.35),
-                            borderRadius: BorderRadius.circular(12),
+                            color: scheme.primary.withValues(alpha: 0.10),
+                            borderRadius: BorderRadius.circular(18),
                           ),
-                          child: Text(
-                            _feedback!,
-                            style: theme.textTheme.bodySmall?.copyWith(
-                              color: scheme.onSurface,
-                            ),
+                          child: Icon(
+                            Icons.mark_email_read_outlined,
+                            color: scheme.primary,
+                          ),
+                        ),
+                        const SizedBox(height: 16),
+                        Text(
+                          'Recupere sua conta sem perder sua rotina.',
+                          style: theme.textTheme.titleLarge?.copyWith(
+                            fontWeight: FontWeight.w800,
+                          ),
+                        ),
+                        const SizedBox(height: 8),
+                        Text(
+                          AppStrings.t(context, 'reset_subtitle'),
+                          style: theme.textTheme.bodyMedium?.copyWith(
+                            color: scheme.onSurfaceVariant,
                           ),
                         ),
                       ],
-                    ],
+                    ),
                   ),
-                ),
+                  const SizedBox(height: 16),
+                  Container(
+                    padding: EdgeInsets.all(
+                      Responsive.isCompactPhone(context) ? 16 : 22,
+                    ),
+                    decoration: AppTheme.premiumCardDecoration(context),
+                    child: Form(
+                      key: _formKey,
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.stretch,
+                        children: [
+                          TextFormField(
+                            controller: _emailController,
+                            keyboardType: TextInputType.emailAddress,
+                            textInputAction: TextInputAction.done,
+                            validator: _validateEmail,
+                            onFieldSubmitted: (_) {
+                              if (!_loading) _sendLink();
+                            },
+                            decoration: InputDecoration(
+                              labelText: AppStrings.t(context, 'email'),
+                              prefixIcon: const Icon(
+                                Icons.alternate_email_rounded,
+                              ),
+                            ),
+                          ),
+                          const SizedBox(height: 18),
+                          SizedBox(
+                            height: 52,
+                            child: ElevatedButton(
+                              onPressed: _loading ? null : _sendLink,
+                              child: _loading
+                                  ? SizedBox(
+                                      height: 18,
+                                      width: 18,
+                                      child: CircularProgressIndicator(
+                                        strokeWidth: 2,
+                                        color: scheme.onPrimary,
+                                      ),
+                                    )
+                                  : Text(
+                                      AppStrings.t(
+                                        context,
+                                        'reset_send_button',
+                                      ),
+                                    ),
+                            ),
+                          ),
+                          if (_feedback != null) ...[
+                            const SizedBox(height: 14),
+                            Container(
+                              padding: const EdgeInsets.all(14),
+                              decoration: BoxDecoration(
+                                color: scheme.primary.withValues(alpha: 0.10),
+                                borderRadius: BorderRadius.circular(18),
+                                border: Border.all(
+                                  color: scheme.primary.withValues(alpha: 0.12),
+                                ),
+                              ),
+                              child: Text(
+                                _feedback!,
+                                style: theme.textTheme.bodySmall?.copyWith(
+                                  color: scheme.onSurface,
+                                ),
+                              ),
+                            ),
+                          ],
+                        ],
+                      ),
+                    ),
+                  ),
+                ],
               ),
             ),
           ),

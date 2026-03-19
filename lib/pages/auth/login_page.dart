@@ -9,6 +9,7 @@ import 'package:jetx/services/firestore_service.dart';
 import 'package:jetx/services/local_storage_service.dart';
 import 'package:jetx/services/notification_service.dart';
 import 'package:jetx/services/security_lock_service.dart';
+import 'package:jetx/core/theme/app_theme.dart';
 import 'package:jetx/core/ui/responsive.dart';
 import 'package:jetx/widgets/guided_assistance.dart';
 
@@ -126,189 +127,207 @@ class _LoginPageState extends State<LoginPage> {
     final isDark = theme.brightness == Brightness.dark;
 
     return Scaffold(
-      body: SafeArea(
-        child: Center(
-          child: SingleChildScrollView(
-            padding: Responsive.pagePadding(context),
-            child: ConstrainedBox(
-              constraints: const BoxConstraints(maxWidth: 440),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  Align(
-                    alignment: Alignment.center,
-                    child: Image.asset(
-                      isDark
-                          ? 'assets/branding/Logo_dark_slogan.png'
-                          : 'assets/branding/Logo_light_slogan.png',
-                      width: Responsive.clampLogoWidth(
-                        context,
-                        max: 320,
-                        fraction: 0.75,
+      body: Container(
+        decoration: BoxDecoration(
+          gradient: LinearGradient(
+            colors: [
+              Theme.of(context).scaffoldBackgroundColor,
+              scheme.surfaceContainerLow,
+            ],
+            begin: Alignment.topCenter,
+            end: Alignment.bottomCenter,
+          ),
+        ),
+        child: SafeArea(
+          child: Center(
+            child: SingleChildScrollView(
+              padding: Responsive.pagePadding(context),
+              child: ConstrainedBox(
+                constraints: const BoxConstraints(maxWidth: 400),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    Align(
+                      alignment: Alignment.center,
+                      child: Image.asset(
+                        isDark
+                            ? 'assets/branding/Logo_dark_slogan.png'
+                            : 'assets/branding/Logo_light_slogan.png',
+                        width: Responsive.clampLogoWidth(
+                          context,
+                          min: 144,
+                          max: 188,
+                          fraction: 0.48,
+                        ),
                       ),
                     ),
-                  ),
-                  const SizedBox(height: 28),
-                  Card(
-                    child: Padding(
-                      padding: EdgeInsets.all(
-                        Responsive.isCompactPhone(context) ? 16 : 20,
-                      ),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.stretch,
-                        children: [
-                          Row(
-                            children: [
-                              Expanded(
-                                child: Text(
-                                  'Acesse com seu e-mail',
-                                  style: theme.textTheme.titleSmall?.copyWith(
-                                    fontWeight: FontWeight.w600,
-                                  ),
-                                ),
-                              ),
-                            ],
-                          ),
-                          const SizedBox(height: 8),
-                          TextField(
-                            controller: emailController,
-                            keyboardType: TextInputType.emailAddress,
-                            textInputAction: TextInputAction.next,
-                            decoration: InputDecoration(
-                              labelText: AppStrings.t(context, 'email'),
-                              prefixIcon: Icon(
-                                Icons.email_outlined,
-                                color: scheme.onSurfaceVariant,
-                                size: 20,
+                    const SizedBox(height: 8),
+                    Container(
+                      decoration: AppTheme.premiumCardDecoration(context),
+                      child: Padding(
+                        padding: EdgeInsets.all(
+                          Responsive.isCompactPhone(context) ? 14 : 18,
+                        ),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.stretch,
+                          children: [
+                            Text(
+                              'Entrar no Voolo',
+                              style: theme.textTheme.titleLarge?.copyWith(
+                                fontWeight: FontWeight.w800,
                               ),
                             ),
-                          ),
-                          const SizedBox(height: 14),
-                          TextField(
-                            controller: passwordController,
-                            obscureText: _obscurePassword,
-                            textInputAction: TextInputAction.done,
-                            onSubmitted: (_) => _loading ? null : _login(),
-                            decoration: InputDecoration(
-                              labelText: AppStrings.t(context, 'password'),
-                              prefixIcon: Icon(
-                                Icons.lock_outline,
+                            const SizedBox(height: 6),
+                            Text(
+                              'Entre e continue seu plano financeiro.',
+                              style: theme.textTheme.bodyMedium?.copyWith(
                                 color: scheme.onSurfaceVariant,
-                                size: 20,
                               ),
-                              suffixIcon: IconButton(
-                                onPressed: () {
-                                  setState(() {
-                                    _obscurePassword = !_obscurePassword;
-                                  });
-                                },
-                                icon: Icon(
-                                  _obscurePassword
-                                      ? Icons.visibility_rounded
-                                      : Icons.visibility_off_rounded,
+                            ),
+                            const SizedBox(height: 14),
+                            TextField(
+                              controller: emailController,
+                              keyboardType: TextInputType.emailAddress,
+                              textInputAction: TextInputAction.next,
+                              decoration: InputDecoration(
+                                labelText: AppStrings.t(context, 'email'),
+                                prefixIcon: Icon(
+                                  Icons.email_outlined,
+                                  color: scheme.onSurfaceVariant,
                                   size: 20,
                                 ),
                               ),
                             ),
-                          ),
-                          const SizedBox(height: 18),
-                          SizedBox(
-                            width: double.infinity,
-                            height: 52,
-                            child: ElevatedButton(
-                              onPressed: _loading ? null : _login,
-                              child: _loading
-                                  ? SizedBox(
-                                      height: 18,
-                                      width: 18,
-                                      child: CircularProgressIndicator(
-                                        strokeWidth: 2,
-                                        color: scheme.onPrimary,
-                                      ),
-                                    )
-                                  : Text(AppStrings.t(context, 'login')),
-                            ),
-                          ),
-                          const SizedBox(height: 16),
-                          Row(
-                            children: [
-                              Expanded(
-                                child: Divider(
-                                  color: scheme.outline.withValues(alpha: 0.35),
+                            const SizedBox(height: 12),
+                            TextField(
+                              controller: passwordController,
+                              obscureText: _obscurePassword,
+                              textInputAction: TextInputAction.done,
+                              onSubmitted: (_) => _loading ? null : _login(),
+                              decoration: InputDecoration(
+                                labelText: AppStrings.t(context, 'password'),
+                                prefixIcon: Icon(
+                                  Icons.lock_outline,
+                                  color: scheme.onSurfaceVariant,
+                                  size: 20,
                                 ),
-                              ),
-                              Padding(
-                                padding:
-                                    const EdgeInsets.symmetric(horizontal: 12),
-                                child: Text(
-                                  AppStrings.t(context, 'or'),
-                                  style: theme.textTheme.bodySmall?.copyWith(
-                                    color: scheme.onSurfaceVariant,
+                                suffixIcon: IconButton(
+                                  onPressed: () {
+                                    setState(() {
+                                      _obscurePassword = !_obscurePassword;
+                                    });
+                                  },
+                                  icon: Icon(
+                                    _obscurePassword
+                                        ? Icons.visibility_rounded
+                                        : Icons.visibility_off_rounded,
+                                    size: 20,
                                   ),
                                 ),
                               ),
-                              Expanded(
-                                child: Divider(
-                                  color: scheme.outline.withValues(alpha: 0.35),
-                                ),
-                              ),
-                            ],
-                          ),
-                          const SizedBox(height: 16),
-                          SizedBox(
-                            width: double.infinity,
-                            height: 52,
-                            child: OutlinedButton.icon(
-                              onPressed: _loading ? null : _loginWithGoogle,
-                              icon: Image.network(
-                                'https://upload.wikimedia.org/wikipedia/commons/c/c1/Google_%22G%22_logo.svg',
-                                height: 18,
-                                errorBuilder: (_, __, ___) => Icon(
-                                  Icons.g_mobiledata,
-                                  size: 26,
-                                  color: scheme.onSurfaceVariant,
-                                ),
-                              ),
-                              label:
-                                  Text(AppStrings.t(context, 'login_google')),
                             ),
-                          ),
-                          const SizedBox(height: 12),
-                          TextButton(
-                            onPressed: () {
-                              Navigator.pushNamed(
-                                context,
-                                AppRoutes.forgotPassword,
-                              );
-                            },
-                            child:
-                                Text(AppStrings.t(context, 'forgot_password')),
-                          ),
-                          TextButton(
-                            onPressed: () => showSupportSheet(context),
-                            child: const Text('Preciso de ajuda'),
-                          ),
-                        ],
+                            const SizedBox(height: 16),
+                            SizedBox(
+                              width: double.infinity,
+                              height: 52,
+                              child: ElevatedButton(
+                                onPressed: _loading ? null : _login,
+                                child: _loading
+                                    ? SizedBox(
+                                        height: 18,
+                                        width: 18,
+                                        child: CircularProgressIndicator(
+                                          strokeWidth: 2,
+                                          color: scheme.onPrimary,
+                                        ),
+                                      )
+                                    : Text(AppStrings.t(context, 'login')),
+                              ),
+                            ),
+                            const SizedBox(height: 14),
+                            Row(
+                              children: [
+                                Expanded(
+                                  child: Divider(
+                                    color:
+                                        scheme.outline.withValues(alpha: 0.35),
+                                  ),
+                                ),
+                                Padding(
+                                  padding: const EdgeInsets.symmetric(
+                                      horizontal: 12),
+                                  child: Text(
+                                    AppStrings.t(context, 'or'),
+                                    style: theme.textTheme.bodySmall?.copyWith(
+                                      color: scheme.onSurfaceVariant,
+                                    ),
+                                  ),
+                                ),
+                                Expanded(
+                                  child: Divider(
+                                    color:
+                                        scheme.outline.withValues(alpha: 0.35),
+                                  ),
+                                ),
+                              ],
+                            ),
+                            const SizedBox(height: 14),
+                            SizedBox(
+                              width: double.infinity,
+                              height: 52,
+                              child: OutlinedButton.icon(
+                                onPressed: _loading ? null : _loginWithGoogle,
+                                icon: Image.network(
+                                  'https://upload.wikimedia.org/wikipedia/commons/c/c1/Google_%22G%22_logo.svg',
+                                  height: 18,
+                                  errorBuilder: (_, __, ___) => Icon(
+                                    Icons.g_mobiledata,
+                                    size: 26,
+                                    color: scheme.onSurfaceVariant,
+                                  ),
+                                ),
+                                label:
+                                    Text(AppStrings.t(context, 'login_google')),
+                              ),
+                            ),
+                            const SizedBox(height: 8),
+                            TextButton(
+                              onPressed: () {
+                                Navigator.pushNamed(
+                                  context,
+                                  AppRoutes.forgotPassword,
+                                );
+                              },
+                              child: Text(
+                                  AppStrings.t(context, 'forgot_password')),
+                            ),
+                            TextButton(
+                              onPressed: () => showSupportSheet(context),
+                              child: const Text('Preciso de ajuda'),
+                            ),
+                          ],
+                        ),
                       ),
                     ),
-                  ),
-                  const SizedBox(height: 12),
-                  TextButton(
-                    onPressed: () {
-                      Navigator.push(
-                        context,
-                        MaterialPageRoute(builder: (_) => const RegisterPage()),
-                      );
-                    },
-                    child: Text(
-                      AppStrings.t(context, 'register'),
-                      style: TextStyle(
-                        color: scheme.primary,
-                        fontWeight: FontWeight.w600,
+                    const SizedBox(height: 4),
+                    TextButton(
+                      onPressed: () {
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                              builder: (_) => const RegisterPage()),
+                        );
+                      },
+                      child: Text(
+                        AppStrings.t(context, 'register'),
+                        style: TextStyle(
+                          color: scheme.primary,
+                          fontWeight: FontWeight.w700,
+                        ),
                       ),
                     ),
-                  ),
-                ],
+                  ],
+                ),
               ),
             ),
           ),

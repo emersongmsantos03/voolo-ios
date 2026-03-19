@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import '../core/theme/app_theme.dart';
-import '../core/ui/responsive.dart';
 
 class EducationalEmptyState extends StatelessWidget {
   final String title;
@@ -18,32 +17,30 @@ class EducationalEmptyState extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
     return Container(
-      padding: Responsive.pagePadding(context),
-      decoration: BoxDecoration(
-        color: Theme.of(context).colorScheme.surface,
-        borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: Colors.white10),
-      ),
+      padding: const EdgeInsets.all(24),
+      decoration: AppTheme.premiumCardDecoration(context),
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
           Container(
-            padding: const EdgeInsets.all(16),
+            width: 72,
+            height: 72,
             decoration: BoxDecoration(
-              color: Colors.amber.withOpacity(0.1),
-              shape: BoxShape.circle,
+              color: scheme.primary.withValues(alpha: 0.10),
+              borderRadius: BorderRadius.circular(24),
             ),
-            child: Icon(icon, size: 40, color: Colors.amber),
+            child: Icon(icon, size: 34, color: scheme.primary),
           ),
           const SizedBox(height: 20),
           Text(
             title,
             textAlign: TextAlign.center,
-            style: const TextStyle(
-              color: Colors.amber,
-              fontSize: 18,
-              fontWeight: FontWeight.bold,
+            style: TextStyle(
+              color: AppTheme.textPrimary(context),
+              fontSize: 20,
+              fontWeight: FontWeight.w800,
             ),
           ),
           const SizedBox(height: 10),
@@ -51,7 +48,7 @@ class EducationalEmptyState extends StatelessWidget {
             message,
             textAlign: TextAlign.center,
             style: TextStyle(
-              color: AppTheme.textPrimary(context).withOpacity(0.7),
+              color: AppTheme.textSecondary(context),
               fontSize: 14,
               height: 1.4,
             ),

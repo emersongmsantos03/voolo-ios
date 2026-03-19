@@ -3,6 +3,7 @@ import 'package:flutter_timezone/flutter_timezone.dart';
 import 'package:timezone/data/latest.dart' as tz;
 import 'package:timezone/timezone.dart' as tz;
 
+import '../core/localization/app_strings.dart';
 import '../models/credit_card.dart';
 import '../models/expense.dart';
 import '../models/fixed_series.dart';
@@ -13,6 +14,7 @@ class NotificationService {
   static final FlutterLocalNotificationsPlugin _plugin =
       FlutterLocalNotificationsPlugin();
   static bool _initialized = false;
+  static String _localeCode = 'pt';
 
   static const String _channelReminders = 'voolo_reminders';
   static const String _channelEngagement = 'voolo_engagement';
@@ -43,16 +45,26 @@ class NotificationService {
     _initialized = true;
   }
 
+  static Future<void> setLocale(String code) async {
+    _localeCode = code;
+    if (!_initialized) return;
+    await _createChannels();
+    await scheduleEngagementReminders();
+  }
+
+  static String _t(String key) => AppStrings.byCode(_localeCode, key);
+
+  static String _tr(String key, Map<String, String> vars) =>
+      AppStrings.trByCode(_localeCode, key, vars);
+
   static Future<void> _requestPermissions() async {
-    final android =
-        _plugin.resolvePlatformSpecificImplementation<
-            AndroidFlutterLocalNotificationsPlugin>();
+    final android = _plugin.resolvePlatformSpecificImplementation<
+        AndroidFlutterLocalNotificationsPlugin>();
     await android?.requestNotificationsPermission();
     await android?.requestExactAlarmsPermission();
 
-    final ios =
-        _plugin.resolvePlatformSpecificImplementation<
-            IOSFlutterLocalNotificationsPlugin>();
+    final ios = _plugin.resolvePlatformSpecificImplementation<
+        IOSFlutterLocalNotificationsPlugin>();
     await ios?.requestPermissions(
       alert: true,
       badge: true,
@@ -61,24 +73,23 @@ class NotificationService {
   }
 
   static Future<void> _createChannels() async {
-    final android =
-        _plugin.resolvePlatformSpecificImplementation<
-            AndroidFlutterLocalNotificationsPlugin>();
+    final android = _plugin.resolvePlatformSpecificImplementation<
+        AndroidFlutterLocalNotificationsPlugin>();
     if (android == null) return;
 
     await android.createNotificationChannel(
-      const AndroidNotificationChannel(
+      AndroidNotificationChannel(
         _channelReminders,
-        'Lembretes do Voolo',
-        description: 'Avisos de vencimento e revisao de gastos.',
+        _t('notif_channel_reminders_name'),
+        description: _t('notif_channel_reminders_desc'),
         importance: Importance.defaultImportance,
       ),
     );
     await android.createNotificationChannel(
-      const AndroidNotificationChannel(
+      AndroidNotificationChannel(
         _channelEngagement,
-        'Check-ins do Voolo',
-        description: 'Lembretes gentis para manter o controle.',
+        _t('notif_channel_engagement_name'),
+        description: _t('notif_channel_engagement_desc'),
         importance: Importance.low,
       ),
     );
@@ -153,9 +164,10 @@ class NotificationService {
     return scheduled;
   }
 
-  /// Agenda lembretes de contas fixas
   static Future<void> scheduleExpenseReminder(Expense expense) async {
-    if (expense.dueDay == null || !expense.isFixed || expense.isCreditCard) return;
+    if (expense.dueDay == null || !expense.isFixed || expense.isCreditCard) {
+      return;
+    }
     await init();
 
     final dueDay = expense.dueDay!;
@@ -163,65 +175,17 @@ class NotificationService {
     final preId = _expensePreId(expense.id);
 
     final dueDate = _nextInstanceAt(dueDay, 9, 0);
-    final dueDetails = _details(
-      channelId: _channelReminders,
-      channelName: 'Lembretes do Voolo',
-      importance: Importance.defaultImportance,
-      priority: Priority.defaultPriority,
-    );
-
-    await _plugin.zonedSchedule(
-      dueId,
-      'Vence hoje',
-      '${expense.name} vence hoje. Confira o pagamento.',
-      dueDate,
-      dueDetails,
-      androidScheduleMode: AndroidScheduleMode.exactAllowWhileIdle,
-      uiLocalNotificationDateInterpretation:
-          UILocalNotificationDateInterpretation.absoluteTime,
-      matchDateTimeComponents: DateTimeComponents.dayOfMonthAndTime,
-    );
-
-    if (dueDay >= 4) {
-      final preDate = _nextInstanceAt(dueDay - 3, 9, 0);
-      await _plugin.zonedSchedule(
-        preId,
-        'Vencimento chegando',
-        '${expense.name} vence em 3 dias. Antecipe para evitar juros.',
-        preDate,
-        dueDetails,
-        androidScheduleMode: AndroidScheduleMode.exactAllowWhileIdle,
-        uiLocalNotificationDateInterpretation:
-            UILocalNotificationDateInterpretation.absoluteTime,
-        matchDateTimeComponents: DateTimeComponents.dayOfMonthAndTime,
-      );
-    } else {
-      // If due day changed to 1-3, ensure any old "3 days before" reminder is removed.
-      await _plugin.cancel(preId);
-    }
-  }
-
-  /// Agenda lembretes de contas fixas (recorrências).
-  static Future<void> scheduleFixedSeriesReminder(FixedSeries series) async {
-    if (!series.isActive || series.dueDay == null || series.isCreditCard) return;
-    await init();
-
-    final dueDay = series.dueDay!;
-    final dueId = _fixedSeriesDueId(series.seriesId);
-    final preId = _fixedSeriesPreId(series.seriesId);
-
-    final dueDate = _nextInstanceAt(dueDay, 9, 0);
     final details = _details(
       channelId: _channelReminders,
-      channelName: 'Lembretes do Voolo',
+      channelName: _t('notif_channel_reminders_name'),
       importance: Importance.defaultImportance,
       priority: Priority.defaultPriority,
     );
 
     await _plugin.zonedSchedule(
       dueId,
-      'Vence hoje',
-      '${series.name} vence hoje. Confira o pagamento.',
+      _t('notif_due_today_title'),
+      _tr('notif_due_today_body', {'name': expense.name}),
       dueDate,
       details,
       androidScheduleMode: AndroidScheduleMode.exactAllowWhileIdle,
@@ -234,8 +198,8 @@ class NotificationService {
       final preDate = _nextInstanceAt(dueDay - 3, 9, 0);
       await _plugin.zonedSchedule(
         preId,
-        'Vencimento chegando',
-        '${series.name} vence em 3 dias. Antecipe para evitar juros.',
+        _t('notif_due_soon_title'),
+        _tr('notif_due_soon_body', {'name': expense.name}),
         preDate,
         details,
         androidScheduleMode: AndroidScheduleMode.exactAllowWhileIdle,
@@ -248,27 +212,28 @@ class NotificationService {
     }
   }
 
-  /// Agenda lembretes de faturas de cartão (dia do vencimento e 3 dias antes).
-  static Future<void> scheduleCreditCardBillReminder(CreditCard card) async {
-    if (card.dueDay <= 0) return;
+  static Future<void> scheduleFixedSeriesReminder(FixedSeries series) async {
+    if (!series.isActive || series.dueDay == null || series.isCreditCard) {
+      return;
+    }
     await init();
 
-    final dueDay = card.dueDay;
-    final dueId = _cardDueId(card.id);
-    final preId = _cardPreId(card.id);
+    final dueDay = series.dueDay!;
+    final dueId = _fixedSeriesDueId(series.seriesId);
+    final preId = _fixedSeriesPreId(series.seriesId);
 
     final dueDate = _nextInstanceAt(dueDay, 9, 0);
     final details = _details(
       channelId: _channelReminders,
-      channelName: 'Lembretes do Voolo',
+      channelName: _t('notif_channel_reminders_name'),
       importance: Importance.defaultImportance,
       priority: Priority.defaultPriority,
     );
 
     await _plugin.zonedSchedule(
       dueId,
-      'Fatura vence hoje',
-      'A fatura do cartão ${card.name} vence hoje. Confira o pagamento.',
+      _t('notif_due_today_title'),
+      _tr('notif_due_today_body', {'name': series.name}),
       dueDate,
       details,
       androidScheduleMode: AndroidScheduleMode.exactAllowWhileIdle,
@@ -281,8 +246,54 @@ class NotificationService {
       final preDate = _nextInstanceAt(dueDay - 3, 9, 0);
       await _plugin.zonedSchedule(
         preId,
-        'Fatura chegando',
-        'A fatura do cartão ${card.name} vence em 3 dias. Evite juros.',
+        _t('notif_due_soon_title'),
+        _tr('notif_due_soon_body', {'name': series.name}),
+        preDate,
+        details,
+        androidScheduleMode: AndroidScheduleMode.exactAllowWhileIdle,
+        uiLocalNotificationDateInterpretation:
+            UILocalNotificationDateInterpretation.absoluteTime,
+        matchDateTimeComponents: DateTimeComponents.dayOfMonthAndTime,
+      );
+    } else {
+      await _plugin.cancel(preId);
+    }
+  }
+
+  static Future<void> scheduleCreditCardBillReminder(CreditCard card) async {
+    if (card.dueDay <= 0) return;
+    await init();
+
+    final dueDay = card.dueDay;
+    final dueId = _cardDueId(card.id);
+    final preId = _cardPreId(card.id);
+
+    final dueDate = _nextInstanceAt(dueDay, 9, 0);
+    final details = _details(
+      channelId: _channelReminders,
+      channelName: _t('notif_channel_reminders_name'),
+      importance: Importance.defaultImportance,
+      priority: Priority.defaultPriority,
+    );
+
+    await _plugin.zonedSchedule(
+      dueId,
+      _t('notif_card_due_today_title'),
+      _tr('notif_card_due_today_body', {'name': card.name}),
+      dueDate,
+      details,
+      androidScheduleMode: AndroidScheduleMode.exactAllowWhileIdle,
+      uiLocalNotificationDateInterpretation:
+          UILocalNotificationDateInterpretation.absoluteTime,
+      matchDateTimeComponents: DateTimeComponents.dayOfMonthAndTime,
+    );
+
+    if (dueDay >= 4) {
+      final preDate = _nextInstanceAt(dueDay - 3, 9, 0);
+      await _plugin.zonedSchedule(
+        preId,
+        _t('notif_card_due_soon_title'),
+        _tr('notif_card_due_soon_body', {'name': card.name}),
         preDate,
         details,
         androidScheduleMode: AndroidScheduleMode.exactAllowWhileIdle,
@@ -313,9 +324,8 @@ class NotificationService {
     await _plugin.cancel(_cardPreId(cardId));
   }
 
-  /// Lembretes suaves (sem spam): semanal + mensal.
   static Future<void> scheduleEngagementReminders() async {
-    const dailyId = 9001; // legacy: cancel to avoid spam
+    const dailyId = 9001;
     const weeklyId = 9002;
     const monthlyInvestId = 9003;
 
@@ -338,12 +348,12 @@ class NotificationService {
 
     await _plugin.zonedSchedule(
       weeklyId,
-      'Fechamento da semana',
-      'Confira seu resumo e ajuste o que for necessário.',
+      _t('notif_weekly_review_title'),
+      _t('notif_weekly_review_body'),
       nextSunday,
       _details(
         channelId: _channelEngagement,
-        channelName: 'Check-ins do Voolo',
+        channelName: _t('notif_channel_engagement_name'),
         importance: Importance.low,
         priority: Priority.low,
       ),
@@ -353,16 +363,15 @@ class NotificationService {
       matchDateTimeComponents: DateTimeComponents.dayOfWeekAndTime,
     );
 
-    // Lembrete mensal de investimento (gentil, sem insistência).
     final monthly = _nextInstanceAt(10, 19, 0);
     await _plugin.zonedSchedule(
       monthlyInvestId,
-      'Lembrete de investimento',
-      'Se fizer sentido, defina um valor para investir este mês.',
+      _t('notif_monthly_invest_title'),
+      _t('notif_monthly_invest_body'),
       monthly,
       _details(
         channelId: _channelEngagement,
-        channelName: 'Check-ins do Voolo',
+        channelName: _t('notif_channel_engagement_name'),
         importance: Importance.low,
         priority: Priority.low,
       ),

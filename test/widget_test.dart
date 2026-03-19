@@ -22,6 +22,7 @@ import 'package:jetx/pages/dashboard/dashboard_page.dart';
 import 'package:jetx/services/local_database_service.dart';
 import 'package:jetx/services/local_storage_service.dart';
 import 'package:jetx/state/locale_state.dart';
+import 'package:jetx/state/privacy_state.dart';
 import 'package:jetx/state/theme_state.dart';
 
 void main() {
@@ -50,6 +51,11 @@ void main() {
   });
 
   testWidgets('App starts on dashboard screen', (WidgetTester tester) async {
+    tester.view.devicePixelRatio = 1.0;
+    tester.view.physicalSize = const Size(390, 844);
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+
     await LocalStorageService.init();
 
     await tester.pumpWidget(
@@ -57,6 +63,7 @@ void main() {
         providers: [
           ChangeNotifierProvider(create: (_) => ThemeState()),
           ChangeNotifierProvider(create: (_) => LocaleState()),
+          ChangeNotifierProvider(create: (_) => PrivacyState()),
         ],
         child: const MaterialApp(home: DashboardPage()),
       ),

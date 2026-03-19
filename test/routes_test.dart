@@ -17,6 +17,7 @@ import 'package:jetx/routes/app_routes.dart';
 import 'package:jetx/services/local_database_service.dart';
 import 'package:jetx/services/local_storage_service.dart';
 import 'package:jetx/state/locale_state.dart';
+import 'package:jetx/state/privacy_state.dart';
 import 'package:jetx/state/theme_state.dart';
 
 void main() {
@@ -48,6 +49,11 @@ void main() {
 
   testWidgets('All named routes resolve (no unknown route page)',
       (WidgetTester tester) async {
+    tester.view.devicePixelRatio = 1.0;
+    tester.view.physicalSize = const Size(390, 844);
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+
     await LocalStorageService.init();
 
     final navKey = GlobalKey<NavigatorState>();
@@ -56,6 +62,7 @@ void main() {
         providers: [
           ChangeNotifierProvider(create: (_) => ThemeState()),
           ChangeNotifierProvider(create: (_) => LocaleState()),
+          ChangeNotifierProvider(create: (_) => PrivacyState()),
         ],
         child: MaterialApp(
           navigatorKey: navKey,

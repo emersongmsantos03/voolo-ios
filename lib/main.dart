@@ -1,8 +1,11 @@
-﻿import 'package:flutter/material.dart';
+import 'dart:async';
+import 'dart:ui';
+
+import 'package:firebase_auth/firebase_auth.dart';
+import 'package:firebase_core/firebase_core.dart';
+import 'package:flutter/material.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:provider/provider.dart';
-import 'package:firebase_core/firebase_core.dart';
-import 'package:firebase_auth/firebase_auth.dart';
 
 import 'core/localization/app_strings.dart';
 import 'core/theme/app_theme.dart';
@@ -19,14 +22,74 @@ import 'widgets/offline_banner.dart';
 final GlobalKey<NavigatorState> _navKey = GlobalKey<NavigatorState>();
 
 Future<void> main() async {
-  WidgetsFlutterBinding.ensureInitialized();
-  await Firebase.initializeApp();
+  await runZonedGuarded(() async {
+    WidgetsFlutterBinding.ensureInitialized();
+    FlutterError.onError = (details) {
+      FlutterError.presentError(details);
+      debugPrint('FlutterError: ${details.exceptionAsString()}');
+      debugPrintStack(stackTrace: details.stack);
+    };
+    ErrorWidget.builder = (details) => _FatalErrorScaffold(
+          title: 'Algo saiu do esperado',
+          message: 'O Voolo encontrou um erro nesta tela.',
+          details: details.exceptionAsString(),
+        );
+    PlatformDispatcher.instance.onError = (error, stack) {
+      debugPrint('Uncaught async error: $error');
+      debugPrintStack(stackTrace: stack);
+      return true;
+    };
+
+    final bootstrap = await _bootstrapApp();
+
+    if (bootstrap.firebaseReady) {
+      FirebaseAuth.instance.authStateChanges().listen((authUser) {
+        if (authUser != null) return;
+        final navigator = _navKey.currentState;
+        if (navigator == null) return;
+        navigator.pushNamedAndRemoveUntil(AppRoutes.login, (route) => false);
+      });
+    }
+
+    runApp(
+      MultiProvider(
+        providers: [
+          ChangeNotifierProvider(create: (_) => ThemeState()),
+          ChangeNotifierProvider(create: (_) => LocaleState()),
+          ChangeNotifierProvider(create: (_) => PrivacyState()),
+        ],
+        child: JetxApp(initialRoute: bootstrap.initialRoute),
+      ),
+    );
+  }, (error, stack) {
+    debugPrint('Bootstrap error: $error');
+    debugPrintStack(stackTrace: stack);
+    runApp(
+      const _FatalApp(
+        title: 'Nao foi possivel abrir o app',
+        message: 'O Voolo encontrou um erro ao iniciar.',
+      ),
+    );
+  });
+}
+
+Future<_BootstrapResult> _bootstrapApp() async {
+  var firebaseReady = false;
+  try {
+    await Firebase.initializeApp();
+    firebaseReady = true;
+  } catch (e) {
+    debugPrint('Firebase bootstrap unavailable, starting in local mode: $e');
+  }
+
+  LocalStorageService.configureCloud(enabled: firebaseReady);
   await DateUtilsJetx.init();
   await LocalDatabaseService.init();
-  // Ensure init doesn't hang the app indefinitely
-  await LocalStorageService.init().timeout(const Duration(seconds: 3), onTimeout: () => null);
+  await LocalStorageService.init().timeout(
+    const Duration(seconds: 3),
+    onTimeout: () => null,
+  );
 
-  // If we are logged in, wait a bit for the remote sync to avoid showing onboarding unnecessarily
   if (LocalStorageService.currentUserId != null) {
     await LocalStorageService.waitForSync(timeoutSeconds: 2);
   }
@@ -43,22 +106,9 @@ Future<void> main() async {
           ? AppRoutes.securityLock
           : (needsSetup ? AppRoutes.onboarding : AppRoutes.dashboard));
 
-  FirebaseAuth.instance.authStateChanges().listen((authUser) {
-    if (authUser != null) return;
-    final navigator = _navKey.currentState;
-    if (navigator == null) return;
-    navigator.pushNamedAndRemoveUntil(AppRoutes.login, (route) => false);
-  });
-
-  runApp(
-    MultiProvider(
-      providers: [
-        ChangeNotifierProvider(create: (_) => ThemeState()),
-        ChangeNotifierProvider(create: (_) => LocaleState()),
-        ChangeNotifierProvider(create: (_) => PrivacyState()),
-      ],
-      child: JetxApp(initialRoute: initialRoute),
-    ),
+  return _BootstrapResult(
+    firebaseReady: firebaseReady,
+    initialRoute: initialRoute,
   );
 }
 
@@ -84,14 +134,127 @@ class JetxApp extends StatelessWidget {
           GlobalWidgetsLocalizations.delegate,
           GlobalCupertinoLocalizations.delegate,
         ],
-
         builder: (context, child) => OfflineBanner(
           child: child ?? const SizedBox.shrink(),
         ),
-
-        // ?. Rotas centralizadas
         onGenerateRoute: AppRoutes.onGenerateRoute,
         initialRoute: initialRoute,
+      ),
+    );
+  }
+}
+
+class _BootstrapResult {
+  final bool firebaseReady;
+  final String initialRoute;
+
+  const _BootstrapResult({
+    required this.firebaseReady,
+    required this.initialRoute,
+  });
+}
+
+class _FatalApp extends StatelessWidget {
+  final String title;
+  final String message;
+
+  const _FatalApp({
+    required this.title,
+    required this.message,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return MaterialApp(
+      title: 'Voolo',
+      debugShowCheckedModeBanner: false,
+      theme: AppTheme.lightTheme,
+      darkTheme: AppTheme.darkTheme,
+      home: _FatalErrorScaffold(title: title, message: message),
+    );
+  }
+}
+
+class _FatalErrorScaffold extends StatelessWidget {
+  final String title;
+  final String message;
+  final String? details;
+
+  const _FatalErrorScaffold({
+    required this.title,
+    required this.message,
+    this.details,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    return Scaffold(
+      body: SafeArea(
+        child: Center(
+          child: Padding(
+            padding: const EdgeInsets.all(24),
+            child: ConstrainedBox(
+              constraints: const BoxConstraints(maxWidth: 420),
+              child: Container(
+                padding: const EdgeInsets.all(24),
+                decoration: AppTheme.premiumCardDecoration(context),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Container(
+                      width: 64,
+                      height: 64,
+                      decoration: BoxDecoration(
+                        color: scheme.error.withValues(alpha: 0.10),
+                        borderRadius: BorderRadius.circular(20),
+                      ),
+                      child: Icon(
+                        Icons.error_outline_rounded,
+                        color: scheme.error,
+                        size: 34,
+                      ),
+                    ),
+                    const SizedBox(height: 18),
+                    Text(
+                      title,
+                      textAlign: TextAlign.center,
+                      style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                            fontWeight: FontWeight.w800,
+                          ),
+                    ),
+                    const SizedBox(height: 8),
+                    Text(
+                      message,
+                      textAlign: TextAlign.center,
+                      style: TextStyle(color: AppTheme.textSecondary(context)),
+                    ),
+                    if (details != null && details!.trim().isNotEmpty) ...[
+                      const SizedBox(height: 14),
+                      Container(
+                        width: double.infinity,
+                        padding: const EdgeInsets.all(12),
+                        decoration: BoxDecoration(
+                          color: scheme.surfaceContainerLow,
+                          borderRadius: BorderRadius.circular(16),
+                        ),
+                        child: Text(
+                          details!,
+                          style: TextStyle(
+                            color: AppTheme.textMuted(context),
+                            fontSize: 12,
+                          ),
+                          maxLines: 6,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ),
+                    ],
+                  ],
+                ),
+              ),
+            ),
+          ),
+        ),
       ),
     );
   }

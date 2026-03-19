@@ -7,7 +7,6 @@ import '../../core/gamification/mission_progress.dart';
 import '../../core/localization/app_strings.dart';
 import '../../core/theme/app_theme.dart';
 import '../../core/ui/responsive.dart';
-import '../../models/expense.dart';
 import '../../models/monthly_dashboard.dart';
 import '../../models/user_profile.dart';
 import '../../services/firestore_service.dart';
@@ -703,7 +702,7 @@ class _MissionsBody extends StatelessWidget {
                 Text(
                   catalogMessage!,
                   style: TextStyle(
-                    color: Colors.redAccent.withOpacity(0.9),
+                    color: AppTheme.danger,
                     fontSize: 13,
                     fontWeight: FontWeight.w600,
                   ),
@@ -714,9 +713,11 @@ class _MissionsBody extends StatelessWidget {
               Container(
                 padding: Responsive.pagePadding(context),
                 decoration: BoxDecoration(
-                color: Colors.white.withOpacity(0.03),
+                color: AppTheme.highlight(context),
                 borderRadius: BorderRadius.circular(24),
-                border: Border.all(color: Colors.white.withOpacity(0.1)),
+                border: Border.all(
+                  color: Theme.of(context).colorScheme.primary.withValues(alpha: 0.24),
+                ),
               ),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
@@ -733,8 +734,8 @@ class _MissionsBody extends StatelessWidget {
                             children: [
                               Text(
                                 '$userXp',
-                                style: const TextStyle(
-                                  color: Colors.white,
+                                style: TextStyle(
+                                  color: AppTheme.textPrimary(context),
                                   fontSize: 40,
                                   fontWeight: FontWeight.w800,
                                 ),
@@ -756,26 +757,26 @@ class _MissionsBody extends StatelessWidget {
                         padding: const EdgeInsets.symmetric(
                             horizontal: 16, vertical: 8),
                         decoration: BoxDecoration(
-                          gradient: const LinearGradient(
-                            colors: [
-                              const Color(0xFFD4AF37),
-                              const Color(0xFFa855f7)
-                            ], // var(--primary) to purple
-                            begin: Alignment.topLeft,
-                            end: Alignment.bottomRight,
+                          color: Theme.of(context).colorScheme.primary.withValues(alpha: 0.14),
+                          border: Border.all(
+                            color: Theme.of(context).colorScheme.primary.withValues(alpha: 0.24),
                           ),
                           borderRadius: BorderRadius.circular(99),
                         ),
                         child: Row(
                           children: [
-                            const Icon(Icons.emoji_events,
-                                color: Colors.white, size: 16),
+                            Icon(
+                              Icons.emoji_events,
+                              color: Theme.of(context).colorScheme.primary,
+                              size: 16,
+                            ),
                             const SizedBox(width: 6),
                             _FixedText(
                               'Nível $userLevel',
-                              style: const TextStyle(
-                                  color: Colors.white,
-                                  fontWeight: FontWeight.bold),
+                              style: TextStyle(
+                                color: AppTheme.textPrimary(context),
+                                fontWeight: FontWeight.bold,
+                              ),
                             ),
                           ],
                         ),
@@ -804,9 +805,11 @@ class _MissionsBody extends StatelessWidget {
                         borderRadius: BorderRadius.circular(6),
                         child: LinearProgressIndicator(
                           value: progress,
-                          backgroundColor: Colors.white.withOpacity(0.1),
+                          backgroundColor:
+                              Theme.of(context).colorScheme.surfaceContainerHighest,
                           valueColor: const AlwaysStoppedAnimation<Color>(
-                              const Color(0xFF33C587)), // Success Green
+                            AppTheme.success,
+                          ),
                           minHeight: 12,
                         ),
                       ),
@@ -833,10 +836,10 @@ class _MissionsBody extends StatelessWidget {
                   Text(
                     AppStrings.t(context, 'missions_month').toUpperCase(),
                     style: TextStyle(
-                      color: AppTheme.textSecondary(context),
+                      color: AppTheme.textMuted(context),
                       fontSize: 14,
                       fontWeight: FontWeight.w700,
-                      letterSpacing: 0.5,
+                      letterSpacing: 1,
                     ),
                   ),
                   const SizedBox(height: 12),
@@ -853,10 +856,10 @@ class _MissionsBody extends StatelessWidget {
             Text(
               AppStrings.t(context, 'missions_week').toUpperCase(),
               style: TextStyle(
-                color: AppTheme.textSecondary(context),
+                color: AppTheme.textMuted(context),
                 fontSize: 14,
                 fontWeight: FontWeight.w700,
-                letterSpacing: 0.5,
+                letterSpacing: 1,
               ),
             ),
             const SizedBox(height: 12),
@@ -865,10 +868,10 @@ class _MissionsBody extends StatelessWidget {
             Text(
               AppStrings.t(context, 'missions_day').toUpperCase(),
               style: TextStyle(
-                color: AppTheme.textSecondary(context),
+                color: AppTheme.textMuted(context),
                 fontSize: 14,
                 fontWeight: FontWeight.w700,
-                letterSpacing: 0.5,
+                letterSpacing: 1,
               ),
             ),
             const SizedBox(height: 12),
@@ -932,43 +935,45 @@ class _MissionTile extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
     final bgColor = view.completed
-        ? const Color(0xFF10b981).withOpacity(0.05)
-        : const Color(0xFF1e1b4b).withOpacity(0.6);
+        ? AppTheme.success.withValues(alpha: 0.08)
+        : scheme.surface;
     final borderColor = view.completed
-        ? const Color(0xFF10b981).withOpacity(0.2)
-        : Colors.white.withOpacity(0.08);
+        ? AppTheme.success.withValues(alpha: 0.18)
+        : scheme.outline.withValues(alpha: 0.16);
+    final accent = view.completed ? AppTheme.success : scheme.primary;
 
     return InkWell(
       onTap: () => _showDetails(context),
-      borderRadius: BorderRadius.circular(16),
+      borderRadius: BorderRadius.circular(20),
       child: Container(
         margin: const EdgeInsets.only(bottom: 12),
-        padding: const EdgeInsets.all(16),
+        padding: const EdgeInsets.all(18),
         decoration: BoxDecoration(
           color: bgColor,
-          borderRadius: BorderRadius.circular(16),
+          borderRadius: BorderRadius.circular(20),
           border: Border.all(color: borderColor),
         ),
         child: Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // Icon Box
             Container(
-              width: 40,
-              height: 40,
+              width: 44,
+              height: 44,
               decoration: BoxDecoration(
-                color: Colors.white.withOpacity(0.05),
-                borderRadius: BorderRadius.circular(12),
+                color: accent.withValues(alpha: 0.12),
+                borderRadius: BorderRadius.circular(14),
               ),
               child: Icon(
-                view.completed ? Icons.check_circle : Icons.bolt,
-                color: view.completed ? const Color(0xFF33C587) : Colors.amber,
+                view.completed
+                    ? Icons.check_circle_rounded
+                    : Icons.auto_awesome_rounded,
+                color: accent,
                 size: 20,
               ),
             ),
             const SizedBox(width: 16),
-
-            // Content
             Expanded(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
@@ -979,24 +984,24 @@ class _MissionTile extends StatelessWidget {
                       Expanded(
                         child: Text(
                           view.mission.title,
-                          style: const TextStyle(
-                            color: Colors.white,
+                          style: TextStyle(
+                            color: AppTheme.textPrimary(context),
                             fontSize: 16,
-                            fontWeight: FontWeight.w600,
+                            fontWeight: FontWeight.w700,
                           ),
                         ),
                       ),
                       Container(
                         padding: const EdgeInsets.symmetric(
-                            horizontal: 8, vertical: 2),
+                            horizontal: 10, vertical: 5),
                         decoration: BoxDecoration(
-                          color: Colors.amber.withOpacity(0.1),
-                          borderRadius: BorderRadius.circular(4),
+                          color: scheme.primary.withValues(alpha: 0.10),
+                          borderRadius: BorderRadius.circular(999),
                         ),
                         child: Text(
                           '+${view.mission.xp} XP',
-                          style: const TextStyle(
-                            color: Colors.amber,
+                          style: TextStyle(
+                            color: scheme.primary,
                             fontSize: 12,
                             fontWeight: FontWeight.w700,
                           ),
@@ -1008,11 +1013,10 @@ class _MissionTile extends StatelessWidget {
                   Text(
                     view.mission.desc,
                     style: TextStyle(
-                      color: Colors.white.withOpacity(0.6),
+                      color: AppTheme.textSecondary(context),
                       fontSize: 13,
+                      height: 1.4,
                     ),
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
                   ),
                   const SizedBox(height: 6),
                   Text(
@@ -1035,14 +1039,17 @@ class _MissionTile extends StatelessWidget {
                   const Text(
                     'Concluída',
                     style: TextStyle(
-                      color: Color(0xFF33C587),
+                      color: AppTheme.success,
                       fontWeight: FontWeight.w600,
                       fontSize: 14,
                     ),
                   ),
                   const SizedBox(width: 4),
-                  const Icon(Icons.check_circle,
-                      color: Color(0xFF33C587), size: 16),
+                  const Icon(
+                    Icons.check_circle_rounded,
+                    color: AppTheme.success,
+                    size: 16,
+                  ),
                 ],
               )
             else if (view.mission.completionMode == 'auto')
@@ -1067,12 +1074,12 @@ class _MissionTile extends StatelessWidget {
               TextButton(
                 onPressed: () => onComplete(view),
                 style: TextButton.styleFrom(
-                  backgroundColor: AppTheme.primary(context),
-                  foregroundColor: Colors.white,
+                  backgroundColor: scheme.primary,
+                  foregroundColor: scheme.onPrimary,
                   padding:
-                      const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                      const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
                   shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(8)),
+                      borderRadius: BorderRadius.circular(12)),
                 ),
                 child: const Text(
                   'Escrever',
@@ -1084,12 +1091,12 @@ class _MissionTile extends StatelessWidget {
                 onPressed:
                     view.progress.completed ? () => onComplete(view) : null,
                 style: TextButton.styleFrom(
-                  backgroundColor: AppTheme.primary(context),
-                  foregroundColor: Colors.white,
+                  backgroundColor: scheme.primary,
+                  foregroundColor: scheme.onPrimary,
                   padding:
-                      const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                      const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
                   shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(8)),
+                      borderRadius: BorderRadius.circular(12)),
                 ),
                 child: const Text(
                   'Coletar',

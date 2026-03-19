@@ -15,7 +15,6 @@ import '../../core/utils/sensitive_display.dart';
 import '../../models/user_profile.dart';
 import '../../models/credit_card.dart';
 import '../../models/income_source.dart';
-import '../../routes/app_routes.dart';
 import '../../services/local_storage_service.dart';
 import '../../services/notification_service.dart';
 import '../../theme/app_colors.dart';
@@ -303,111 +302,40 @@ class _ProfilePageState extends State<ProfilePage> {
     ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(msg)));
   }
 
-  String _accountDeletionErrorMessage(AccountDeletionException error) {
-    switch (error.code) {
-      case 'password-required':
-        return 'Digite sua senha atual para confirmar a exclusao da conta.';
-      case 'wrong-password':
-      case 'invalid-credential':
-        return 'Senha incorreta. Confira e tente novamente.';
-      case 'requires-recent-login':
-        return 'Por seguranca, faca login novamente e tente excluir a conta.';
-      case 'reauth-cancelled':
-        return 'A confirmacao foi cancelada antes da exclusao.';
-      case 'network-request-failed':
-        return 'Sem conexao. Tente novamente quando a internet voltar.';
-      case 'unsupported-provider':
-        return 'Este metodo de login ainda nao suporta exclusao automatica.';
-      default:
-        return 'Nao foi possivel excluir a conta agora. Tente novamente.';
-    }
-  }
-
-  Future<void> _deleteAccount() async {
-    final needsPassword = LocalStorageService.currentUserUsesPasswordProvider;
-    final confirmationController = TextEditingController();
-    final passwordController = TextEditingController();
-
-    final confirmed = await showDialog<bool>(
-      context: context,
-      barrierDismissible: false,
-      builder: (dialogContext) => AlertDialog(
-        title: const Text('Excluir conta'),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            const Text(
-              'Esta acao remove seu acesso e apaga seus dados sincronizados do app. Digite EXCLUIR para confirmar.',
+  Widget _sectionCard({
+    required String title,
+    String? subtitle,
+    required List<Widget> children,
+  }) {
+    return Container(
+      padding: const EdgeInsets.all(18),
+      decoration: AppTheme.premiumCardDecoration(context),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            title,
+            style: TextStyle(
+              color: AppTheme.textPrimary(context),
+              fontWeight: FontWeight.w800,
+              fontSize: 18,
             ),
-            const SizedBox(height: 12),
-            TextField(
-              controller: confirmationController,
-              textCapitalization: TextCapitalization.characters,
-              decoration: const InputDecoration(
-                labelText: 'Confirmacao',
-                hintText: 'EXCLUIR',
+          ),
+          if (subtitle != null) ...[
+            const SizedBox(height: 6),
+            Text(
+              subtitle,
+              style: TextStyle(
+                color: AppTheme.textSecondary(context),
+                height: 1.4,
               ),
             ),
-            if (needsPassword) ...[
-              const SizedBox(height: 12),
-              TextField(
-                controller: passwordController,
-                obscureText: true,
-                decoration: const InputDecoration(
-                  labelText: 'Senha atual',
-                ),
-              ),
-            ],
           ],
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(dialogContext, false),
-            child: const Text('Cancelar'),
-          ),
-          ElevatedButton(
-            onPressed: () {
-              final confirmation =
-                  confirmationController.text.trim().toUpperCase();
-              if (confirmation != 'EXCLUIR') {
-                return;
-              }
-              Navigator.pop(dialogContext, true);
-            },
-            style: ElevatedButton.styleFrom(
-              backgroundColor: Colors.redAccent,
-              foregroundColor: Colors.white,
-            ),
-            child: const Text('Excluir conta'),
-          ),
+          const SizedBox(height: 16),
+          ...children,
         ],
       ),
     );
-
-    final password = passwordController.text;
-    confirmationController.dispose();
-    passwordController.dispose();
-
-    if (confirmed != true) return;
-
-    setState(() => _saving = true);
-    try {
-      await LocalStorageService.deleteCurrentAccount(password: password);
-      if (!mounted) return;
-      Navigator.pushNamedAndRemoveUntil(
-        context,
-        AppRoutes.login,
-        (route) => false,
-      );
-    } on AccountDeletionException catch (e) {
-      if (!mounted) return;
-      _snack(_accountDeletionErrorMessage(e));
-    } finally {
-      if (mounted) {
-        setState(() => _saving = false);
-      }
-    }
   }
 
   Future<String?> _askIncomeDeleteScope() async {
@@ -567,11 +495,7 @@ class _ProfilePageState extends State<ProfilePage> {
           children: [
             Container(
               padding: const EdgeInsets.all(12),
-              decoration: BoxDecoration(
-                color: Theme.of(context).colorScheme.surface,
-                borderRadius: BorderRadius.circular(12),
-                border: Border.all(color: Colors.white10),
-              ),
+              decoration: AppTheme.premiumCardDecoration(context),
               child: Row(
                 children: [
                   const Icon(Icons.tips_and_updates_outlined, size: 18),
@@ -589,156 +513,195 @@ class _ProfilePageState extends State<ProfilePage> {
               ),
             ),
             const SizedBox(height: 14),
-            Center(
-              child: CircleAvatar(
-                radius: 36,
-                backgroundColor: AppColors.primary,
-                backgroundImage: photo,
-                child: photo == null
-                    ? const Icon(Icons.person, color: Colors.black, size: 34)
-                    : null,
-              ),
-            ),
-            const SizedBox(height: 10),
-            Center(
-              child: TextButton.icon(
-                onPressed: _pickProfilePhoto,
-                icon: const Icon(Icons.photo_library),
-                label: Text(AppStrings.t(context, 'profile_change_photo')),
+            Container(
+              padding: const EdgeInsets.all(22),
+              decoration: AppTheme.premiumCardDecoration(context),
+              child: Column(
+                children: [
+                  CircleAvatar(
+                    radius: 38,
+                    backgroundColor: AppColors.primary,
+                    backgroundImage: photo,
+                    child: photo == null
+                        ? const Icon(Icons.person,
+                            color: Colors.black, size: 34)
+                        : null,
+                  ),
+                  const SizedBox(height: 12),
+                  Text(
+                    '${firstNameController.text} ${lastNameController.text}'
+                        .trim(),
+                    style: TextStyle(
+                      color: AppTheme.textPrimary(context),
+                      fontWeight: FontWeight.w800,
+                      fontSize: 20,
+                    ),
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    emailController.text,
+                    style: TextStyle(color: AppTheme.textSecondary(context)),
+                  ),
+                  const SizedBox(height: 12),
+                  TextButton.icon(
+                    onPressed: _pickProfilePhoto,
+                    icon: const Icon(Icons.photo_library),
+                    label: Text(AppStrings.t(context, 'profile_change_photo')),
+                  ),
+                ],
               ),
             ),
             const SizedBox(height: 18),
-            TextField(
-              controller: firstNameController,
-              decoration: InputDecoration(
-                  labelText: AppStrings.t(context, 'first_name')),
-            ),
-            const SizedBox(height: 12),
-            TextField(
-              controller: lastNameController,
-              decoration: InputDecoration(
-                  labelText: AppStrings.t(context, 'last_name')),
-            ),
-            const SizedBox(height: 12),
-            TextField(
-              controller: emailController,
-              keyboardType: TextInputType.emailAddress,
-              decoration:
-                  InputDecoration(labelText: AppStrings.t(context, 'email')),
-            ),
-            const SizedBox(height: 12),
-            ListTile(
-              contentPadding: EdgeInsets.zero,
-              title: Text(
-                AppStrings.t(context, 'birth_date'),
-                style: TextStyle(color: AppTheme.textSecondary(context)),
-              ),
-              subtitle: Text(
-                birthDate == null
-                    ? AppStrings.t(context, 'select')
-                    : DateUtilsJetx.formatDate(
-                        birthDate!,
-                        locale: Localizations.localeOf(context).toLanguageTag(),
-                      ),
-                style: TextStyle(color: AppTheme.textPrimary(context)),
-              ),
-              trailing: const Icon(Icons.calendar_month, color: Colors.amber),
-              onTap: _pickBirthDate,
-            ),
-            DropdownButtonFormField<String>(
-              initialValue: _genderOptions.contains(gender)
-                  ? gender
-                  : _genderOptions.first,
-              decoration:
-                  InputDecoration(labelText: AppStrings.t(context, 'gender')),
-              items: _genderOptions
-                  .map(
-                    (value) => DropdownMenuItem(
-                      value: value,
-                      child: Text(AppStrings.t(context, 'gender_$value')),
-                    ),
-                  )
-                  .toList(),
-              onChanged: (v) =>
-                  setState(() => gender = v ?? _genderOptions.first),
-            ),
-            const SizedBox(height: 12),
-            TextField(
-              controller: professionController,
-              decoration: InputDecoration(
-                  labelText: AppStrings.t(context, 'profession')),
-            ),
-            const SizedBox(height: 12),
-            ..._buildIncomeSources(),
-            const SizedBox(height: 22),
-            Text(
-              AppStrings.t(context, 'wealth_info_title'),
-              style: TextStyle(color: AppTheme.textSecondary(context)),
-            ),
-            const SizedBox(height: 10),
-            TextField(
-              controller: propertyValueController,
-              keyboardType:
-                  const TextInputType.numberWithOptions(decimal: true),
-              inputFormatters: const [MoneyTextInputFormatter()],
-              decoration: InputDecoration(
-                labelText: AppStrings.t(context, 'profile_property_value'),
-                prefixText: 'R\$ ',
-              ),
-            ),
-            const SizedBox(height: 12),
-            TextField(
-              controller: investBalanceController,
-              keyboardType:
-                  const TextInputType.numberWithOptions(decimal: true),
-              inputFormatters: const [MoneyTextInputFormatter()],
-              decoration: InputDecoration(
-                labelText: AppStrings.t(context, 'profile_invest_balance'),
-                prefixText: 'R\$ ',
-              ),
-            ),
-            const SizedBox(height: 22),
-            Text(
-              AppStrings.t(context, 'credit_cards_title'),
-              style: TextStyle(color: AppTheme.textSecondary(context)),
-            ),
-            const SizedBox(height: 10),
-            if (_cards.isEmpty)
-              Text(
-                AppStrings.t(context, 'credit_cards_empty'),
-                style:
-                    TextStyle(color: AppTheme.textMuted(context), fontSize: 12),
-              )
-            else
-              ..._cards.map(
-                (card) => ListTile(
+            _sectionCard(
+              title: 'Dados pessoais',
+              subtitle:
+                  'Mantenha seus dados principais atualizados para o app organizar melhor sua jornada.',
+              children: [
+                TextField(
+                  controller: firstNameController,
+                  decoration: InputDecoration(
+                      labelText: AppStrings.t(context, 'first_name')),
+                ),
+                const SizedBox(height: 12),
+                TextField(
+                  controller: lastNameController,
+                  decoration: InputDecoration(
+                      labelText: AppStrings.t(context, 'last_name')),
+                ),
+                const SizedBox(height: 12),
+                TextField(
+                  controller: emailController,
+                  keyboardType: TextInputType.emailAddress,
+                  decoration: InputDecoration(
+                      labelText: AppStrings.t(context, 'email')),
+                ),
+                const SizedBox(height: 12),
+                ListTile(
                   contentPadding: EdgeInsets.zero,
-                  title: Text(card.name,
-                      style: TextStyle(color: AppTheme.textPrimary(context))),
-                  subtitle: Text(
-                    AppStrings.tr(
-                      context,
-                      'card_due_day_label',
-                      {'day': '${card.dueDay}'},
-                    ),
-                    style: TextStyle(
-                        color: AppTheme.textSecondary(context), fontSize: 12),
+                  title: Text(
+                    AppStrings.t(context, 'birth_date'),
+                    style: TextStyle(color: AppTheme.textSecondary(context)),
                   ),
-                  trailing: IconButton(
-                    icon: const Icon(Icons.delete_outline),
-                    color: AppTheme.textSecondary(context),
-                    onPressed: () => _removeCard(card),
+                  subtitle: Text(
+                    birthDate == null
+                        ? AppStrings.t(context, 'select')
+                        : DateUtilsJetx.formatDate(
+                            birthDate!,
+                            locale:
+                                Localizations.localeOf(context).toLanguageTag(),
+                          ),
+                    style: TextStyle(color: AppTheme.textPrimary(context)),
+                  ),
+                  trailing: const Icon(Icons.calendar_month),
+                  onTap: _pickBirthDate,
+                ),
+                DropdownButtonFormField<String>(
+                  initialValue: _genderOptions.contains(gender)
+                      ? gender
+                      : _genderOptions.first,
+                  decoration: InputDecoration(
+                      labelText: AppStrings.t(context, 'gender')),
+                  items: _genderOptions
+                      .map(
+                        (value) => DropdownMenuItem(
+                          value: value,
+                          child: Text(AppStrings.t(context, 'gender_$value')),
+                        ),
+                      )
+                      .toList(),
+                  onChanged: (v) =>
+                      setState(() => gender = v ?? _genderOptions.first),
+                ),
+                const SizedBox(height: 12),
+                TextField(
+                  controller: professionController,
+                  decoration: InputDecoration(
+                      labelText: AppStrings.t(context, 'profession')),
+                ),
+              ],
+            ),
+            const SizedBox(height: 18),
+            _sectionCard(
+              title: 'Renda',
+              subtitle:
+                  'Sua renda é a base para limites, previsões e recomendações do mês.',
+              children: _buildIncomeSources(),
+            ),
+            const SizedBox(height: 18),
+            _sectionCard(
+              title: AppStrings.t(context, 'wealth_info_title'),
+              subtitle:
+                  'Esses dados ajudam o Voolo a ler seu patrimônio com mais contexto.',
+              children: [
+                TextField(
+                  controller: propertyValueController,
+                  keyboardType:
+                      const TextInputType.numberWithOptions(decimal: true),
+                  inputFormatters: const [MoneyTextInputFormatter()],
+                  decoration: InputDecoration(
+                    labelText: AppStrings.t(context, 'profile_property_value'),
+                    prefixText: 'R\$ ',
                   ),
                 ),
-              ),
-            const SizedBox(height: 6),
-            Align(
-              alignment: Alignment.centerLeft,
-              child: TextButton.icon(
-                onPressed: _addCard,
-                icon: const Icon(Icons.add),
-                label: Text(AppStrings.t(context, 'card_add')),
-              ),
+                const SizedBox(height: 12),
+                TextField(
+                  controller: investBalanceController,
+                  keyboardType:
+                      const TextInputType.numberWithOptions(decimal: true),
+                  inputFormatters: const [MoneyTextInputFormatter()],
+                  decoration: InputDecoration(
+                    labelText: AppStrings.t(context, 'profile_invest_balance'),
+                    prefixText: 'R\$ ',
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 18),
+            _sectionCard(
+              title: AppStrings.t(context, 'credit_cards_title'),
+              subtitle:
+                  'Seus cartões alimentam a leitura correta da fatura no dashboard e nos relatórios.',
+              children: [
+                if (_cards.isEmpty)
+                  Text(
+                    AppStrings.t(context, 'credit_cards_empty'),
+                    style: TextStyle(
+                        color: AppTheme.textMuted(context), fontSize: 12),
+                  )
+                else
+                  ..._cards.map(
+                    (card) => ListTile(
+                      contentPadding: EdgeInsets.zero,
+                      title: Text(card.name,
+                          style:
+                              TextStyle(color: AppTheme.textPrimary(context))),
+                      subtitle: Text(
+                        AppStrings.tr(
+                          context,
+                          'card_due_day_label',
+                          {'day': '${card.dueDay}'},
+                        ),
+                        style: TextStyle(
+                            color: AppTheme.textSecondary(context),
+                            fontSize: 12),
+                      ),
+                      trailing: IconButton(
+                        icon: const Icon(Icons.delete_outline),
+                        color: AppTheme.textSecondary(context),
+                        onPressed: () => _removeCard(card),
+                      ),
+                    ),
+                  ),
+                const SizedBox(height: 6),
+                Align(
+                  alignment: Alignment.centerLeft,
+                  child: TextButton.icon(
+                    onPressed: _addCard,
+                    icon: const Icon(Icons.add),
+                    label: Text(AppStrings.t(context, 'card_add')),
+                  ),
+                ),
+              ],
             ),
             const SizedBox(height: 22),
             SizedBox(
@@ -752,49 +715,6 @@ class _ProfilePageState extends State<ProfilePage> {
                         child: CircularProgressIndicator(strokeWidth: 2),
                       )
                     : Text(AppStrings.t(context, 'save')),
-              ),
-            ),
-            const SizedBox(height: 18),
-            Container(
-              padding: const EdgeInsets.all(14),
-              decoration: BoxDecoration(
-                color: Colors.redAccent.withValues(alpha: 0.08),
-                borderRadius: BorderRadius.circular(12),
-                border:
-                    Border.all(color: Colors.redAccent.withValues(alpha: 0.2)),
-              ),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  const Text(
-                    'Zona de risco',
-                    style: TextStyle(
-                      fontWeight: FontWeight.w700,
-                      color: Colors.redAccent,
-                    ),
-                  ),
-                  const SizedBox(height: 6),
-                  Text(
-                    'Se voce nao quiser mais usar o Voolo, exclua sua conta por aqui. Esta acao e permanente.',
-                    style: TextStyle(
-                      color: AppTheme.textSecondary(context),
-                      fontSize: 12,
-                    ),
-                  ),
-                  const SizedBox(height: 10),
-                  SizedBox(
-                    width: double.infinity,
-                    child: OutlinedButton.icon(
-                      onPressed: _saving ? null : _deleteAccount,
-                      icon: const Icon(Icons.delete_forever_outlined),
-                      label: const Text('Excluir minha conta'),
-                      style: OutlinedButton.styleFrom(
-                        foregroundColor: Colors.redAccent,
-                        side: const BorderSide(color: Colors.redAccent),
-                      ),
-                    ),
-                  ),
-                ],
               ),
             ),
           ],
@@ -851,9 +771,14 @@ class _ProfilePageState extends State<ProfilePage> {
             child: Container(
               padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
               decoration: BoxDecoration(
-                color: Theme.of(context).colorScheme.surface,
-                borderRadius: BorderRadius.circular(12),
-                border: Border.all(color: Colors.white10),
+                color: Theme.of(context).colorScheme.surfaceContainerLow,
+                borderRadius: BorderRadius.circular(16),
+                border: Border.all(
+                  color: Theme.of(context)
+                      .colorScheme
+                      .outline
+                      .withValues(alpha: 0.14),
+                ),
               ),
               child: Row(
                 children: [

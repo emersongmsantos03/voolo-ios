@@ -4,6 +4,8 @@ import 'package:jetx/models/goal.dart';
 import 'package:jetx/models/monthly_dashboard.dart';
 import 'package:jetx/services/weekly_plan_service.dart';
 
+String _tr(String key, [Map<String, String>? vars]) => key;
+
 void main() {
   group('WeeklyPlanService', () {
     test('returns add_income when dashboard is missing', () {
@@ -11,6 +13,7 @@ void main() {
         currentDashboard: null,
         goals: const [],
         checkInDaysLast7: 0,
+        tr: _tr,
       );
 
       expect(result.items, isNotEmpty);
@@ -32,6 +35,7 @@ void main() {
         currentDashboard: d,
         goals: const [],
         checkInDaysLast7: 1,
+        tr: _tr,
       );
 
       expect(result.nextBestAction?.id, 'negative_balance');
@@ -62,6 +66,7 @@ void main() {
           ),
         ],
         checkInDaysLast7: 6,
+        tr: _tr,
       );
 
       expect(result.nextBestAction?.id, 'maintain_routine');
