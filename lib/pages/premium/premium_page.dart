@@ -507,7 +507,7 @@ class _PremiumPageState extends State<PremiumPage> {
                   if (!_storeAvailable) ...[
                     Text(
                       _error == 'android-only'
-                          ? 'Disponivel apenas no Android.'
+                          ? 'Disponivel em outra plataforma.'
                           : 'Loja indisponivel.',
                       style: TextStyle(color: scheme.error),
                     ),

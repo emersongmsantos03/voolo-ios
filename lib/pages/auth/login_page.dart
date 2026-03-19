@@ -245,52 +245,54 @@ class _LoginPageState extends State<LoginPage> {
                               ),
                             ),
                             const SizedBox(height: 14),
-                            Row(
-                              children: [
-                                Expanded(
-                                  child: Divider(
-                                    color:
-                                        scheme.outline.withValues(alpha: 0.35),
+                            if (Theme.of(context).platform != TargetPlatform.iOS) ...[
+                              Row(
+                                children: [
+                                  Expanded(
+                                    child: Divider(
+                                      color:
+                                          scheme.outline.withValues(alpha: 0.35),
+                                    ),
                                   ),
-                                ),
-                                Padding(
-                                  padding: const EdgeInsets.symmetric(
-                                      horizontal: 12),
-                                  child: Text(
-                                    AppStrings.t(context, 'or'),
-                                    style: theme.textTheme.bodySmall?.copyWith(
+                                  Padding(
+                                    padding: const EdgeInsets.symmetric(
+                                        horizontal: 12),
+                                    child: Text(
+                                      AppStrings.t(context, 'or'),
+                                      style: theme.textTheme.bodySmall?.copyWith(
+                                        color: scheme.onSurfaceVariant,
+                                      ),
+                                    ),
+                                  ),
+                                  Expanded(
+                                    child: Divider(
+                                      color:
+                                          scheme.outline.withValues(alpha: 0.35),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                              const SizedBox(height: 14),
+                              SizedBox(
+                                width: double.infinity,
+                                height: 52,
+                                child: OutlinedButton.icon(
+                                  onPressed: _loading ? null : _loginWithGoogle,
+                                  icon: Image.network(
+                                    'https://upload.wikimedia.org/wikipedia/commons/c/c1/Google_%22G%22_logo.svg',
+                                    height: 18,
+                                    errorBuilder: (_, __, ___) => Icon(
+                                      Icons.g_mobiledata,
+                                      size: 26,
                                       color: scheme.onSurfaceVariant,
                                     ),
                                   ),
+                                  label:
+                                      Text(AppStrings.t(context, 'login_google')),
                                 ),
-                                Expanded(
-                                  child: Divider(
-                                    color:
-                                        scheme.outline.withValues(alpha: 0.35),
-                                  ),
-                                ),
-                              ],
-                            ),
-                            const SizedBox(height: 14),
-                            SizedBox(
-                              width: double.infinity,
-                              height: 52,
-                              child: OutlinedButton.icon(
-                                onPressed: _loading ? null : _loginWithGoogle,
-                                icon: Image.network(
-                                  'https://upload.wikimedia.org/wikipedia/commons/c/c1/Google_%22G%22_logo.svg',
-                                  height: 18,
-                                  errorBuilder: (_, __, ___) => Icon(
-                                    Icons.g_mobiledata,
-                                    size: 26,
-                                    color: scheme.onSurfaceVariant,
-                                  ),
-                                ),
-                                label:
-                                    Text(AppStrings.t(context, 'login_google')),
                               ),
-                            ),
-                            const SizedBox(height: 8),
+                              const SizedBox(height: 8),
+                            ],
                             TextButton(
                               onPressed: () {
                                 Navigator.pushNamed(

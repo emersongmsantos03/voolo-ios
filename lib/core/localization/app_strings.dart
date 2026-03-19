@@ -240,7 +240,7 @@ class AppStrings {
       'reset_resend_wait': 'Aguarde 60 segundos para reenviar.',
       'reset_rate_limited': 'Muitas tentativas. Tente novamente mais tarde.',
       'login_google_not_ready':
-          'Google ainda nao configurado. No Firebase, adicione o SHA-1 do Android e baixe novamente android/app/google-services.json.',
+          'Google ainda nao configurado. No Firebase, verifique o certificado SHA-1 do projeto e baixe novamente o google-services.json.',
       'login_apple_not_ready': 'Login com Apple ainda não configurado.',
       'login_cancelled': 'Login cancelado.',
       'login_google': 'Entrar com Google',
@@ -807,7 +807,7 @@ class AppStrings {
       'reset_resend_wait': 'Please wait 60 seconds to resend.',
       'reset_rate_limited': 'Too many attempts. Try again later.',
       'login_google_not_ready':
-          'Google login is not set up yet. In Firebase, add the Android SHA-1 and re-download android/app/google-services.json.',
+          'Google login is not set up yet. In Firebase, verify the project SHA-1 certificate and re-download google-services.json.',
       'login_apple_not_ready': 'Apple login is not set up yet.',
       'login_cancelled': 'Sign-in cancelled.',
       'login_google': 'Sign in with Google',
