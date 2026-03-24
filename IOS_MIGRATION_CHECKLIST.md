@@ -14,8 +14,8 @@ Este projeto foi adaptado para iOS no Flutter, mas antes de subir na App Store v
 
 3. In-App Purchase (App Store)
 - Crie os produtos no App Store Connect com os IDs usados no app:
-  - `voolo-mensal`
-  - `voolo-anual`
+  - `voolo`
+  - `voolo_y`
 - Garanta que o backend tenha o endpoint iOS:
   - `POST /billing/appstore/sync-subscription`
 - O app agora envia `receiptData`, `subscriptionId` e `transactionId`.

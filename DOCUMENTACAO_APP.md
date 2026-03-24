@@ -121,7 +121,7 @@ Tela:
 
 Fluxo atual:
 1. app consulta disponibilidade da loja (`InAppPurchase.instance`)
-2. consulta dois produtos (`voolo-mensal` e `voolo-anual`)
+2. consulta dois produtos (`voolo` e `voolo_y`)
 3. inicia compra e escuta `purchaseStream`
 4. ao comprar/restaurar, envia token para backend em:
    - `POST /billing/googleplay/sync-subscription`

@@ -31,11 +31,11 @@ class BillingService {
 
   static const String iosMonthlySubscriptionId = String.fromEnvironment(
     'VOOLO_IOS_MONTHLY_SUBSCRIPTION_ID',
-    defaultValue: 'voolo_mensal',
+    defaultValue: 'voolo',
   );
   static const String iosYearlySubscriptionId = String.fromEnvironment(
     'VOOLO_IOS_YEARLY_SUBSCRIPTION_ID',
-    defaultValue: 'voolo_anual',
+    defaultValue: 'voolo_y',
   );
   static const Set<String> supportedAppleSubscriptionIds = {
     iosMonthlySubscriptionId,
