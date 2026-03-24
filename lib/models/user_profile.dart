@@ -14,7 +14,7 @@ class UserProfile {
   String lastName;
   String email;
   String password;
-  DateTime birthDate;
+  DateTime? birthDate;
   String profession;
   double monthlyIncome;
   String gender;
@@ -41,7 +41,7 @@ class UserProfile {
     required this.lastName,
     required this.email,
     this.password = '',
-    required this.birthDate,
+    this.birthDate,
     required this.profession,
     required this.monthlyIncome,
     required this.gender,
@@ -78,7 +78,7 @@ class UserProfile {
         'lastName': lastName,
         'email': email,
         'password': password,
-        'birthDate': birthDate.toIso8601String(),
+        'birthDate': birthDate?.toIso8601String(),
         'profession': profession,
         'monthlyIncome': monthlyIncome,
         'gender': gender,
@@ -167,9 +167,9 @@ class UserProfile {
       lastName: (json['lastName'] as String?) ?? '',
       email: (json['email'] as String?) ?? '',
       password: (json['password'] as String?) ?? '',
-      birthDate: json['birthDate'] != null 
-          ? DateTime.tryParse(json['birthDate'] as String) ?? DateTime(2000, 1, 1)
-          : DateTime(2000, 1, 1),
+      birthDate: json['birthDate'] != null
+          ? DateTime.tryParse(json['birthDate'] as String)
+          : null,
       profession: (json['profession'] as String?) ?? '',
       monthlyIncome: (json['monthlyIncome'] as num?)?.toDouble() ?? 0.0,
       gender: GenderCatalog.normalize((json['gender'] as String?) ?? '') ??

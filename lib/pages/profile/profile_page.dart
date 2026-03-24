@@ -240,7 +240,7 @@ class _ProfilePageState extends State<ProfilePage> {
       lastName: lastName,
       email: email,
       password: password.isEmpty ? _user!.password : password,
-      birthDate: birthDate ?? _user!.birthDate,
+      birthDate: birthDate,
       profession: profession,
       monthlyIncome:
           _user!.monthlyIncome, // Handled by separate income collection
@@ -579,12 +579,12 @@ class _ProfilePageState extends State<ProfilePage> {
                 ListTile(
                   contentPadding: EdgeInsets.zero,
                   title: Text(
-                    AppStrings.t(context, 'birth_date'),
+                    '${AppStrings.t(context, 'birth_date')} (Opcional)',
                     style: TextStyle(color: AppTheme.textSecondary(context)),
                   ),
                   subtitle: Text(
                     birthDate == null
-                        ? AppStrings.t(context, 'select')
+                        ? 'Nao informado'
                         : DateUtilsJetx.formatDate(
                             birthDate!,
                             locale:
@@ -592,7 +592,22 @@ class _ProfilePageState extends State<ProfilePage> {
                           ),
                     style: TextStyle(color: AppTheme.textPrimary(context)),
                   ),
-                  trailing: const Icon(Icons.calendar_month),
+                  trailing: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      if (birthDate != null)
+                        IconButton(
+                          visualDensity: VisualDensity.compact,
+                          padding: EdgeInsets.zero,
+                          constraints: const BoxConstraints(),
+                          onPressed: () => setState(() => birthDate = null),
+                          icon: const Icon(Icons.close_rounded, size: 18),
+                          tooltip: 'Remover data',
+                        ),
+                      const SizedBox(width: 4),
+                      const Icon(Icons.calendar_month),
+                    ],
+                  ),
                   onTap: _pickBirthDate,
                 ),
                 DropdownButtonFormField<String>(

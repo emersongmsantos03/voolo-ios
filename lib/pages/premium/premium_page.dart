@@ -78,7 +78,7 @@ class _PremiumPageState extends State<PremiumPage> {
       setState(() {
         _storeAvailable = false;
         _loading = false;
-        _error = 'android-only';
+        _error = 'store-unavailable';
       });
       return;
     }
@@ -280,11 +280,11 @@ class _PremiumPageState extends State<PremiumPage> {
   Future<void> _buySelectedPlan() async {
     if (_working) return;
     final option = _planOptions[_selectedPlan];
-    if (option == null) {
+      if (option == null) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
-          content: Text('Plano ainda nao disponivel no Google Play para este app.'),
+          content: Text('Plano ainda nao disponivel para este app.'),
         ),
       );
       return;
@@ -473,8 +473,54 @@ class _PremiumPageState extends State<PremiumPage> {
     );
   }
 
+  Widget _buildIosFallback(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    return Scaffold(
+      appBar: AppBar(
+        title: Text(_t('premium_badge', 'Premium')),
+      ),
+      body: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Center(
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: 520),
+            child: Container(
+              padding: const EdgeInsets.all(20),
+              decoration: BoxDecoration(
+                color: scheme.surface,
+                borderRadius: BorderRadius.circular(20),
+                border: Border.all(color: scheme.outlineVariant),
+              ),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    _t('unlock_premium_title', 'Desbloqueie Voolo Pro'),
+                    style: Theme.of(context)
+                        .textTheme
+                        .titleLarge
+                        ?.copyWith(fontWeight: FontWeight.w800),
+                  ),
+                  const SizedBox(height: 8),
+                  Text(
+                    'Nesta versao para iOS, a ativacao de recursos Premium ainda nao esta disponivel. O app continua funcionando normalmente enquanto concluimos a liberacao dessa area.',
+                    style: TextStyle(color: scheme.onSurfaceVariant),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
+    if (!Platform.isAndroid) {
+      return _buildIosFallback(context);
+    }
     final scheme = Theme.of(context).colorScheme;
 
     return Scaffold(
@@ -506,9 +552,7 @@ class _PremiumPageState extends State<PremiumPage> {
                   const SizedBox(height: 16),
                   if (!_storeAvailable) ...[
                     Text(
-                      _error == 'android-only'
-                          ? 'Disponivel em outra plataforma.'
-                          : 'Loja indisponivel.',
+                      'Funcionalidade indisponivel nesta plataforma.',
                       style: TextStyle(color: scheme.error),
                     ),
                   ] else ...[

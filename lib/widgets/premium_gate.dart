@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 
 import '../core/localization/app_strings.dart';
@@ -377,6 +378,52 @@ class _PremiumBadge extends StatelessWidget {
 
 void showPremiumDialog(BuildContext context) {
   final scheme = Theme.of(context).colorScheme;
+  final isApplePlatform = defaultTargetPlatform == TargetPlatform.iOS ||
+      defaultTargetPlatform == TargetPlatform.macOS;
+
+  if (isApplePlatform) {
+    showDialog<void>(
+      context: context,
+      barrierDismissible: true,
+      builder: (_) => Dialog(
+        backgroundColor: scheme.surface,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        child: Padding(
+          padding: const EdgeInsets.all(18),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  Expanded(
+                    child: Text(
+                      AppStrings.t(context, 'premium_dialog_title'),
+                      style: const TextStyle(
+                        fontWeight: FontWeight.w800,
+                        fontSize: 18,
+                      ),
+                    ),
+                  ),
+                  IconButton(
+                    onPressed: () => Navigator.pop(context),
+                    icon: const Icon(Icons.close_rounded),
+                    tooltip: AppStrings.t(context, 'close'),
+                  ),
+                ],
+              ),
+              Text(
+                'Os recursos Premium desta versao estao em revisao para iOS. Continue usando o app normalmente enquanto concluimos a ativacao nessa plataforma.',
+                style: TextStyle(color: scheme.onSurfaceVariant),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+    return;
+  }
+
   String selectedPlan = 'monthly';
 
   showDialog<void>(
@@ -411,7 +458,7 @@ void showPremiumDialog(BuildContext context) {
                 ],
               ),
               Text(
-                'Escolha seu plano premium:',
+                'Escolha uma opcao premium:',
                 style: TextStyle(color: scheme.onSurfaceVariant),
               ),
               const SizedBox(height: 14),
