@@ -17,6 +17,12 @@
    - `integration_test/app_store_screenshots_test.dart`
 4. Exports screenshots as build artifacts
 
+## Generated screenshots
+- `01_login`
+- `02_register` or `02_login_fallback`
+- `03_forgot_password` or `03_login_alt`
+- `04_premium_paywall`
+
 ## Files added for screenshot automation
 - `integration_test/app_store_screenshots_test.dart`
 - `test_driver/integration_test.dart`

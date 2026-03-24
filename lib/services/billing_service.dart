@@ -29,6 +29,19 @@ class BillingService {
     googlePlayYearlySubscriptionId,
   };
 
+  static const String iosMonthlySubscriptionId = String.fromEnvironment(
+    'VOOLO_IOS_MONTHLY_SUBSCRIPTION_ID',
+    defaultValue: 'voolo_mensal',
+  );
+  static const String iosYearlySubscriptionId = String.fromEnvironment(
+    'VOOLO_IOS_YEARLY_SUBSCRIPTION_ID',
+    defaultValue: 'voolo_anual',
+  );
+  static const Set<String> supportedAppleSubscriptionIds = {
+    iosMonthlySubscriptionId,
+    iosYearlySubscriptionId,
+  };
+
   static Future<Map<String, dynamic>> _post(
     String path,
     Map<String, dynamic> data,
@@ -87,6 +100,23 @@ class BillingService {
     return _post('/billing/googleplay/sync-subscription', {
       'purchaseToken': purchaseToken,
       'subscriptionId': subscriptionId,
+    });
+  }
+
+  static Future<Map<String, dynamic>> syncAppStoreSubscription({
+    required String receiptData,
+    required String subscriptionId,
+    String? transactionId,
+    String? originalTransactionId,
+  }) {
+    return _post('/billing/appstore/sync-subscription', {
+      'receiptData': receiptData,
+      'subscriptionId': subscriptionId,
+      if (transactionId != null && transactionId.trim().isNotEmpty)
+        'transactionId': transactionId.trim(),
+      if (originalTransactionId != null &&
+          originalTransactionId.trim().isNotEmpty)
+        'originalTransactionId': originalTransactionId.trim(),
     });
   }
 }

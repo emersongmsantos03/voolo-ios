@@ -5,7 +5,9 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:in_app_purchase/in_app_purchase.dart';
 import 'package:in_app_purchase_android/in_app_purchase_android.dart';
+import 'package:url_launcher/url_launcher.dart';
 
+import '../../core/constants/auth_links.dart';
 import '../../core/localization/app_strings.dart';
 import '../../services/billing_service.dart';
 
@@ -38,6 +40,9 @@ class _PlanPurchaseOption {
 }
 
 class _PremiumPageState extends State<PremiumPage> {
+  static const bool _screenshotMode =
+      bool.fromEnvironment('SCREENSHOT_MODE');
+
   final InAppPurchase _iap = InAppPurchase.instance;
   StreamSubscription<List<PurchaseDetails>>? _purchaseSub;
 
@@ -60,6 +65,37 @@ class _PremiumPageState extends State<PremiumPage> {
   void initState() {
     super.initState();
     _selectedPlan = widget.initialPlan == 'yearly' ? 'yearly' : 'monthly';
+    if (_screenshotMode) {
+      _loading = false;
+      _storeAvailable = true;
+      _planOptions['monthly'] = _PlanPurchaseOption(
+        planKey: 'monthly',
+        productId: BillingService.iosMonthlySubscriptionId,
+        productDetails: ProductDetails(
+          id: BillingService.iosMonthlySubscriptionId,
+          title: 'Plano mensal',
+          description: 'Acesso premium mensal no Voolo',
+          price: 'R\$ 29,90',
+          rawPrice: 29.90,
+          currencyCode: 'BRL',
+        ),
+        priceText: 'R\$ 29,90 / mes',
+      );
+      _planOptions['yearly'] = _PlanPurchaseOption(
+        planKey: 'yearly',
+        productId: BillingService.iosYearlySubscriptionId,
+        productDetails: ProductDetails(
+          id: BillingService.iosYearlySubscriptionId,
+          title: 'Plano anual',
+          description: 'Acesso premium anual no Voolo',
+          price: 'R\$ 299,90',
+          rawPrice: 299.90,
+          currencyCode: 'BRL',
+        ),
+        priceText: 'R\$ 299,90 / ano',
+      );
+      return;
+    }
     _purchaseSub = _iap.purchaseStream.listen(
       _onPurchaseUpdates,
       onError: (_) {},
@@ -74,14 +110,7 @@ class _PremiumPageState extends State<PremiumPage> {
   }
 
   Future<void> _initStore() async {
-    if (!Platform.isAndroid) {
-      setState(() {
-        _storeAvailable = false;
-        _loading = false;
-        _error = 'store-unavailable';
-      });
-      return;
-    }
+    if (_screenshotMode) return;
 
     try {
       final available = await _iap.isAvailable();
@@ -94,13 +123,7 @@ class _PremiumPageState extends State<PremiumPage> {
         return;
       }
 
-      final response = await _iap.queryProductDetails(
-        {
-          BillingService.googlePlayUnifiedSubscriptionId,
-          BillingService.googlePlayMonthlySubscriptionId,
-          BillingService.googlePlayYearlySubscriptionId,
-        },
-      );
+      final response = await _iap.queryProductDetails(_subscriptionProductIds());
 
       if (response.error != null) {
         setState(() {
@@ -133,9 +156,55 @@ class _PremiumPageState extends State<PremiumPage> {
     }
   }
 
+  Set<String> _subscriptionProductIds() {
+    if (Platform.isAndroid) {
+      return {
+        BillingService.googlePlayUnifiedSubscriptionId,
+        BillingService.googlePlayMonthlySubscriptionId,
+        BillingService.googlePlayYearlySubscriptionId,
+      };
+    }
+
+    return {
+      BillingService.iosMonthlySubscriptionId,
+      BillingService.iosYearlySubscriptionId,
+    };
+  }
+
   Map<String, _PlanPurchaseOption> _buildPlanOptions(
       List<ProductDetails> productDetails) {
     final options = <String, _PlanPurchaseOption>{};
+
+    if (!Platform.isAndroid) {
+      ProductDetails? firstById(String id) {
+        for (final p in productDetails) {
+          if (p.id == id) return p;
+        }
+        return null;
+      }
+
+      final monthly = firstById(BillingService.iosMonthlySubscriptionId);
+      if (monthly != null) {
+        options['monthly'] = _PlanPurchaseOption(
+          planKey: 'monthly',
+          productId: monthly.id,
+          productDetails: monthly,
+          priceText: monthly.price,
+        );
+      }
+
+      final yearly = firstById(BillingService.iosYearlySubscriptionId);
+      if (yearly != null) {
+        options['yearly'] = _PlanPurchaseOption(
+          planKey: 'yearly',
+          productId: yearly.id,
+          productDetails: yearly,
+          priceText: yearly.price,
+        );
+      }
+
+      return options;
+    }
 
     // Prefer unified subscription with base plans/offers.
     for (final pd in productDetails) {
@@ -355,21 +424,12 @@ class _PremiumPageState extends State<PremiumPage> {
     PurchaseDetails purchase, {
     bool showFeedback = true,
   }) async {
-    final purchaseToken =
-        purchase.verificationData.serverVerificationData.toString().trim();
     final subscriptionId = purchase.productID.toString().trim();
-    if (purchaseToken.isEmpty || subscriptionId.isEmpty) return;
-
-    if (!BillingService.supportedGooglePlaySubscriptionIds
-        .contains(subscriptionId)) {
-      return;
-    }
 
     try {
-      final res = await BillingService.syncGooglePlaySubscription(
-        purchaseToken: purchaseToken,
-        subscriptionId: subscriptionId,
-      );
+      final res = Platform.isAndroid
+          ? await _syncGooglePlayPremium(subscriptionId, purchase)
+          : await _syncAppStorePremium(subscriptionId, purchase);
       final granted = res['premiumGranted'] == true;
       if (showFeedback && mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -397,6 +457,49 @@ class _PremiumPageState extends State<PremiumPage> {
         );
       }
     }
+  }
+
+  Future<Map<String, dynamic>> _syncGooglePlayPremium(
+    String subscriptionId,
+    PurchaseDetails purchase,
+  ) async {
+    final purchaseToken =
+        purchase.verificationData.serverVerificationData.toString().trim();
+    if (purchaseToken.isEmpty || subscriptionId.isEmpty) {
+      throw BillingException('invalid-argument');
+    }
+
+    if (!BillingService.supportedGooglePlaySubscriptionIds
+        .contains(subscriptionId)) {
+      throw BillingException('unsupported-subscription-id');
+    }
+
+    return BillingService.syncGooglePlaySubscription(
+      purchaseToken: purchaseToken,
+      subscriptionId: subscriptionId,
+    );
+  }
+
+  Future<Map<String, dynamic>> _syncAppStorePremium(
+    String subscriptionId,
+    PurchaseDetails purchase,
+  ) async {
+    final receiptData =
+        purchase.verificationData.serverVerificationData.toString().trim();
+    if (receiptData.isEmpty || subscriptionId.isEmpty) {
+      throw BillingException('invalid-argument');
+    }
+
+    if (!BillingService.supportedAppleSubscriptionIds
+        .contains(subscriptionId)) {
+      throw BillingException('unsupported-subscription-id');
+    }
+
+    return BillingService.syncAppStoreSubscription(
+      receiptData: receiptData,
+      subscriptionId: subscriptionId,
+      transactionId: purchase.purchaseID,
+    );
   }
 
   Widget _planTile({
@@ -473,42 +576,145 @@ class _PremiumPageState extends State<PremiumPage> {
     );
   }
 
-  Widget _buildIosFallback(BuildContext context) {
+  Widget _buildScreenshotPaywall(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
+
     return Scaffold(
       appBar: AppBar(
         title: Text(_t('premium_badge', 'Premium')),
       ),
-      body: Padding(
+      body: SingleChildScrollView(
         padding: const EdgeInsets.all(16),
         child: Center(
           child: ConstrainedBox(
-            constraints: const BoxConstraints(maxWidth: 520),
-            child: Container(
-              padding: const EdgeInsets.all(20),
-              decoration: BoxDecoration(
-                color: scheme.surface,
-                borderRadius: BorderRadius.circular(20),
-                border: Border.all(color: scheme.outlineVariant),
-              ),
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    _t('unlock_premium_title', 'Desbloqueie Voolo Pro'),
-                    style: Theme.of(context)
-                        .textTheme
-                        .titleLarge
-                        ?.copyWith(fontWeight: FontWeight.w800),
+            constraints: const BoxConstraints(maxWidth: 560),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(20),
+                  decoration: BoxDecoration(
+                    borderRadius: BorderRadius.circular(28),
+                    gradient: LinearGradient(
+                      colors: [
+                        scheme.primary.withValues(alpha: 0.12),
+                        scheme.secondary.withValues(alpha: 0.08),
+                        scheme.surface,
+                      ],
+                      begin: Alignment.topLeft,
+                      end: Alignment.bottomRight,
+                    ),
+                    border: Border.all(color: scheme.outlineVariant),
                   ),
-                  const SizedBox(height: 8),
-                  Text(
-                    'Nesta versao para iOS, a ativacao de recursos Premium ainda nao esta disponivel. O app continua funcionando normalmente enquanto concluimos a liberacao dessa area.',
-                    style: TextStyle(color: scheme.onSurfaceVariant),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Container(
+                        width: 54,
+                        height: 54,
+                        decoration: BoxDecoration(
+                          color: scheme.primary.withValues(alpha: 0.12),
+                          borderRadius: BorderRadius.circular(18),
+                        ),
+                        child: Icon(
+                          Icons.workspace_premium_rounded,
+                          color: scheme.primary,
+                          size: 30,
+                        ),
+                      ),
+                      const SizedBox(height: 18),
+                      Text(
+                        'Desbloqueie o Voolo Pro',
+                        style: Theme.of(context)
+                            .textTheme
+                            .headlineSmall
+                            ?.copyWith(fontWeight: FontWeight.w900),
+                      ),
+                      const SizedBox(height: 8),
+                      Text(
+                        'Assinatura pelo App Store com acesso a missoes, metas, relatorios e simuladores premium.',
+                        style: TextStyle(
+                          color: scheme.onSurfaceVariant,
+                          height: 1.35,
+                        ),
+                      ),
+                      const SizedBox(height: 18),
+                      _planTile(
+                        planKey: 'monthly',
+                        title: 'Plano mensal',
+                        fallbackPrice: 'R\$ 29,90 / mes',
+                        subtitle: 'Renovacao automatica. Cancele quando quiser.',
+                      ),
+                      const SizedBox(height: 10),
+                      _planTile(
+                        planKey: 'yearly',
+                        title: 'Plano anual',
+                        fallbackPrice: 'R\$ 299,90 / ano',
+                        subtitle: 'Cobrado 1 vez por ano. Melhora o custo mensal.',
+                      ),
+                      const SizedBox(height: 16),
+                      Container(
+                        padding: const EdgeInsets.all(14),
+                        decoration: BoxDecoration(
+                          color: scheme.surface,
+                          borderRadius: BorderRadius.circular(18),
+                          border: Border.all(color: scheme.outlineVariant),
+                        ),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            _perkLine(context, 'Relatorios e insights premium'),
+                            _perkLine(context, 'Calculadora e simuladores avancados'),
+                            _perkLine(context, 'Restaurar compras no mesmo Apple ID'),
+                          ],
+                        ),
+                      ),
+                      const SizedBox(height: 16),
+                      SizedBox(
+                        height: 50,
+                        width: double.infinity,
+                        child: ElevatedButton(
+                          onPressed: null,
+                          child: const Text('Assinar com a App Store'),
+                        ),
+                      ),
+                      const SizedBox(height: 10),
+                      SizedBox(
+                        height: 46,
+                        width: double.infinity,
+                        child: OutlinedButton(
+                          onPressed: null,
+                          child: const Text('Restaurar compras'),
+                        ),
+                      ),
+                      const SizedBox(height: 12),
+                      Text(
+                        'A captura de tela abaixo pode ser enviada para revisao da App Store.',
+                        style: TextStyle(
+                          color: scheme.onSurfaceVariant,
+                          fontSize: 12,
+                        ),
+                      ),
+                    ],
                   ),
-                ],
-              ),
+                ),
+                const SizedBox(height: 14),
+                Wrap(
+                  alignment: WrapAlignment.center,
+                  spacing: 12,
+                  runSpacing: 8,
+                  children: [
+                    TextButton(
+                      onPressed: null,
+                      child: const Text('Termos de Uso'),
+                    ),
+                    TextButton(
+                      onPressed: null,
+                      child: const Text('Politica de Privacidade'),
+                    ),
+                  ],
+                ),
+              ],
             ),
           ),
         ),
@@ -516,10 +722,38 @@ class _PremiumPageState extends State<PremiumPage> {
     );
   }
 
+  Widget _perkLine(BuildContext context, String text) {
+    final scheme = Theme.of(context).colorScheme;
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 10),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Icon(Icons.check_circle_rounded, size: 18, color: scheme.primary),
+          const SizedBox(width: 8),
+          Expanded(
+            child: Text(
+              text,
+              style: TextStyle(
+                color: scheme.onSurfaceVariant,
+                height: 1.35,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Future<void> _openExternalUrl(String url) async {
+    final uri = Uri.parse(url);
+    await launchUrl(uri, mode: LaunchMode.externalApplication);
+  }
+
   @override
   Widget build(BuildContext context) {
-    if (!Platform.isAndroid) {
-      return _buildIosFallback(context);
+    if (_screenshotMode) {
+      return _buildScreenshotPaywall(context);
     }
     final scheme = Theme.of(context).colorScheme;
 
@@ -549,10 +783,27 @@ class _PremiumPageState extends State<PremiumPage> {
                     ),
                     style: TextStyle(color: scheme.onSurfaceVariant),
                   ),
+                  if (_error != null) ...[
+                    const SizedBox(height: 8),
+                    Text(
+                      _error == 'product-not-found'
+                          ? 'Produtos ainda nao localizados no App Store Connect.'
+                          : _error == 'product-query-failed'
+                              ? 'Nao foi possivel carregar os produtos da loja.'
+                              : 'Loja indisponivel no momento.',
+                      style: TextStyle(
+                        color: scheme.error,
+                        fontSize: 13,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ],
                   const SizedBox(height: 16),
                   if (!_storeAvailable) ...[
                     Text(
-                      'Funcionalidade indisponivel nesta plataforma.',
+                      Platform.isAndroid
+                          ? 'Funcionalidade indisponivel nesta plataforma.'
+                          : 'Os produtos da App Store ainda nao foram encontrados. Quando estiverem configurados, os precos aparecem aqui.',
                       style: TextStyle(color: scheme.error),
                     ),
                   ] else ...[
@@ -597,9 +848,29 @@ class _PremiumPageState extends State<PremiumPage> {
                     ),
                     const SizedBox(height: 10),
                     Text(
-                      'No plano anual voce paga uma vez por ano e continua com acesso premium por todos os meses do periodo.',
+                      Platform.isAndroid
+                          ? 'No plano anual voce paga uma vez por ano e continua com acesso premium por todos os meses do periodo.'
+                          : 'O pagamento sera processado pela App Store e pode ser restaurado no mesmo Apple ID.',
                       style:
                           TextStyle(color: scheme.onSurfaceVariant, fontSize: 12),
+                    ),
+                    const SizedBox(height: 14),
+                    Wrap(
+                      alignment: WrapAlignment.center,
+                      spacing: 12,
+                      runSpacing: 8,
+                      children: [
+                        TextButton(
+                          onPressed: () =>
+                              _openExternalUrl(AuthLinks.termsUrl),
+                          child: const Text('Termos de Uso'),
+                        ),
+                        TextButton(
+                          onPressed: () =>
+                              _openExternalUrl(AuthLinks.privacyUrl),
+                          child: const Text('Politica de Privacidade'),
+                        ),
+                      ],
                     ),
                   ],
                 ],
