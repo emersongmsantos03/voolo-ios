@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:integration_test/integration_test.dart';
 import 'package:jetx/main.dart' as app;
-import 'package:jetx/routes/app_routes.dart';
+import 'package:jetx/pages/premium/premium_page.dart';
 
 Future<void> _settle(WidgetTester tester) async {
   await tester.pump(const Duration(milliseconds: 400));
@@ -54,10 +54,10 @@ void main() {
       await binding.takeScreenshot('03_login_alt');
     }
 
-    final navigator = tester.state<NavigatorState>(find.byType(Navigator));
-    navigator.pushNamed(
-      AppRoutes.premium,
-      arguments: {'plan': 'yearly'},
+    await tester.pumpWidget(
+      const MaterialApp(
+        home: PremiumPage(initialPlan: 'yearly'),
+      ),
     );
     await _settle(tester);
     await binding.takeScreenshot('04_premium_paywall');
