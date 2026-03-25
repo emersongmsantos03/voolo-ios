@@ -337,10 +337,6 @@ class LocalStorageService {
     if (normalizedEmail.isEmpty) return null;
 
     final localUser = _findLocalUser(normalizedEmail);
-    if (localUser != null && localUser.password == password) {
-      await setCurrentUser(localUser.email);
-      return getUserProfile();
-    }
 
     if (normalizedEmail == _reviewAccountEmail &&
         password == _reviewAccountPassword) {
@@ -377,7 +373,6 @@ class LocalStorageService {
       } else if (e.code == 'network-request-failed') {
         _lastLoginError = 'no_connection';
       } else if (_canFallbackToLocalCredentialsError(e.code)) {
-        final localUser = _findLocalUser(normalizedEmail);
         if (localUser != null && localUser.password == password) {
           await setCurrentUser(localUser.email);
           return getUserProfile();
