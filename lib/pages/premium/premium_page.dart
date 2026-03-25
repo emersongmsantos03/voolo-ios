@@ -115,6 +115,10 @@ class _PremiumPageState extends State<PremiumPage> {
     try {
       final available = await _iap.isAvailable();
       if (!available) {
+        if (Platform.isIOS) {
+          _applyAppleFallbackPaywall();
+          return;
+        }
         setState(() {
           _storeAvailable = false;
           _loading = false;
@@ -126,6 +130,10 @@ class _PremiumPageState extends State<PremiumPage> {
       final response = await _iap.queryProductDetails(_subscriptionProductIds());
 
       if (response.error != null) {
+        if (Platform.isIOS) {
+          _applyAppleFallbackPaywall();
+          return;
+        }
         setState(() {
           _storeAvailable = true;
           _loading = false;
@@ -135,6 +143,11 @@ class _PremiumPageState extends State<PremiumPage> {
       }
 
       final options = _buildPlanOptions(response.productDetails);
+
+      if (options.isEmpty && Platform.isIOS) {
+        _applyAppleFallbackPaywall();
+        return;
+      }
 
       setState(() {
         _storeAvailable = true;
@@ -148,12 +161,28 @@ class _PremiumPageState extends State<PremiumPage> {
       await _loadPastPurchasesAndSync();
     } catch (_) {
       if (!mounted) return;
+      if (Platform.isIOS) {
+        _applyAppleFallbackPaywall();
+        return;
+      }
       setState(() {
         _storeAvailable = false;
         _loading = false;
         _error = 'unknown';
       });
     }
+  }
+
+  void _applyAppleFallbackPaywall() {
+    if (!mounted) return;
+    setState(() {
+      _storeAvailable = true;
+      _loading = false;
+      _error = null;
+      _planOptions
+        ..clear()
+        ..addAll(_buildFallbackApplePlanOptions());
+    });
   }
 
   Set<String> _subscriptionProductIds() {
@@ -264,6 +293,37 @@ class _PremiumPageState extends State<PremiumPage> {
     }
 
     return options;
+  }
+
+  Map<String, _PlanPurchaseOption> _buildFallbackApplePlanOptions() {
+    return {
+      'monthly': _PlanPurchaseOption(
+        planKey: 'monthly',
+        productId: BillingService.iosMonthlySubscriptionId,
+        productDetails: ProductDetails(
+          id: BillingService.iosMonthlySubscriptionId,
+          title: 'Plano mensal',
+          description: 'Acesso premium mensal no Voolo',
+          price: 'R\$ 29,90',
+          rawPrice: 29.90,
+          currencyCode: 'BRL',
+        ),
+        priceText: 'R\$ 29,90 / mes',
+      ),
+      'yearly': _PlanPurchaseOption(
+        planKey: 'yearly',
+        productId: BillingService.iosYearlySubscriptionId,
+        productDetails: ProductDetails(
+          id: BillingService.iosYearlySubscriptionId,
+          title: 'Plano anual',
+          description: 'Acesso premium anual no Voolo',
+          price: 'R\$ 299,90',
+          rawPrice: 299.90,
+          currencyCode: 'BRL',
+        ),
+        priceText: 'R\$ 299,90 / ano',
+      ),
+    };
   }
 
   String? _inferPlanFromOffer({
