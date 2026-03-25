@@ -116,12 +116,16 @@ class _RegisterPageState extends State<RegisterPage> {
         children: [
           Icon(icon, size: 14, color: scheme.primary),
           const SizedBox(width: 8),
-          Text(
-            label,
-            style: TextStyle(
-              color: AppTheme.textSecondary(context),
-              fontSize: 12,
-              fontWeight: FontWeight.w700,
+          Flexible(
+            child: Text(
+              label,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: TextStyle(
+                color: AppTheme.textSecondary(context),
+                fontSize: 12,
+                fontWeight: FontWeight.w700,
+              ),
             ),
           ),
         ],

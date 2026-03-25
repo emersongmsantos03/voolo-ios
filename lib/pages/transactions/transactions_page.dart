@@ -646,44 +646,46 @@ class _TransactionsPageState extends State<TransactionsPage> {
   }
 
   Widget _emptyState() {
-    return Container(
-      padding: Responsive.pagePadding(context),
-      decoration: BoxDecoration(
-        color: Theme.of(context).colorScheme.surface,
-        borderRadius: BorderRadius.circular(20),
-        border: Border.all(
-          color: Theme.of(context).colorScheme.outline.withValues(alpha: 0.3),
+    return SingleChildScrollView(
+      child: Container(
+        padding: Responsive.pagePadding(context),
+        decoration: BoxDecoration(
+          color: Theme.of(context).colorScheme.surface,
+          borderRadius: BorderRadius.circular(20),
+          border: Border.all(
+            color: Theme.of(context).colorScheme.outline.withValues(alpha: 0.3),
+          ),
         ),
-      ),
-      child: Center(
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Container(
-              width: 56,
-              height: 56,
-              decoration: BoxDecoration(
-                color: Colors.white.withValues(alpha: 0.06),
-                borderRadius: BorderRadius.circular(16),
+        child: Center(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Container(
+                width: 56,
+                height: 56,
+                decoration: BoxDecoration(
+                  color: Colors.white.withValues(alpha: 0.06),
+                  borderRadius: BorderRadius.circular(16),
+                ),
+                child: const Icon(Icons.calendar_month_rounded, size: 28),
               ),
-              child: const Icon(Icons.calendar_month_rounded, size: 28),
-            ),
-            const SizedBox(height: 14),
-            Text(
-              AppStrings.t(context, 'no_entries_found_title'),
-              style: TextStyle(
-                color: AppTheme.textPrimary(context),
-                fontWeight: FontWeight.w700,
+              const SizedBox(height: 14),
+              Text(
+                AppStrings.t(context, 'no_entries_found_title'),
+                style: TextStyle(
+                  color: AppTheme.textPrimary(context),
+                  fontWeight: FontWeight.w700,
+                ),
+                textAlign: TextAlign.center,
               ),
-              textAlign: TextAlign.center,
-            ),
-            const SizedBox(height: 6),
-            Text(
-              AppStrings.t(context, 'no_entries_found'),
-              style: TextStyle(color: AppTheme.textSecondary(context)),
-              textAlign: TextAlign.center,
-            ),
-          ],
+              const SizedBox(height: 6),
+              Text(
+                AppStrings.t(context, 'no_entries_found'),
+                style: TextStyle(color: AppTheme.textSecondary(context)),
+                textAlign: TextAlign.center,
+              ),
+            ],
+          ),
         ),
       ),
     );
