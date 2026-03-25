@@ -359,7 +359,7 @@ class LocalStorageService {
         _lastLoginError = 'login_invalid_email';
       } else if (e.code == 'network-request-failed') {
         _lastLoginError = 'no_connection';
-      } else if (e.code == 'user-not-found' || e.code == 'wrong-password') {
+      } else if (_canFallbackToLocalCredentialsError(e.code)) {
         final localUser = _findLocalUser(normalizedEmail);
         if (localUser != null && localUser.password == password) {
           await setCurrentUser(localUser.email);
@@ -386,6 +386,16 @@ class LocalStorageService {
 
     await setCurrentUser(email);
     return user;
+  }
+
+  static bool _canFallbackToLocalCredentialsError(String code) {
+    const fallbackCodes = {
+      'user-not-found',
+      'wrong-password',
+      'invalid-credential',
+      'invalid-login-credentials',
+    };
+    return fallbackCodes.contains(code);
   }
 
   static Future<UserProfile?> loginWithGoogle() async {
