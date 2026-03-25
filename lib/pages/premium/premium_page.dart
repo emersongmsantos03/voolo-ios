@@ -100,6 +100,11 @@ class _PremiumPageState extends State<PremiumPage> {
       _onPurchaseUpdates,
       onError: (_) {},
     );
+    if (Platform.isIOS) {
+      _storeAvailable = true;
+      _loading = false;
+      _planOptions.addAll(_buildFallbackApplePlanOptions());
+    }
     _initStore();
   }
 
@@ -183,6 +188,15 @@ class _PremiumPageState extends State<PremiumPage> {
         ..clear()
         ..addAll(_buildFallbackApplePlanOptions());
     });
+  }
+
+  _PlanPurchaseOption? _effectiveOptionFor(String planKey) {
+    final option = _planOptions[planKey];
+    if (option != null) return option;
+    if (Platform.isIOS) {
+      return _buildFallbackApplePlanOptions()[planKey];
+    }
+    return null;
   }
 
   Set<String> _subscriptionProductIds() {
@@ -408,8 +422,8 @@ class _PremiumPageState extends State<PremiumPage> {
 
   Future<void> _buySelectedPlan() async {
     if (_working) return;
-    final option = _planOptions[_selectedPlan];
-      if (option == null) {
+    final option = _effectiveOptionFor(_selectedPlan);
+    if (option == null) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
@@ -570,7 +584,7 @@ class _PremiumPageState extends State<PremiumPage> {
   }) {
     final scheme = Theme.of(context).colorScheme;
     final selected = _selectedPlan == planKey;
-    final option = _planOptions[planKey];
+    final option = _effectiveOptionFor(planKey);
     final priceText = option?.priceText ?? fallbackPrice;
 
     return InkWell(
@@ -620,7 +634,7 @@ class _PremiumPageState extends State<PremiumPage> {
                     subtitle,
                     style: TextStyle(color: scheme.onSurfaceVariant),
                   ),
-                  if (option == null) ...[
+                  if (option == null && !Platform.isIOS) ...[
                     const SizedBox(height: 6),
                     Text(
                       'Indisponivel no momento',
@@ -816,6 +830,7 @@ class _PremiumPageState extends State<PremiumPage> {
       return _buildScreenshotPaywall(context);
     }
     final scheme = Theme.of(context).colorScheme;
+    final showPaywallContent = Platform.isIOS || _storeAvailable;
 
     return Scaffold(
       appBar: AppBar(
@@ -843,7 +858,7 @@ class _PremiumPageState extends State<PremiumPage> {
                     ),
                     style: TextStyle(color: scheme.onSurfaceVariant),
                   ),
-                  if (_error != null) ...[
+                  if (!Platform.isIOS && _error != null) ...[
                     const SizedBox(height: 8),
                     Text(
                       _error == 'product-not-found'
@@ -859,7 +874,7 @@ class _PremiumPageState extends State<PremiumPage> {
                     ),
                   ],
                   const SizedBox(height: 16),
-                  if (!_storeAvailable) ...[
+                  if (!showPaywallContent) ...[
                     Text(
                       Platform.isAndroid
                           ? 'Funcionalidade indisponivel nesta plataforma.'
@@ -884,16 +899,17 @@ class _PremiumPageState extends State<PremiumPage> {
                     SizedBox(
                       height: 50,
                       child: ElevatedButton(
-                        onPressed:
-                            _working || _planOptions[_selectedPlan] == null
-                                ? null
-                                : _buySelectedPlan,
+                        onPressed: _working ||
+                                _effectiveOptionFor(_selectedPlan) == null
+                            ? null
+                            : _buySelectedPlan,
                         child: _working
                             ? const SizedBox(
                                 height: 18,
                                 width: 18,
-                                child:
-                                    CircularProgressIndicator(strokeWidth: 2),
+                                child: CircularProgressIndicator(
+                                  strokeWidth: 2,
+                                ),
                               )
                             : Text(_t('premium_cta', 'Seja Premium')),
                       ),
