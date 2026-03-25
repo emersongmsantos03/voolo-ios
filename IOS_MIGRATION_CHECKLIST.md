@@ -20,12 +20,25 @@ Este projeto foi adaptado para iOS no Flutter, mas antes de subir na App Store v
   - `POST /billing/appstore/sync-subscription`
 - O app agora envia `receiptData`, `subscriptionId` e `transactionId`.
 
-4. Conta e privacidade (App Review)
+4. Backend iOS (Firebase Functions)
+- Entre na pasta `functions` e rode `npm install`.
+- Configure os segredos do App Store Connect no Firebase Functions:
+  - `apple.key_id`
+  - `apple.issuer_id`
+  - `apple.bundle_id`
+  - `apple.private_key_b64`
+  - `apple.environment` (`SANDBOX` para testes/review, `PRODUCTION` quando for publicar)
+- Exemplo de configuracao via Firebase CLI:
+  - `firebase functions:config:set apple.key_id="..." apple.issuer_id="..." apple.bundle_id="com.voolo.jetx" apple.private_key_b64="..." apple.environment="SANDBOX"`
+- Depois publique apenas o backend:
+  - `firebase deploy --only functions:billingApiUs`
+
+5. Conta e privacidade (App Review)
 - O app deve permitir exclusao de conta dentro do proprio fluxo autenticado.
 - Revise `ios/Runner/PrivacyInfo.xcprivacy` antes de cada envio.
 - Em `App Store Connect`, preencha os privacy labels de acordo com o que o Firebase/Auth/Firestore realmente coletam.
 
-5. Notificacoes locais
+6. Notificacoes locais
 - O app ja pede permissao no iOS.
 - Valide no dispositivo real (simulador nao entrega todos os cenarios de notificacao).
 

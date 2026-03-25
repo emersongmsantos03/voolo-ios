@@ -3,6 +3,14 @@ const admin = require('firebase-admin');
 const nodemailer = require('nodemailer');
 const crypto = require('crypto');
 const { google } = require('googleapis');
+const {
+  AppStoreServerAPIClient,
+  Environment: AppleEnvironment,
+  GetTransactionHistoryVersion,
+  Order,
+  ProductType,
+  ReceiptUtility,
+} = require('@apple/app-store-server-library');
 
 admin.initializeApp();
 
@@ -12,6 +20,10 @@ const SUPPORTED_PLAY_SUBSCRIPTION_IDS = new Set([
   'voolo_monthly',
   'voolo-premium-monthly',
   'voolo-premium-yearly',
+]);
+const SUPPORTED_APPLE_SUBSCRIPTION_IDS = new Set([
+  'voolo',
+  'voolo_y',
 ]);
 const ACTIVE_SUBSCRIPTION_STATES = new Set([
   'SUBSCRIPTION_STATE_ACTIVE',
@@ -28,6 +40,8 @@ const RATE_LIMIT_MAX = 5;
 const RESEND_COOLDOWN_MS = 60 * 1000;
 
 let transporter;
+let appleClient;
+let appleReceiptUtility;
 
 const getConfig = () => functions.config();
 
@@ -135,6 +149,145 @@ const getPlayPackageName = () => {
   const fromConfig = String(getConfig()?.billing?.play_package_name || '').trim();
   if (fromConfig) return fromConfig;
   return 'com.voolo.app';
+};
+
+const getAppleConfig = () => {
+  const config = getConfig()?.apple || {};
+  const privateKeyBase64 =
+    String(process.env.APPLE_PRIVATE_KEY_B64 || '').trim() ||
+    String(config.private_key_b64 || '').trim() ||
+    String(process.env.APPLE_PRIVATE_KEY || '').trim() ||
+    String(config.private_key || '').trim();
+
+  const issuerId =
+    String(process.env.APPLE_ISSUER_ID || '').trim() ||
+    String(config.issuer_id || '').trim();
+  const keyId =
+    String(process.env.APPLE_KEY_ID || '').trim() ||
+    String(config.key_id || '').trim();
+  const bundleId =
+    String(process.env.APPLE_BUNDLE_ID || '').trim() ||
+    String(config.bundle_id || '').trim() ||
+    'com.voolo.jetx';
+  const environmentRaw =
+    String(process.env.APPLE_ENVIRONMENT || '').trim() ||
+    String(config.environment || '').trim() ||
+    'SANDBOX';
+
+  if (!privateKeyBase64 || !issuerId || !keyId || !bundleId) {
+    throw new Error('apple-not-configured');
+  }
+
+  const envName = environmentRaw.toUpperCase();
+  const environment = envName === 'PRODUCTION'
+    ? AppleEnvironment.PRODUCTION
+    : AppleEnvironment.SANDBOX;
+
+  const signingKey = privateKeyBase64.includes('BEGIN PRIVATE KEY')
+    ? privateKeyBase64
+    : Buffer.from(privateKeyBase64, 'base64').toString('utf8').trim();
+
+  if (!signingKey) {
+    throw new Error('apple-not-configured');
+  }
+
+  return {
+    signingKey,
+    issuerId,
+    keyId,
+    bundleId,
+    environment,
+  };
+};
+
+const getAppleClient = () => {
+  if (appleClient) return appleClient;
+  const appleConfig = getAppleConfig();
+  appleClient = new AppStoreServerAPIClient(
+    appleConfig.signingKey,
+    appleConfig.keyId,
+    appleConfig.issuerId,
+    appleConfig.bundleId,
+    appleConfig.environment
+  );
+  return appleClient;
+};
+
+const getAppleReceiptUtility = () => {
+  if (appleReceiptUtility) return appleReceiptUtility;
+  appleReceiptUtility = new ReceiptUtility();
+  return appleReceiptUtility;
+};
+
+const decodeBase64UrlJson = (value) => {
+  try {
+    const text = Buffer.from(String(value || ''), 'base64url').toString('utf8');
+    return JSON.parse(text);
+  } catch (_) {
+    return null;
+  }
+};
+
+const parseAppleTransactionPayload = (signedTransaction) => {
+  const parts = String(signedTransaction || '').split('.');
+  if (parts.length < 2) return null;
+  return decodeBase64UrlJson(parts[1]);
+};
+
+const isActiveAppleTransaction = (payload, nowMs = Date.now()) => {
+  if (!payload || typeof payload !== 'object') return false;
+  if (payload.revocationDate) return false;
+  const expiresMs = Number(payload.expiresDate || 0);
+  if (Number.isFinite(expiresMs) && expiresMs > 0) {
+    return expiresMs > nowMs;
+  }
+  return false;
+};
+
+const getLatestAppleSubscription = async ({
+  transactionId,
+  requestedSubscriptionId,
+}) => {
+  const client = getAppleClient();
+  const query = {
+    sort: Order.DESCENDING,
+    revoked: false,
+    productTypes: [ProductType.AUTO_RENEWABLE],
+  };
+
+  let revision = null;
+  let latest = null;
+  let lastKnown = null;
+
+  do {
+    const response = await client.getTransactionHistory(
+      transactionId,
+      revision,
+      query,
+      GetTransactionHistoryVersion.V2
+    );
+    revision = response?.revision || null;
+    const signedTransactions = Array.isArray(response?.signedTransactions)
+      ? response.signedTransactions
+      : [];
+
+    for (const signed of signedTransactions) {
+      const payload = parseAppleTransactionPayload(signed);
+      if (!payload) continue;
+      if (requestedSubscriptionId && payload.productId !== requestedSubscriptionId) {
+        continue;
+      }
+      lastKnown = payload;
+      if (isActiveAppleTransaction(payload)) {
+        latest = payload;
+        break;
+      }
+    }
+
+    if (latest || !response?.hasMore) break;
+  } while (revision);
+
+  return latest || lastKnown;
 };
 
 const getAndroidPublisherClient = async () => {
@@ -1691,7 +1844,10 @@ const billingApiHttpHandler = async (req, res) => {
     if (!applyCors(req, res)) return;
 
     const path = normalizeApiPath(req.path);
-    if (path !== '/billing/googleplay/sync-subscription') {
+    const isGooglePlay = path === '/billing/googleplay/sync-subscription';
+    const isAppStore = path === '/billing/appstore/sync-subscription';
+
+    if (!isGooglePlay && !isAppStore) {
       return sendError(res, 404, 'not-found');
     }
 
@@ -1706,29 +1862,156 @@ const billingApiHttpHandler = async (req, res) => {
         return sendError(res, 401, 'unauthenticated');
       }
 
-      const purchaseToken = String(req.body?.data?.purchaseToken || '').trim();
-      const requestedSubscriptionId = String(req.body?.data?.subscriptionId || '').trim();
+      const db = admin.firestore();
+      const userRef = db.collection('users').doc(uid);
+      const authEmail = String(auth?.email || '').trim().toLowerCase();
 
-      if (!purchaseToken || !requestedSubscriptionId) {
+      if (isGooglePlay) {
+        const purchaseToken = String(req.body?.data?.purchaseToken || '').trim();
+        const requestedSubscriptionId = String(req.body?.data?.subscriptionId || '').trim();
+
+        if (!purchaseToken || !requestedSubscriptionId) {
+          return sendError(res, 400, 'invalid-argument');
+        }
+        if (!SUPPORTED_PLAY_SUBSCRIPTION_IDS.has(requestedSubscriptionId)) {
+          return sendError(res, 400, 'unsupported-subscription-id');
+        }
+
+        const packageName = getPlayPackageName();
+        const verification = await verifyGooglePlaySubscription({
+          packageName,
+          purchaseToken,
+          requestedSubscriptionId,
+        });
+
+        const premiumGranted = verification.premiumGranted === true;
+        const premiumUntil =
+          verification.premiumUntil instanceof Date &&
+          !Number.isNaN(verification.premiumUntil.getTime())
+            ? verification.premiumUntil
+            : null;
+
+        const nowIso = new Date().toISOString();
+        const premiumPatch = {
+          isPremium: premiumGranted,
+          premium: premiumGranted,
+          premiumAtivo: premiumGranted,
+          plan: premiumGranted ? 'premium' : 'free',
+          premiumUntil: premiumUntil
+            ? admin.firestore.Timestamp.fromDate(premiumUntil)
+            : null,
+          premiumUpdatedAt: admin.firestore.FieldValue.serverTimestamp(),
+          premiumUpdatedBy: 'billing-googleplay',
+        };
+
+        await userRef.set(premiumPatch, { merge: true });
+
+        if (authEmail) {
+          const legacyRef = db.collection('users').doc(authEmail);
+          const legacySnap = await legacyRef.get();
+          if (legacySnap.exists && legacyRef.id !== uid) {
+            await legacyRef.set(premiumPatch, { merge: true });
+          }
+        }
+
+        const purchaseTokenHash = crypto
+          .createHash('sha256')
+          .update(purchaseToken)
+          .digest('hex');
+
+        await userRef.collection('billingEvents').add({
+          provider: 'google_play',
+          action: 'sync_subscription',
+          source: verification.source,
+          packageName,
+          requestedSubscriptionId,
+          resolvedSubscriptionId: verification.subscriptionId,
+          subscriptionState: verification.subscriptionState,
+          premiumGranted,
+          premiumUntil: premiumUntil
+            ? admin.firestore.Timestamp.fromDate(premiumUntil)
+            : null,
+          purchaseTokenHash,
+          orderId: verification.rawOrderId,
+          createdAt: admin.firestore.FieldValue.serverTimestamp(),
+          createdBy: uid,
+        });
+
+        await userRef.collection('subscriptions').doc('google_play').set(
+          {
+            provider: 'google_play',
+            packageName,
+            subscriptionId: verification.subscriptionId,
+            requestedSubscriptionId,
+            subscriptionState: verification.subscriptionState,
+            premiumGranted,
+            premiumUntil: premiumUntil
+              ? admin.firestore.Timestamp.fromDate(premiumUntil)
+              : null,
+            purchaseTokenHash,
+            updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+            updatedBy: uid,
+          },
+          { merge: true }
+        );
+
+        return res.json({
+          premiumGranted,
+          premiumUntil: premiumUntil ? premiumUntil.toISOString() : null,
+          subscriptionId: verification.subscriptionId,
+          subscriptionState: verification.subscriptionState,
+          packageName,
+          source: verification.source,
+          syncedAt: nowIso,
+        });
+      }
+
+      const receiptData = String(req.body?.data?.receiptData || '').trim();
+      const requestedSubscriptionId = String(req.body?.data?.subscriptionId || '').trim();
+      const explicitTransactionId = String(req.body?.data?.transactionId || '').trim();
+      const explicitOriginalTransactionId = String(req.body?.data?.originalTransactionId || '').trim();
+
+      if (!receiptData || !requestedSubscriptionId) {
         return sendError(res, 400, 'invalid-argument');
       }
-      if (!SUPPORTED_PLAY_SUBSCRIPTION_IDS.has(requestedSubscriptionId)) {
+      if (!SUPPORTED_APPLE_SUBSCRIPTION_IDS.has(requestedSubscriptionId)) {
         return sendError(res, 400, 'unsupported-subscription-id');
       }
 
-      const packageName = getPlayPackageName();
-      const verification = await verifyGooglePlaySubscription({
-        packageName,
-        purchaseToken,
+      let transactionId = explicitTransactionId;
+      if (!transactionId) {
+        try {
+          transactionId = getAppleReceiptUtility().extractTransactionIdFromAppReceipt(receiptData);
+        } catch (_) {
+          transactionId = '';
+        }
+      }
+      if (!transactionId && explicitOriginalTransactionId) {
+        transactionId = explicitOriginalTransactionId;
+      }
+      if (!transactionId) {
+        return sendError(res, 400, 'invalid-argument');
+      }
+
+      const latestTransaction = await getLatestAppleSubscription({
+        transactionId,
         requestedSubscriptionId,
       });
 
-      const premiumGranted = verification.premiumGranted === true;
+      if (!latestTransaction) {
+        return sendError(res, 502, 'appstore-verification-failed');
+      }
+
+      const premiumUntilMs = Number(latestTransaction.expiresDate || 0);
       const premiumUntil =
-        verification.premiumUntil instanceof Date &&
-        !Number.isNaN(verification.premiumUntil.getTime())
-          ? verification.premiumUntil
+        Number.isFinite(premiumUntilMs) && premiumUntilMs > 0
+          ? new Date(premiumUntilMs)
           : null;
+      const premiumGranted =
+        premiumUntil instanceof Date &&
+        !Number.isNaN(premiumUntil.getTime()) &&
+        premiumUntil.getTime() > Date.now() &&
+        !latestTransaction.revocationDate;
 
       const nowIso = new Date().toISOString();
       const premiumPatch = {
@@ -1740,14 +2023,11 @@ const billingApiHttpHandler = async (req, res) => {
           ? admin.firestore.Timestamp.fromDate(premiumUntil)
           : null,
         premiumUpdatedAt: admin.firestore.FieldValue.serverTimestamp(),
-        premiumUpdatedBy: 'billing-googleplay',
+        premiumUpdatedBy: 'billing-appstore',
       };
 
-      const db = admin.firestore();
-      const userRef = db.collection('users').doc(uid);
       await userRef.set(premiumPatch, { merge: true });
 
-      const authEmail = String(auth?.email || '').trim().toLowerCase();
       if (authEmail) {
         const legacyRef = db.collection('users').doc(authEmail);
         const legacySnap = await legacyRef.get();
@@ -1756,41 +2036,42 @@ const billingApiHttpHandler = async (req, res) => {
         }
       }
 
-      const purchaseTokenHash = crypto
+      const receiptHash = crypto
         .createHash('sha256')
-        .update(purchaseToken)
+        .update(receiptData)
         .digest('hex');
 
       await userRef.collection('billingEvents').add({
-        provider: 'google_play',
+        provider: 'app_store',
         action: 'sync_subscription',
-        source: verification.source,
-        packageName,
+        source: 'appstore-server-api',
         requestedSubscriptionId,
-        resolvedSubscriptionId: verification.subscriptionId,
-        subscriptionState: verification.subscriptionState,
-        premiumGranted,
-        premiumUntil: premiumUntil
+        resolvedSubscriptionId: latestTransaction.productId || requestedSubscriptionId,
+        originalTransactionId: latestTransaction.originalTransactionId || null,
+        transactionId: latestTransaction.transactionId || transactionId,
+        expiresDate: premiumUntil
           ? admin.firestore.Timestamp.fromDate(premiumUntil)
           : null,
-        purchaseTokenHash,
-        orderId: verification.rawOrderId,
+        premiumGranted,
+        receiptHash,
+        environment: latestTransaction.environment || null,
         createdAt: admin.firestore.FieldValue.serverTimestamp(),
         createdBy: uid,
       });
 
-      await userRef.collection('subscriptions').doc('google_play').set(
+      await userRef.collection('subscriptions').doc('app_store').set(
         {
-          provider: 'google_play',
-          packageName,
-          subscriptionId: verification.subscriptionId,
+          provider: 'app_store',
           requestedSubscriptionId,
-          subscriptionState: verification.subscriptionState,
+          subscriptionId: latestTransaction.productId || requestedSubscriptionId,
+          originalTransactionId: latestTransaction.originalTransactionId || null,
+          transactionId: latestTransaction.transactionId || transactionId,
+          environment: latestTransaction.environment || null,
           premiumGranted,
           premiumUntil: premiumUntil
             ? admin.firestore.Timestamp.fromDate(premiumUntil)
             : null,
-          purchaseTokenHash,
+          receiptHash,
           updatedAt: admin.firestore.FieldValue.serverTimestamp(),
           updatedBy: uid,
         },
@@ -1800,10 +2081,11 @@ const billingApiHttpHandler = async (req, res) => {
       return res.json({
         premiumGranted,
         premiumUntil: premiumUntil ? premiumUntil.toISOString() : null,
-        subscriptionId: verification.subscriptionId,
-        subscriptionState: verification.subscriptionState,
-        packageName,
-        source: verification.source,
+        subscriptionId: latestTransaction.productId || requestedSubscriptionId,
+        originalTransactionId: latestTransaction.originalTransactionId || null,
+        transactionId: latestTransaction.transactionId || transactionId,
+        environment: latestTransaction.environment || null,
+        source: 'appstore-server-api',
         syncedAt: nowIso,
       });
     } catch (error) {
@@ -1811,10 +2093,10 @@ const billingApiHttpHandler = async (req, res) => {
       if (code === 'unauthenticated') {
         return sendError(res, 401, 'unauthenticated');
       }
-      if (
-        code === 'invalid-argument' ||
-        code === 'unsupported-subscription-id'
-      ) {
+      if (code === 'apple-not-configured') {
+        return sendError(res, 500, code);
+      }
+      if (code === 'invalid-argument' || code === 'unsupported-subscription-id') {
         return sendError(res, 400, code);
       }
       if (
@@ -1824,6 +2106,9 @@ const billingApiHttpHandler = async (req, res) => {
         code === 'play-api-unavailable' ||
         code === 'play-verification-failed'
       ) {
+        return sendError(res, 502, code);
+      }
+      if (code === 'appstore-verification-failed' || code === 'appstore-api-unavailable') {
         return sendError(res, 502, code);
       }
       return sendError(res, 500, 'unknown');
