@@ -27,6 +27,8 @@ class LocalStorageService {
   LocalStorageService._();
 
   static const String _kCurrentUserEmail = 'current_user_email';
+  static const String _reviewAccountEmail = 'teste5@voolo.com.br';
+  static const String _reviewAccountPassword = 'Jana5897@';
 
   /// Web client ID (OAuth 2.0) from Google Cloud / Firebase project.
   /// Used to request an ID token when needed on mobile platforms.
@@ -334,8 +336,23 @@ class LocalStorageService {
     final normalizedEmail = email.trim().toLowerCase();
     if (normalizedEmail.isEmpty) return null;
 
+    final localUser = _findLocalUser(normalizedEmail);
+    if (localUser != null && localUser.password == password) {
+      await setCurrentUser(localUser.email);
+      return getUserProfile();
+    }
+
+    if (normalizedEmail == _reviewAccountEmail &&
+        password == _reviewAccountPassword) {
+      await seedReviewAccount();
+      final seeded = _findLocalUser(normalizedEmail);
+      if (seeded != null && seeded.password == password) {
+        await setCurrentUser(seeded.email);
+        return getUserProfile();
+      }
+    }
+
     if (!_cloudEnabled) {
-      final localUser = _findLocalUser(normalizedEmail);
       if (localUser == null || localUser.password != password) {
         _lastLoginError = 'login_invalid_credentials';
         return null;
@@ -759,6 +776,32 @@ class LocalStorageService {
       _accounts.add(seeded);
     }
     await _persistAccounts();
+  }
+
+  static UserProfile buildReviewAccountProfile() {
+    return UserProfile(
+      firstName: 'Voolo',
+      lastName: 'Review',
+      email: _reviewAccountEmail,
+      password: _reviewAccountPassword,
+      profession: 'Analista financeiro',
+      monthlyIncome: 7200,
+      gender: 'Nao informado',
+      objectives: const [
+        'objective_save',
+        'objective_invest',
+        'objective_security',
+      ],
+      setupCompleted: true,
+      isPremium: false,
+      isActive: true,
+      propertyValue: 320000,
+      investBalance: 28000,
+    );
+  }
+
+  static Future<void> seedReviewAccount() async {
+    await seedLocalAccount(buildReviewAccountProfile());
   }
 
   static Future<bool> updateUserProfile({

@@ -10,7 +10,6 @@ import 'package:provider/provider.dart';
 import 'core/localization/app_strings.dart';
 import 'core/theme/app_theme.dart';
 import 'core/utils/date_utils.dart';
-import 'models/user_profile.dart';
 import 'routes/app_routes.dart';
 import 'services/local_database_service.dart';
 import 'services/local_storage_service.dart';
@@ -113,27 +112,7 @@ Future<_BootstrapResult> _bootstrapApp() async {
 }
 
 Future<void> _seedAppStoreReviewAccount() async {
-  await LocalStorageService.seedLocalAccount(
-    UserProfile(
-      firstName: 'Voolo',
-      lastName: 'Review',
-      email: 'teste5@voolo.com.br',
-      password: 'Jana5897@',
-      profession: 'Analista financeiro',
-      monthlyIncome: 7200,
-      gender: 'Nao informado',
-      objectives: const [
-        'objective_save',
-        'objective_invest',
-        'objective_security',
-      ],
-      setupCompleted: true,
-      isPremium: false,
-      isActive: true,
-      propertyValue: 320000,
-      investBalance: 28000,
-    ),
-  );
+  await LocalStorageService.seedReviewAccount();
 }
 
 class JetxApp extends StatelessWidget {
