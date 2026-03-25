@@ -275,20 +275,34 @@ class LocalStorageService {
     goalNotifier.value++;
   }
 
-  static String _essentialGuideKey() {
-    final userKey = _localUserKey() ?? 'anonymous';
-    return 'dashboard_essential_guide_seen_$userKey';
-  }
-
   static Future<bool> hasSeenDashboardEssentialGuide() async {
     await _ensureInit();
-    final value = await LocalDatabaseService.getSetting(_essentialGuideKey());
+    final user = getUserProfile();
+    if (user != null) {
+      return user.dashboardEssentialGuideSeen;
+    }
+    final userKey = _localUserKey();
+    if (userKey == null || userKey.isEmpty) return false;
+    final value = await LocalDatabaseService.getSetting(
+      'dashboard_essential_guide_seen_$userKey',
+    );
     return value == '1';
   }
 
   static Future<void> markDashboardEssentialGuideSeen() async {
     await _ensureInit();
-    await LocalDatabaseService.setSetting(_essentialGuideKey(), '1');
+    final user = getUserProfile();
+    if (user != null) {
+      final updated = user.copyWith(dashboardEssentialGuideSeen: true);
+      await saveUserProfile(updated);
+    }
+    final userKey = _localUserKey();
+    if (userKey != null && userKey.isNotEmpty) {
+      await LocalDatabaseService.setSetting(
+        'dashboard_essential_guide_seen_$userKey',
+        '1',
+      );
+    }
   }
 
   // ================= AUTH / ACCOUNTS =================

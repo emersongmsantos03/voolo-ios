@@ -23,6 +23,7 @@ class UserProfile {
   bool setupCompleted;
   bool isPremium;
   DateTime? premiumUntil;
+  bool dashboardEssentialGuideSeen;
   bool isActive;
   int totalXp;
   List<String> completedMissions;
@@ -50,6 +51,7 @@ class UserProfile {
     this.setupCompleted = false,
     this.isPremium = false,
     this.premiumUntil,
+    this.dashboardEssentialGuideSeen = false,
     this.isActive = true,
     this.totalXp = 0,
     List<String> completedMissions = const [],
@@ -87,6 +89,7 @@ class UserProfile {
         'setupCompleted': setupCompleted,
         'isPremium': isPremium,
         'isActive': isActive,
+        'dashboardEssentialGuideSeen': dashboardEssentialGuideSeen,
         'plan': plan,
         'status': status,
         'totalXp': totalXp,
@@ -162,6 +165,11 @@ class UserProfile {
       isPremium = premiumUntil.isAfter(now);
     }
 
+    final dashboardEssentialGuideSeen =
+        (json['dashboardEssentialGuideSeen'] as bool?) ??
+            (json['essentialGuideSeen'] as bool?) ??
+            false;
+
     return UserProfile(
       firstName: (json['firstName'] as String?) ?? 'Usuario',
       lastName: (json['lastName'] as String?) ?? '',
@@ -184,6 +192,7 @@ class UserProfile {
       setupCompleted: (json['setupCompleted'] as bool?) ?? false,
       isPremium: isPremium,
       premiumUntil: premiumUntil,
+      dashboardEssentialGuideSeen: dashboardEssentialGuideSeen,
       isActive: isActive,
       totalXp: (json['totalXp'] as num?)?.toInt() ?? 0,
       completedMissions: (json['completedMissions'] as List<dynamic>?)
@@ -231,6 +240,7 @@ class UserProfile {
     bool? setupCompleted,
     bool? isPremium,
     DateTime? premiumUntil,
+    bool? dashboardEssentialGuideSeen,
     bool? isActive,
     int? totalXp,
     List<String>? completedMissions,
@@ -258,6 +268,8 @@ class UserProfile {
       setupCompleted: setupCompleted ?? this.setupCompleted,
       isPremium: isPremium ?? this.isPremium,
       premiumUntil: premiumUntil ?? this.premiumUntil,
+      dashboardEssentialGuideSeen:
+          dashboardEssentialGuideSeen ?? this.dashboardEssentialGuideSeen,
       isActive: isActive ?? this.isActive,
       totalXp: totalXp ?? this.totalXp,
       completedMissions: completedMissions ?? this.completedMissions,
