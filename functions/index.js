@@ -174,8 +174,16 @@ const getAppleConfig = () => {
     String(config.environment || '').trim() ||
     'SANDBOX';
 
-  if (!privateKeyBase64 || !issuerId || !keyId || !bundleId) {
-    throw new Error('apple-not-configured');
+  const missing = [];
+  if (!privateKeyBase64) missing.push('APPLE_PRIVATE_KEY_B64');
+  if (!issuerId) missing.push('APPLE_ISSUER_ID');
+  if (!keyId) missing.push('APPLE_KEY_ID');
+  if (!bundleId) missing.push('APPLE_BUNDLE_ID');
+
+  if (missing.length > 0) {
+    const err = new Error(`apple-not-configured:${missing.join(',')}`);
+    err.code = 'apple-not-configured';
+    throw err;
   }
 
   const envName = environmentRaw.toUpperCase();
@@ -188,7 +196,9 @@ const getAppleConfig = () => {
     : Buffer.from(privateKeyBase64, 'base64').toString('utf8').trim();
 
   if (!signingKey) {
-    throw new Error('apple-not-configured');
+    const err = new Error('apple-not-configured:APPLE_PRIVATE_KEY_B64');
+    err.code = 'apple-not-configured';
+    throw err;
   }
 
   return {

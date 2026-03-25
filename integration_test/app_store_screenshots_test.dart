@@ -17,41 +17,59 @@ Finder _firstByTexts(List<String> texts) {
   return find.byWidget(const SizedBox.shrink());
 }
 
+Finder _firstByIcon(IconData icon) {
+  final finder = find.byIcon(icon);
+  if (finder.evaluate().isNotEmpty) return finder.first;
+  return find.byWidget(const SizedBox.shrink());
+}
+
+Future<void> _openDrawer(WidgetTester tester) async {
+  final menuButton = find.byTooltip('Open navigation menu');
+  if (menuButton.evaluate().isNotEmpty) {
+    await tester.tap(menuButton.first);
+    await _settle(tester);
+  }
+}
+
 void main() {
   final binding = IntegrationTestWidgetsFlutterBinding.ensureInitialized();
 
   testWidgets('capture app store screenshots', (tester) async {
-    app.main();
+    await app.main();
     await _settle(tester);
 
-    await binding.takeScreenshot('01_login');
+    await binding.takeScreenshot('01_dashboard');
 
-    final registerCta =
-        _firstByTexts(['Cadastre-se', 'Criar conta', 'Cadastrar', 'Register']);
-    if (registerCta.evaluate().isNotEmpty) {
-      await tester.tap(registerCta);
+    final addButton = _firstByIcon(Icons.add);
+    if (addButton.evaluate().isNotEmpty) {
+      await tester.tap(addButton);
       await _settle(tester);
-      await binding.takeScreenshot('02_register');
-      final back = _firstByTexts(['Back', 'Voltar']);
-      if (back.evaluate().isNotEmpty) {
-        await tester.tap(back);
+      await binding.takeScreenshot('02_add_expense');
+
+      final cancelButton = _firstByTexts(['Cancelar', 'Cancel']);
+      if (cancelButton.evaluate().isNotEmpty) {
+        await tester.tap(cancelButton);
         await _settle(tester);
       }
-    } else {
-      await binding.takeScreenshot('02_login_fallback');
     }
 
-    final forgotPassword = _firstByTexts([
-      'Esqueci minha senha',
-      'Recuperar senha',
-      'Forgot password',
-    ]);
-    if (forgotPassword.evaluate().isNotEmpty) {
-      await tester.tap(forgotPassword);
+    await _openDrawer(tester);
+    final profileItem = _firstByTexts(['Perfil', 'Profile']);
+    if (profileItem.evaluate().isNotEmpty) {
+      await tester.tap(profileItem);
       await _settle(tester);
-      await binding.takeScreenshot('03_forgot_password');
-    } else {
-      await binding.takeScreenshot('03_login_alt');
+      await binding.takeScreenshot('03_profile');
+      await tester.pageBack();
+      await _settle(tester);
+    }
+
+    final calculatorButton = _firstByIcon(Icons.calculate);
+    if (calculatorButton.evaluate().isNotEmpty) {
+      await tester.tap(calculatorButton);
+      await _settle(tester);
+      await binding.takeScreenshot('04_calculator');
+      await tester.pageBack();
+      await _settle(tester);
     }
 
     await tester.pumpWidget(
@@ -60,6 +78,6 @@ void main() {
       ),
     );
     await _settle(tester);
-    await binding.takeScreenshot('04_premium_paywall');
+    await binding.takeScreenshot('05_premium');
   });
 }

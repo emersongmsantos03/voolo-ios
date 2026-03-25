@@ -10,6 +10,9 @@ import 'package:provider/provider.dart';
 import 'core/localization/app_strings.dart';
 import 'core/theme/app_theme.dart';
 import 'core/utils/date_utils.dart';
+import 'models/expense.dart';
+import 'models/monthly_dashboard.dart';
+import 'models/user_profile.dart';
 import 'routes/app_routes.dart';
 import 'services/local_database_service.dart';
 import 'services/local_storage_service.dart';
@@ -19,6 +22,9 @@ import 'state/theme_state.dart';
 import 'widgets/offline_banner.dart';
 
 final GlobalKey<NavigatorState> _navKey = GlobalKey<NavigatorState>();
+const bool _previewForceLogin = bool.fromEnvironment('PREVIEW_FORCE_LOGIN');
+const bool _screenshotMode = bool.fromEnvironment('SCREENSHOT_MODE');
+const bool _previewLocalMode = _previewForceLogin || _screenshotMode;
 
 Future<void> main() async {
   await runZonedGuarded(() async {
@@ -41,7 +47,7 @@ Future<void> main() async {
 
     final bootstrap = await _bootstrapApp();
 
-    if (bootstrap.firebaseReady) {
+    if (bootstrap.cloudEnabled) {
       FirebaseAuth.instance.authStateChanges().listen((authUser) {
         if (authUser != null) return;
         final navigator = _navKey.currentState;
@@ -81,7 +87,9 @@ Future<_BootstrapResult> _bootstrapApp() async {
     debugPrint('Firebase bootstrap unavailable, starting in local mode: $e');
   }
 
-  LocalStorageService.configureCloud(enabled: firebaseReady);
+  LocalStorageService.configureCloud(
+    enabled: firebaseReady && !_previewLocalMode,
+  );
   await DateUtilsJetx.init();
   await LocalDatabaseService.init();
   await LocalStorageService.forceLogoutOnStartup();
@@ -90,16 +98,130 @@ Future<_BootstrapResult> _bootstrapApp() async {
     onTimeout: () => null,
   );
 
+  if (_previewLocalMode) {
+    await _seedPreviewSession();
+  }
+
   if (LocalStorageService.currentUserId != null) {
     await LocalStorageService.waitForSync(timeoutSeconds: 2);
   }
 
-  final initialRoute = AppRoutes.login;
+  final initialRoute =
+      _previewLocalMode && LocalStorageService.getUserProfile() != null
+          ? AppRoutes.dashboard
+          : AppRoutes.login;
 
   return _BootstrapResult(
     firebaseReady: firebaseReady,
+    cloudEnabled: firebaseReady && !_previewLocalMode,
     initialRoute: initialRoute,
   );
+}
+
+Future<void> _seedPreviewSession() async {
+  const previewEmail = 'preview@voolo.com.br';
+  const previewPassword = 'Voolo123!';
+
+  UserProfile? demoProfile;
+  final accounts = LocalStorageService.getAccounts();
+  for (final account in accounts) {
+    if (account.email.trim().toLowerCase() == previewEmail) {
+      demoProfile = account;
+      break;
+    }
+  }
+
+  if (demoProfile == null) {
+    demoProfile = UserProfile(
+      firstName: 'Emerson',
+      lastName: 'Moraes',
+      email: previewEmail,
+      password: previewPassword,
+      profession: 'Analista financeiro',
+      monthlyIncome: 7200,
+      gender: 'Nao informado',
+      objectives: const [
+        'objective_save',
+        'objective_invest',
+        'objective_security',
+      ],
+      setupCompleted: true,
+      isPremium: true,
+      isActive: true,
+      propertyValue: 320000,
+      investBalance: 28000,
+    );
+    final created = await LocalStorageService.createAccount(demoProfile);
+    if (!created) {
+      final login = await LocalStorageService.login(
+        email: previewEmail,
+        password: previewPassword,
+      );
+      if (login == null) return;
+      demoProfile = login;
+    }
+  }
+
+  demoProfile = demoProfile.copyWith(
+    firstName: 'Emerson',
+    lastName: 'Moraes',
+    profession: 'Analista financeiro',
+    monthlyIncome: 7200,
+    setupCompleted: true,
+    isPremium: true,
+    objectives: const [
+      'objective_save',
+      'objective_invest',
+      'objective_security',
+    ],
+    propertyValue: 320000,
+    investBalance: 28000,
+  );
+  await LocalStorageService.saveUserProfile(demoProfile);
+
+  final now = DateTime.now();
+  final previewMonth = DateTime(now.year, now.month, 1);
+  final previewDashboard = MonthlyDashboard(
+    month: previewMonth.month,
+    year: previewMonth.year,
+    salary: demoProfile.monthlyIncome,
+    expenses: [
+      Expense(
+        id: 'preview-rent',
+        name: 'Aluguel',
+        type: ExpenseType.fixed,
+        category: ExpenseCategory.moradia,
+        amount: 2100,
+        date: DateTime(now.year, now.month, 5),
+        dueDay: 5,
+      ),
+      Expense(
+        id: 'preview-groceries',
+        name: 'Mercado',
+        type: ExpenseType.variable,
+        category: ExpenseCategory.alimentacao,
+        amount: 860,
+        date: DateTime(now.year, now.month, 12),
+      ),
+      Expense(
+        id: 'preview-transport',
+        name: 'Transporte',
+        type: ExpenseType.variable,
+        category: ExpenseCategory.transporte,
+        amount: 320,
+        date: DateTime(now.year, now.month, 18),
+      ),
+      Expense(
+        id: 'preview-invest',
+        name: 'Investimento',
+        type: ExpenseType.investment,
+        category: ExpenseCategory.investment,
+        amount: 950,
+        date: DateTime(now.year, now.month, 22),
+      ),
+    ],
+  );
+  await LocalStorageService.saveDashboard(previewDashboard);
 }
 
 class JetxApp extends StatelessWidget {
@@ -136,10 +258,12 @@ class JetxApp extends StatelessWidget {
 
 class _BootstrapResult {
   final bool firebaseReady;
+  final bool cloudEnabled;
   final String initialRoute;
 
   const _BootstrapResult({
     required this.firebaseReady,
+    required this.cloudEnabled,
     required this.initialRoute,
   });
 }

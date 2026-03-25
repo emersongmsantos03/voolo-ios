@@ -18,6 +18,8 @@ workflows:
       vars:
         BUNDLE_ID: com.voolo.jetx
         FIREBASE_IOS_PLIST_PATH: ios/Runner/GoogleService-Info.plist
+        VOOLO_IOS_MONTHLY_SUBSCRIPTION_ID: voolo
+        VOOLO_IOS_YEARLY_SUBSCRIPTION_ID: voolo_y
 
     integrations:
       app_store_connect: app-store-connect
@@ -125,7 +127,9 @@ workflows:
         script: |
           set -e
           flutter build ipa --release --no-codesign \
-            --build-number="$CM_FLUTTER_BUILD_NUMBER"
+            --build-number="$CM_FLUTTER_BUILD_NUMBER" \
+            --dart-define=VOOLO_IOS_MONTHLY_SUBSCRIPTION_ID="$VOOLO_IOS_MONTHLY_SUBSCRIPTION_ID" \
+            --dart-define=VOOLO_IOS_YEARLY_SUBSCRIPTION_ID="$VOOLO_IOS_YEARLY_SUBSCRIPTION_ID"
 
       - name: Export signed IPA with App Store profile
         script: |
@@ -298,6 +302,112 @@ workflows:
           xcrun simctl shutdown all || true
           xcrun simctl boot "$CM_SIMULATOR_DEVICE" || true
           xcrun simctl bootstatus "$CM_SIMULATOR_DEVICE" -b
+
+      - name: Generate screenshots
+        script: |
+          set -e
+          mkdir -p "$SCREENSHOTS_DIR"
+          flutter drive \
+            --driver=test_driver/integration_test.dart \
+            --target=integration_test/app_store_screenshots_test.dart \
+            -d "$CM_SIMULATOR_UDID" \
+            --dart-define=SCREENSHOT_MODE=true
+
+      - name: List generated screenshots
+        script: |
+          set -e
+          find build/screenshots -type f -name "*.png" | sed 's|^| - |'
+
+    artifacts:
+      - build/screenshots/**/*.png
+
+  ios-screenshots-ipad:
+    name: iOS Screenshots iPad
+    instance_type: mac_mini_m2
+    max_build_duration: 120
+
+    environment:
+      flutter: stable
+      xcode: latest
+      cocoapods: default
+      groups:
+        - firebase
+      vars:
+        SIMULATOR_DEVICE: "13-inch"
+        SCREENSHOTS_DIR: "build/screenshots/ipad_13"
+
+    scripts:
+      - name: Flutter pub get
+        script: |
+          flutter pub get
+
+      - name: Validate iOS release configuration
+        script: |
+          sh scripts/validate_ios_release.sh
+
+      - name: Provision Firebase iOS plist (optional for screenshot mode)
+        script: |
+          set -e
+          if [ -n "$FIREBASE_IOS_PLIST_BASE64" ]; then
+            echo "$FIREBASE_IOS_PLIST_BASE64" | base64 --decode > ios/Runner/GoogleService-Info.plist
+            echo "Using real Firebase iOS plist from secret."
+          else
+            cat > ios/Runner/GoogleService-Info.plist <<'EOF'
+          <?xml version="1.0" encoding="UTF-8"?>
+          <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+          <plist version="1.0">
+          <dict>
+            <key>API_KEY</key>
+            <string>stub-api-key</string>
+            <key>BUNDLE_ID</key>
+            <string>com.voolo.jetx</string>
+            <key>GCM_SENDER_ID</key>
+            <string>1234567890</string>
+            <key>GOOGLE_APP_ID</key>
+            <string>1:1234567890:ios:1234567890abcdef123456</string>
+            <key>PROJECT_ID</key>
+            <string>stub-project-id</string>
+            <key>REVERSED_CLIENT_ID</key>
+            <string>com.googleusercontent.apps.1234567890-abcdef</string>
+            <key>STORAGE_BUCKET</key>
+            <string>stub-project-id.appspot.com</string>
+          </dict>
+          </plist>
+          EOF
+            echo "Using stub Firebase plist for screenshot mode."
+          fi
+
+      - name: Resolve available iOS simulator
+        script: |
+          set -e
+          LINE="$(xcrun simctl list devices available | awk -v preferredDevice="$SIMULATOR_DEVICE" '
+            /^-- / { runtime=$0; gsub(/^-- /, "", runtime); gsub(/ --$/, "", runtime) }
+            index($0, preferredDevice) > 0 && index(runtime, "iOS") > 0 { print; exit }
+          ')"
+          if [ -z "$LINE" ]; then
+            LINE="$(xcrun simctl list devices available | awk '
+              /^-- / { runtime=$0; gsub(/^-- /, "", runtime); gsub(/ --$/, "", runtime) }
+              index($0, "iPad") > 0 && index(runtime, "iOS") > 0 { print; exit }
+            ')"
+          fi
+          if [ -z "$LINE" ]; then
+            echo "ERROR: No available 13-inch iPad simulator found on this Codemagic machine."
+            xcrun simctl list devices available
+            exit 1
+          fi
+          DEVICE="$(echo "$LINE" | sed -E 's/^[[:space:]]*//; s/[[:space:]]*\(.*$//')"
+          UDID="$(echo "$LINE" | grep -oE '[0-9A-Fa-f-]{36}' | head -n 1)"
+          echo "Resolved simulator device: $DEVICE"
+          echo "Resolved simulator udid: $UDID"
+          echo "CM_SIMULATOR_DEVICE=$DEVICE" >> "$CM_ENV"
+          echo "CM_SIMULATOR_UDID=$UDID" >> "$CM_ENV"
+
+      - name: Boot iOS simulator
+        script: |
+          set -e
+          xcrun simctl shutdown all || true
+          xcrun simctl boot "$CM_SIMULATOR_UDID" || true
+          xcrun simctl bootstatus "$CM_SIMULATOR_UDID" -b
 
       - name: Generate screenshots
         script: |

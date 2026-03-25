@@ -548,8 +548,7 @@ class LocalStorageService {
       if (authUser == null) return null;
 
       _currentUserId = authUser.uid;
-      _currentUserEmail =
-          authUser.email ?? appleCredential.email ?? '';
+      _currentUserEmail = authUser.email ?? appleCredential.email ?? '';
       _loggedOut = false;
 
       var user = await FirestoreService.getUserByUid(_currentUserId!);
@@ -1135,7 +1134,7 @@ class LocalStorageService {
     final plan = UserPlan.fromProfile(getUserProfile());
     final uid = _currentUserId;
     var ok = true;
-    if (plan.hasCloudBackup) {
+    if (_cloudEnabled && plan.hasCloudBackup) {
       if (uid != null && uid.isNotEmpty) {
         final saved =
             await FirestoreService.upsertDashboard(uid, dashboardToSave);
@@ -2074,7 +2073,7 @@ class LocalStorageService {
     }
 
     final plan = UserPlan.fromProfile(getUserProfile());
-    if (!plan.hasCloudBackup) return true;
+    if (!_cloudEnabled || !plan.hasCloudBackup) return true;
 
     if (_currentUserId == null || _currentUserId!.isEmpty) return false;
     final ok =
@@ -2085,7 +2084,7 @@ class LocalStorageService {
 
   static Future<bool> _persistGoals() async {
     final plan = UserPlan.fromProfile(getUserProfile());
-    if (!plan.hasCloudBackup) return true;
+    if (!_cloudEnabled || !plan.hasCloudBackup) return true;
 
     if (_currentUserId == null || _currentUserId!.isEmpty) return false;
     final ok = await FirestoreService.replaceGoals(_currentUserId!, _goals);

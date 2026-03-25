@@ -2,6 +2,7 @@
 
 ## Available workflows
 - `ios-screenshots`: automatic screenshot generation (artifact `.png`).
+- `ios-screenshots-ipad`: iPad 13-inch screenshot generation (artifact `.png`).
 - `ios-app-preview`: builds simulator `.app` so you can use Codemagic **Quick Launch** in browser.
 - `ios-appstore`: release IPA publish flow (now requires Firebase iOS plist secret).
 
@@ -9,6 +10,9 @@
 - Use the workflow: `ios-screenshots`
 - It runs on an iOS simulator (`iPhone 15 Pro Max`) and saves PNG files in:
   - `build/screenshots/iphone_69`
+- Use the workflow: `ios-screenshots-ipad`
+- It runs on an iPad simulator and saves PNG files in:
+  - `build/screenshots/ipad_13`
 
 ## What this workflow does
 1. Runs `flutter pub get`
@@ -18,10 +22,11 @@
 4. Exports screenshots as build artifacts
 
 ## Generated screenshots
-- `01_login`
-- `02_register` or `02_login_fallback`
-- `03_forgot_password` or `03_login_alt`
-- `04_premium_paywall`
+- `01_dashboard`
+- `02_add_expense`
+- `03_profile`
+- `04_calculator`
+- `05_premium`
 
 ## Files added for screenshot automation
 - `integration_test/app_store_screenshots_test.dart`
@@ -51,4 +56,5 @@ base64 -i GoogleService-Info.plist | pbcopy
 
 ## Notes
 - The app runs with `SCREENSHOT_MODE=true` during screenshot generation.
-- This mode avoids Firebase startup dependency and opens real app UI screens for capture.
+- This mode opens a seeded local session directly on the dashboard so the captured images show real in-app usage.
+- Run both screenshot workflows before uploading media to App Store Connect so the iPhone 6.7-inch and iPad 13-inch slots are covered.

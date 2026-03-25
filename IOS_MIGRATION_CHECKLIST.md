@@ -16,6 +16,9 @@ Este projeto foi adaptado para iOS no Flutter, mas antes de subir na App Store v
 - Crie os produtos no App Store Connect com os IDs usados no app:
   - `voolo`
   - `voolo_y`
+- No Codemagic, passe os mesmos IDs no build iOS com:
+  - `--dart-define=VOOLO_IOS_MONTHLY_SUBSCRIPTION_ID=voolo`
+  - `--dart-define=VOOLO_IOS_YEARLY_SUBSCRIPTION_ID=voolo_y`
 - Garanta que o backend tenha o endpoint iOS:
   - `POST /billing/appstore/sync-subscription`
 - O app agora envia `receiptData`, `subscriptionId` e `transactionId`.
@@ -28,6 +31,12 @@ Este projeto foi adaptado para iOS no Flutter, mas antes de subir na App Store v
   - `apple.bundle_id`
   - `apple.private_key_b64`
   - `apple.environment` (`SANDBOX` para testes/review, `PRODUCTION` quando for publicar)
+- O arquivo `.p8` da chave vai no backend, nao no app iOS. Use os nomes equivalentes:
+  - `APPLE_KEY_ID=BDWV8JZ952`
+  - `APPLE_ISSUER_ID=83971460-f0c1-42bb-8c02-8fbd6c17c5ba`
+  - `APPLE_BUNDLE_ID=com.voolo.jetx`
+  - `APPLE_PRIVATE_KEY_B64=<base64-do-arquivo-p8>`
+  - `APPLE_ENVIRONMENT=SANDBOX`
 - Exemplo de configuracao via Firebase CLI:
   - `firebase functions:config:set apple.key_id="..." apple.issuer_id="..." apple.bundle_id="com.voolo.jetx" apple.private_key_b64="..." apple.environment="SANDBOX"`
 - Depois publique apenas o backend:

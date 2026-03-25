@@ -9,8 +9,10 @@
   - Passos exatos para testar compra/restauracao.
 
 ## 2) 2.3.3 Accurate Metadata (screenshots)
-- Subir screenshots que mostrem telas internas reais do app (Dashboard, Lancamentos, Metas, Insights, Premium).
+- Subir screenshots que mostrem telas internas reais do app, como Dashboard, adicionar lancamento, Perfil, Calculadora e Premium.
 - Nao usar apenas splash, logo, login ou mockups externos.
+- Garantir que a maioria das imagens mostre o app em uso, com graficos, cards, formularios e navegação real.
+- Gerar e enviar os conjuntos de 6.7-inch iPhone e 13-inch iPad.
 - Se houver recursos premium nas capturas, garantir que eles existam no build enviado.
 
 ## 3) 2.3.8 Accurate Metadata (4+ e consistencia)
