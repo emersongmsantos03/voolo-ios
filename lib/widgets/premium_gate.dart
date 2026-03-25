@@ -382,45 +382,7 @@ void showPremiumDialog(BuildContext context) {
       defaultTargetPlatform == TargetPlatform.macOS;
 
   if (isApplePlatform) {
-    showDialog<void>(
-      context: context,
-      barrierDismissible: true,
-      builder: (_) => Dialog(
-        backgroundColor: scheme.surface,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-        child: Padding(
-          padding: const EdgeInsets.all(18),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Row(
-                children: [
-                  Expanded(
-                    child: Text(
-                      AppStrings.t(context, 'premium_dialog_title'),
-                      style: const TextStyle(
-                        fontWeight: FontWeight.w800,
-                        fontSize: 18,
-                      ),
-                    ),
-                  ),
-                  IconButton(
-                    onPressed: () => Navigator.pop(context),
-                    icon: const Icon(Icons.close_rounded),
-                    tooltip: AppStrings.t(context, 'close'),
-                  ),
-                ],
-              ),
-              Text(
-                'Os recursos Premium desta versao estao em revisao para iOS. Continue usando o app normalmente enquanto concluimos a ativacao nessa plataforma.',
-                style: TextStyle(color: scheme.onSurfaceVariant),
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
+    Navigator.of(context).pushNamed(AppRoutes.premium);
     return;
   }
 

@@ -107,9 +107,9 @@ class LocalStorageService {
       _currentUserId = authUser.uid;
       _loggedOut = false;
     } else {
-      _currentUserEmail = await _restoreLocalCurrentUserEmail();
       _currentUserId = null;
-      _loggedOut = _currentUserEmail == null;
+      _currentUserEmail = null;
+      _loggedOut = true;
     }
     userNotifier.value = getUserProfile();
 
@@ -229,24 +229,32 @@ class LocalStorageService {
     }
   }
 
-  static Future<String?> _restoreLocalCurrentUserEmail() async {
-    final saved = (await LocalDatabaseService.getSetting(_kCurrentUserEmail))
-        ?.trim()
-        .toLowerCase();
-    if (saved != null && saved.isNotEmpty && _findLocalUser(saved) != null) {
-      return saved;
-    }
-    if (!_cloudEnabled && _accounts.length == 1) {
-      return _accounts.first.email.trim().toLowerCase();
-    }
-    return null;
-  }
-
   static Future<void> _persistCurrentUserEmail(String? email) async {
     await LocalDatabaseService.setSetting(
       _kCurrentUserEmail,
       email?.trim().toLowerCase(),
     );
+  }
+
+  static Future<void> forceLogoutOnStartup() async {
+    _currentUserEmail = null;
+    _currentUserId = null;
+    _loggedOut = true;
+    userNotifier.value = null;
+    dashboardNotifier.value++;
+    goalNotifier.value++;
+    incomeNotifier.value++;
+    _dashboards.clear();
+    _goals.clear();
+    _incomes.clear();
+    _stopUserListener();
+    try {
+      await _googleSignInClient().signOut();
+    } catch (_) {}
+    try {
+      await _auth?.signOut();
+    } catch (_) {}
+    await _persistCurrentUserEmail(null);
   }
 
   static Future<void> _loadLocalUserData() async {

@@ -13,7 +13,6 @@ import 'core/utils/date_utils.dart';
 import 'routes/app_routes.dart';
 import 'services/local_database_service.dart';
 import 'services/local_storage_service.dart';
-import 'services/security_lock_service.dart';
 import 'state/locale_state.dart';
 import 'state/privacy_state.dart';
 import 'state/theme_state.dart';
@@ -85,6 +84,7 @@ Future<_BootstrapResult> _bootstrapApp() async {
   LocalStorageService.configureCloud(enabled: firebaseReady);
   await DateUtilsJetx.init();
   await LocalDatabaseService.init();
+  await LocalStorageService.forceLogoutOnStartup();
   await LocalStorageService.init().timeout(
     const Duration(seconds: 3),
     onTimeout: () => null,
@@ -94,17 +94,7 @@ Future<_BootstrapResult> _bootstrapApp() async {
     await LocalStorageService.waitForSync(timeoutSeconds: 2);
   }
 
-  final user = LocalStorageService.getUserProfile();
-  final needsSetup = user != null &&
-      (!user.setupCompleted ||
-          user.profession.trim().isEmpty ||
-          user.monthlyIncome <= 0 ||
-          user.objectives.isEmpty);
-  final initialRoute = user == null
-      ? AppRoutes.login
-      : (await SecurityLockService.requiresUnlockForCurrentUser()
-          ? AppRoutes.securityLock
-          : (needsSetup ? AppRoutes.onboarding : AppRoutes.dashboard));
+  final initialRoute = AppRoutes.login;
 
   return _BootstrapResult(
     firebaseReady: firebaseReady,
