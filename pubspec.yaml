@@ -2,7 +2,7 @@ name: jetx
 description: Voolo - Controle financeiro e educação financeira
 publish_to: 'none'
 
-version: 1.5.0+5
+version: 1.5.0+34
 
 environment:
   sdk: ">=3.1.0 <4.0.0"
