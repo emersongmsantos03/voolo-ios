@@ -50,6 +50,8 @@ class _PremiumPageState extends State<PremiumPage> {
   bool _working = false;
   bool _iosStoreProductsLoaded = false;
   String? _error;
+  String? _storeDiagnostic;
+  List<String> _missingStoreProductIds = const [];
 
   final Map<String, _PlanPurchaseOption> _planOptions = {};
   final Map<String, GooglePlayPurchaseDetails> _activeSubscriptionsByProductId =
@@ -123,7 +125,13 @@ class _PremiumPageState extends State<PremiumPage> {
       final available = await _iap.isAvailable();
       if (!available) {
         if (Platform.isIOS) {
-          _applyAppleFallbackPaywall();
+          _applyAppleFallbackPaywall(
+            storeDiagnostic: _buildStoreDiagnostic(
+              errorCode: 'store-unavailable',
+              errorMessage:
+                  'O StoreKit nao respondeu neste dispositivo ou simulador.',
+            ),
+          );
           return;
         }
         setState(() {
@@ -136,10 +144,18 @@ class _PremiumPageState extends State<PremiumPage> {
 
       final response =
           await _iap.queryProductDetails(_subscriptionProductIds());
+      final notFoundIds = List<String>.unmodifiable(response.notFoundIDs);
 
       if (response.error != null) {
         if (Platform.isIOS) {
-          _applyAppleFallbackPaywall();
+          _applyAppleFallbackPaywall(
+            missingStoreProductIds: notFoundIds,
+            storeDiagnostic: _buildStoreDiagnostic(
+              missingStoreProductIds: notFoundIds,
+              errorCode: response.error?.code,
+              errorMessage: response.error?.message,
+            ),
+          );
           return;
         }
         setState(() {
@@ -153,7 +169,12 @@ class _PremiumPageState extends State<PremiumPage> {
       final options = _buildPlanOptions(response.productDetails);
 
       if (options.isEmpty && Platform.isIOS) {
-        _applyAppleFallbackPaywall();
+        _applyAppleFallbackPaywall(
+          missingStoreProductIds: notFoundIds,
+          storeDiagnostic: _buildStoreDiagnostic(
+            missingStoreProductIds: notFoundIds,
+          ),
+        );
         return;
       }
 
@@ -165,13 +186,23 @@ class _PremiumPageState extends State<PremiumPage> {
           ..addAll(options);
         _loading = false;
         _error = options.isEmpty ? 'product-not-found' : null;
+        _missingStoreProductIds = notFoundIds;
+        _storeDiagnostic = _buildStoreDiagnostic(
+          missingStoreProductIds: notFoundIds,
+        );
       });
 
       await _loadPastPurchasesAndSync();
     } catch (_) {
       if (!mounted) return;
       if (Platform.isIOS) {
-        _applyAppleFallbackPaywall();
+        _applyAppleFallbackPaywall(
+          storeDiagnostic: _buildStoreDiagnostic(
+            errorCode: 'unknown',
+            errorMessage:
+                'Falha ao consultar os produtos da App Store neste build.',
+          ),
+        );
         return;
       }
       setState(() {
@@ -182,17 +213,54 @@ class _PremiumPageState extends State<PremiumPage> {
     }
   }
 
-  void _applyAppleFallbackPaywall() {
+  void _applyAppleFallbackPaywall({
+    List<String> missingStoreProductIds = const [],
+    String? storeDiagnostic,
+  }) {
     if (!mounted) return;
     setState(() {
       _storeAvailable = true;
       _iosStoreProductsLoaded = false;
       _loading = false;
       _error = null;
+      _missingStoreProductIds =
+          List<String>.unmodifiable(missingStoreProductIds);
+      _storeDiagnostic = storeDiagnostic ??
+          _buildStoreDiagnostic(
+            missingStoreProductIds: missingStoreProductIds,
+          );
       _planOptions
         ..clear()
         ..addAll(_buildFallbackApplePlanOptions());
     });
+  }
+
+  String _buildStoreDiagnostic({
+    List<String> missingStoreProductIds = const [],
+    String? errorCode,
+    String? errorMessage,
+  }) {
+    final expectedIds = <String>[
+      BillingService.iosMonthlySubscriptionId,
+      BillingService.iosYearlySubscriptionId,
+    ];
+    final missing = missingStoreProductIds.isEmpty
+        ? 'nenhum ID ausente foi reportado'
+        : missingStoreProductIds.join(', ');
+    final errorDetails = [
+      if (errorCode != null && errorCode.trim().isNotEmpty)
+        'codigo: $errorCode',
+      if (errorMessage != null && errorMessage.trim().isNotEmpty)
+        'mensagem: ${errorMessage.trim()}',
+    ].join(' | ');
+
+    return [
+      'O StoreKit nao retornou os produtos esperados.',
+      'IDs esperados: ${expectedIds.join(', ')}.',
+      'IDs ausentes: $missing.',
+      if (errorDetails.isNotEmpty) 'Resposta da loja: $errorDetails.',
+      'No dispositivo fisico, confirme que estes produtos existem no App Store Connect, estao em uma Subscription Group ativa e que a conta usada e sandbox/review.',
+    ].join(' ');
   }
 
   _PlanPurchaseOption? _effectiveOptionFor(String planKey) {
@@ -921,6 +989,10 @@ class _PremiumPageState extends State<PremiumPage> {
                     ),
                   ],
                   const SizedBox(height: 16),
+                  if (Platform.isIOS && !_iosStoreProductsLoaded) ...[
+                    _storeDiagnosticCard(context),
+                    const SizedBox(height: 12),
+                  ],
                   if (!showPaywallContent) ...[
                     Text(
                       Platform.isAndroid
@@ -971,18 +1043,6 @@ class _PremiumPageState extends State<PremiumPage> {
                       ),
                     ),
                     const SizedBox(height: 10),
-                    if (Platform.isIOS && !_iosStoreProductsLoaded) ...[
-                      Text(
-                        'Os produtos da App Store ainda nao foram encontrados. '
-                        'A compra so vai funcionar quando o App Store Connect '
-                        'estiver configurado com os IDs corretos.',
-                        style: TextStyle(
-                          color: scheme.error,
-                          fontWeight: FontWeight.w600,
-                        ),
-                      ),
-                      const SizedBox(height: 10),
-                    ],
                     Text(
                       Platform.isAndroid
                           ? 'No plano anual voce paga uma vez por ano e continua com acesso premium por todos os meses do periodo.'
@@ -1010,6 +1070,62 @@ class _PremiumPageState extends State<PremiumPage> {
                   ],
                 ],
               ),
+      ),
+    );
+  }
+
+  Widget _storeDiagnosticCard(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    final expectedIds = <String>[
+      BillingService.iosMonthlySubscriptionId,
+      BillingService.iosYearlySubscriptionId,
+    ];
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: scheme.errorContainer.withValues(alpha: 0.30),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: scheme.error.withValues(alpha: 0.35)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            'Diagnostico do StoreKit',
+            style: TextStyle(
+              color: scheme.error,
+              fontWeight: FontWeight.w800,
+            ),
+          ),
+          const SizedBox(height: 8),
+          Text(
+            _storeDiagnostic ??
+                'O app nao conseguiu carregar os produtos da App Store.',
+            style: TextStyle(
+              color: scheme.onErrorContainer,
+              height: 1.35,
+            ),
+          ),
+          const SizedBox(height: 8),
+          Text(
+            'IDs do build: ${expectedIds.join(', ')}',
+            style: TextStyle(
+              color: scheme.onErrorContainer,
+              fontSize: 12,
+            ),
+          ),
+          if (_missingStoreProductIds.isNotEmpty) ...[
+            const SizedBox(height: 4),
+            Text(
+              'IDs nao encontrados: ${_missingStoreProductIds.join(', ')}',
+              style: TextStyle(
+                color: scheme.onErrorContainer,
+                fontSize: 12,
+              ),
+            ),
+          ],
+        ],
       ),
     );
   }
