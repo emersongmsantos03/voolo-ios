@@ -19,6 +19,9 @@ Este projeto foi adaptado para iOS no Flutter, mas antes de subir na App Store v
 - No Codemagic, passe os mesmos IDs no build iOS com:
   - `--dart-define=VOOLO_IOS_MONTHLY_SUBSCRIPTION_ID=voolo`
   - `--dart-define=VOOLO_IOS_YEARLY_SUBSCRIPTION_ID=voolo_y`
+- Para o build enviado ao review, habilite:
+  - `--dart-define=APP_STORE_REVIEW_MODE=true`
+  - isso cria a conta de revisão localmente sem abrir uma sessão automática
 - Garanta que o backend tenha o endpoint iOS:
   - `POST /billing/appstore/sync-subscription`
 - O app agora envia `receiptData`, `subscriptionId` e `transactionId`.

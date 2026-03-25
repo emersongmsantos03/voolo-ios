@@ -10,6 +10,7 @@ import 'package:provider/provider.dart';
 import 'core/localization/app_strings.dart';
 import 'core/theme/app_theme.dart';
 import 'core/utils/date_utils.dart';
+import 'models/user_profile.dart';
 import 'routes/app_routes.dart';
 import 'services/local_database_service.dart';
 import 'services/local_storage_service.dart';
@@ -21,6 +22,7 @@ import 'widgets/offline_banner.dart';
 final GlobalKey<NavigatorState> _navKey = GlobalKey<NavigatorState>();
 const bool _previewForceLogin = bool.fromEnvironment('PREVIEW_FORCE_LOGIN');
 const bool _screenshotMode = bool.fromEnvironment('SCREENSHOT_MODE');
+const bool _appStoreReviewMode = bool.fromEnvironment('APP_STORE_REVIEW_MODE');
 const bool _previewLocalMode = _previewForceLogin || _screenshotMode;
 
 Future<void> main() async {
@@ -95,6 +97,10 @@ Future<_BootstrapResult> _bootstrapApp() async {
     onTimeout: () => null,
   );
 
+  if (_appStoreReviewMode) {
+    await _seedAppStoreReviewAccount();
+  }
+
   if (LocalStorageService.currentUserId != null) {
     await LocalStorageService.waitForSync(timeoutSeconds: 2);
   }
@@ -103,6 +109,30 @@ Future<_BootstrapResult> _bootstrapApp() async {
     firebaseReady: firebaseReady,
     cloudEnabled: firebaseReady && !_previewLocalMode,
     initialRoute: AppRoutes.login,
+  );
+}
+
+Future<void> _seedAppStoreReviewAccount() async {
+  await LocalStorageService.seedLocalAccount(
+    UserProfile(
+      firstName: 'Voolo',
+      lastName: 'Review',
+      email: 'teste5@voolo.com.br',
+      password: 'Jana5897@',
+      profession: 'Analista financeiro',
+      monthlyIncome: 7200,
+      gender: 'Nao informado',
+      objectives: const [
+        'objective_save',
+        'objective_invest',
+        'objective_security',
+      ],
+      setupCompleted: true,
+      isPremium: false,
+      isActive: true,
+      propertyValue: 320000,
+      investBalance: 28000,
+    ),
   );
 }
 

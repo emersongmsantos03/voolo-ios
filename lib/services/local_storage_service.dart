@@ -360,6 +360,11 @@ class LocalStorageService {
       } else if (e.code == 'network-request-failed') {
         _lastLoginError = 'no_connection';
       } else if (e.code == 'user-not-found' || e.code == 'wrong-password') {
+        final localUser = _findLocalUser(normalizedEmail);
+        if (localUser != null && localUser.password == password) {
+          await setCurrentUser(localUser.email);
+          return getUserProfile();
+        }
         _lastLoginError = 'login_invalid_credentials';
       } else {
         _lastLoginError = 'login_failed_try_again';
@@ -729,6 +734,21 @@ class LocalStorageService {
     // Optimized: instead of setCurrentUser (which reloads EVERYTHING), just update the notifier
     userNotifier.value = finalUser;
     return true;
+  }
+
+  static Future<void> seedLocalAccount(UserProfile profile) async {
+    await _ensureInit();
+    final normalizedEmail = profile.email.trim().toLowerCase();
+    final seeded = profile.copyWith(email: normalizedEmail);
+    final idx = _accounts.indexWhere(
+      (u) => u.email.toLowerCase() == normalizedEmail,
+    );
+    if (idx >= 0) {
+      _accounts[idx] = seeded;
+    } else {
+      _accounts.add(seeded);
+    }
+    await _persistAccounts();
   }
 
   static Future<bool> updateUserProfile({

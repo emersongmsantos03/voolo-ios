@@ -128,6 +128,7 @@ workflows:
           set -e
           flutter build ipa --release --no-codesign \
             --build-number="$CM_FLUTTER_BUILD_NUMBER" \
+            --dart-define=APP_STORE_REVIEW_MODE=true \
             --dart-define=VOOLO_IOS_MONTHLY_SUBSCRIPTION_ID="$VOOLO_IOS_MONTHLY_SUBSCRIPTION_ID" \
             --dart-define=VOOLO_IOS_YEARLY_SUBSCRIPTION_ID="$VOOLO_IOS_YEARLY_SUBSCRIPTION_ID"
 
