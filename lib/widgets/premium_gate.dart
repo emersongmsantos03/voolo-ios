@@ -380,9 +380,10 @@ void showPremiumDialog(BuildContext context) {
   final scheme = Theme.of(context).colorScheme;
   final isApplePlatform = defaultTargetPlatform == TargetPlatform.iOS ||
       defaultTargetPlatform == TargetPlatform.macOS;
+  final navigator = Navigator.of(context, rootNavigator: true);
 
   if (isApplePlatform) {
-    Navigator.of(context).pushNamed(AppRoutes.premium);
+    navigator.pushNamed(AppRoutes.premium);
     return;
   }
 
@@ -443,10 +444,12 @@ void showPremiumDialog(BuildContext context) {
                 width: double.infinity,
                 child: ElevatedButton(
                   onPressed: () {
-                    Navigator.pop(context);
-                    Navigator.of(context).pushNamed(
-                      AppRoutes.premium,
-                      arguments: {'plan': selectedPlan},
+                    navigator.pop();
+                    Future.microtask(
+                      () => navigator.pushNamed(
+                        AppRoutes.premium,
+                        arguments: {'plan': selectedPlan},
+                      ),
                     );
                   },
                   child: Text(AppStrings.t(context, 'premium_cta')),

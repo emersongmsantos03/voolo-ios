@@ -40,8 +40,7 @@ class _PlanPurchaseOption {
 }
 
 class _PremiumPageState extends State<PremiumPage> {
-  static const bool _screenshotMode =
-      bool.fromEnvironment('SCREENSHOT_MODE');
+  static const bool _screenshotMode = bool.fromEnvironment('SCREENSHOT_MODE');
 
   final InAppPurchase _iap = InAppPurchase.instance;
   StreamSubscription<List<PurchaseDetails>>? _purchaseSub;
@@ -49,6 +48,7 @@ class _PremiumPageState extends State<PremiumPage> {
   bool _storeAvailable = false;
   bool _loading = true;
   bool _working = false;
+  bool _iosStoreProductsLoaded = false;
   String? _error;
 
   final Map<String, _PlanPurchaseOption> _planOptions = {};
@@ -68,6 +68,7 @@ class _PremiumPageState extends State<PremiumPage> {
     if (_screenshotMode) {
       _loading = false;
       _storeAvailable = true;
+      _iosStoreProductsLoaded = true;
       _planOptions['monthly'] = _PlanPurchaseOption(
         planKey: 'monthly',
         productId: BillingService.iosMonthlySubscriptionId,
@@ -103,6 +104,7 @@ class _PremiumPageState extends State<PremiumPage> {
     if (Platform.isIOS) {
       _storeAvailable = true;
       _loading = false;
+      _iosStoreProductsLoaded = false;
       _planOptions.addAll(_buildFallbackApplePlanOptions());
     }
     _initStore();
@@ -132,7 +134,8 @@ class _PremiumPageState extends State<PremiumPage> {
         return;
       }
 
-      final response = await _iap.queryProductDetails(_subscriptionProductIds());
+      final response =
+          await _iap.queryProductDetails(_subscriptionProductIds());
 
       if (response.error != null) {
         if (Platform.isIOS) {
@@ -156,6 +159,7 @@ class _PremiumPageState extends State<PremiumPage> {
 
       setState(() {
         _storeAvailable = true;
+        _iosStoreProductsLoaded = Platform.isIOS && options.isNotEmpty;
         _planOptions
           ..clear()
           ..addAll(options);
@@ -182,6 +186,7 @@ class _PremiumPageState extends State<PremiumPage> {
     if (!mounted) return;
     setState(() {
       _storeAvailable = true;
+      _iosStoreProductsLoaded = false;
       _loading = false;
       _error = null;
       _planOptions
@@ -296,7 +301,8 @@ class _PremiumPageState extends State<PremiumPage> {
       );
     }
 
-    final legacyYearly = firstById(BillingService.googlePlayYearlySubscriptionId);
+    final legacyYearly =
+        firstById(BillingService.googlePlayYearlySubscriptionId);
     if (!options.containsKey('yearly') && legacyYearly != null) {
       options['yearly'] = _PlanPurchaseOption(
         planKey: 'yearly',
@@ -387,8 +393,8 @@ class _PremiumPageState extends State<PremiumPage> {
   Future<void> _loadPastPurchasesAndSync() async {
     if (!Platform.isAndroid) return;
     try {
-      final addition = _iap.getPlatformAddition<
-          InAppPurchaseAndroidPlatformAddition>();
+      final addition =
+          _iap.getPlatformAddition<InAppPurchaseAndroidPlatformAddition>();
       final response = await addition.queryPastPurchases();
       if (response.error != null) return;
 
@@ -409,12 +415,24 @@ class _PremiumPageState extends State<PremiumPage> {
     if (_working) return;
     setState(() => _working = true);
     try {
-      await _iap.restorePurchases();
-      await _loadPastPurchasesAndSync();
-      if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Compras restauradas e sincronizadas.')),
-      );
+      try {
+        await _iap.restorePurchases();
+        await _loadPastPurchasesAndSync();
+        if (!mounted) return;
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Compras restauradas e sincronizadas.')),
+        );
+      } catch (error) {
+        debugPrint('Restore purchases failed: $error');
+        if (!mounted) return;
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text(
+              'Nao foi possivel restaurar as compras agora.',
+            ),
+          ),
+        );
+      }
     } finally {
       if (mounted) setState(() => _working = false);
     }
@@ -422,6 +440,18 @@ class _PremiumPageState extends State<PremiumPage> {
 
   Future<void> _buySelectedPlan() async {
     if (_working) return;
+    if (Platform.isIOS && !_iosStoreProductsLoaded) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text(
+            'Os produtos da App Store ainda nao foram carregados. '
+            'Verifique o App Store Connect.',
+          ),
+        ),
+      );
+      return;
+    }
     final option = _effectiveOptionFor(_selectedPlan);
     if (option == null) {
       if (!mounted) return;
@@ -443,16 +473,28 @@ class _PremiumPageState extends State<PremiumPage> {
           productDetails: option.productDetails,
           applicationUserName: uid,
           offerToken: option.offerToken,
-          changeSubscriptionParam: (oldSub != null &&
-                  oldSub.productID != option.productId)
-              ? ChangeSubscriptionParam(oldPurchaseDetails: oldSub)
-              : null,
+          changeSubscriptionParam:
+              (oldSub != null && oldSub.productID != option.productId)
+                  ? ChangeSubscriptionParam(oldPurchaseDetails: oldSub)
+                  : null,
         );
       } else {
         param = PurchaseParam(productDetails: option.productDetails);
       }
 
-      await _iap.buyNonConsumable(purchaseParam: param);
+      try {
+        await _iap.buyNonConsumable(purchaseParam: param);
+      } catch (error) {
+        debugPrint('Buy purchase failed: $error');
+        if (!mounted) return;
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text(
+              'Nao foi possivel abrir a compra da App Store.',
+            ),
+          ),
+        );
+      }
     } finally {
       if (mounted) setState(() => _working = false);
     }
@@ -588,7 +630,8 @@ class _PremiumPageState extends State<PremiumPage> {
     final priceText = option?.priceText ?? fallbackPrice;
 
     return InkWell(
-      onTap: option == null ? null : () => setState(() => _selectedPlan = planKey),
+      onTap:
+          option == null ? null : () => setState(() => _selectedPlan = planKey),
       borderRadius: BorderRadius.circular(16),
       child: AnimatedContainer(
         duration: const Duration(milliseconds: 180),
@@ -717,14 +760,16 @@ class _PremiumPageState extends State<PremiumPage> {
                         planKey: 'monthly',
                         title: 'Plano mensal',
                         fallbackPrice: 'R\$ 29,90 / mes',
-                        subtitle: 'Renovacao automatica. Cancele quando quiser.',
+                        subtitle:
+                            'Renovacao automatica. Cancele quando quiser.',
                       ),
                       const SizedBox(height: 10),
                       _planTile(
                         planKey: 'yearly',
                         title: 'Plano anual',
                         fallbackPrice: 'R\$ 299,90 / ano',
-                        subtitle: 'Cobrado 1 vez por ano. Melhora o custo mensal.',
+                        subtitle:
+                            'Cobrado 1 vez por ano. Melhora o custo mensal.',
                       ),
                       const SizedBox(height: 16),
                       Container(
@@ -738,8 +783,10 @@ class _PremiumPageState extends State<PremiumPage> {
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
                             _perkLine(context, 'Relatorios e insights premium'),
-                            _perkLine(context, 'Calculadora e simuladores avancados'),
-                            _perkLine(context, 'Restaurar compras no mesmo Apple ID'),
+                            _perkLine(
+                                context, 'Calculadora e simuladores avancados'),
+                            _perkLine(
+                                context, 'Restaurar compras no mesmo Apple ID'),
                           ],
                         ),
                       ),
@@ -900,7 +947,8 @@ class _PremiumPageState extends State<PremiumPage> {
                       height: 50,
                       child: ElevatedButton(
                         onPressed: _working ||
-                                _effectiveOptionFor(_selectedPlan) == null
+                                _effectiveOptionFor(_selectedPlan) == null ||
+                                (Platform.isIOS && !_iosStoreProductsLoaded)
                             ? null
                             : _buySelectedPlan,
                         child: _working
@@ -923,12 +971,24 @@ class _PremiumPageState extends State<PremiumPage> {
                       ),
                     ),
                     const SizedBox(height: 10),
+                    if (Platform.isIOS && !_iosStoreProductsLoaded) ...[
+                      Text(
+                        'Os produtos da App Store ainda nao foram encontrados. '
+                        'A compra so vai funcionar quando o App Store Connect '
+                        'estiver configurado com os IDs corretos.',
+                        style: TextStyle(
+                          color: scheme.error,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                      const SizedBox(height: 10),
+                    ],
                     Text(
                       Platform.isAndroid
                           ? 'No plano anual voce paga uma vez por ano e continua com acesso premium por todos os meses do periodo.'
                           : 'O pagamento sera processado pela App Store e pode ser restaurado no mesmo Apple ID.',
-                      style:
-                          TextStyle(color: scheme.onSurfaceVariant, fontSize: 12),
+                      style: TextStyle(
+                          color: scheme.onSurfaceVariant, fontSize: 12),
                     ),
                     const SizedBox(height: 14),
                     Wrap(
@@ -937,8 +997,7 @@ class _PremiumPageState extends State<PremiumPage> {
                       runSpacing: 8,
                       children: [
                         TextButton(
-                          onPressed: () =>
-                              _openExternalUrl(AuthLinks.termsUrl),
+                          onPressed: () => _openExternalUrl(AuthLinks.termsUrl),
                           child: const Text('Termos de Uso'),
                         ),
                         TextButton(
