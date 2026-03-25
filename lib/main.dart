@@ -10,9 +10,6 @@ import 'package:provider/provider.dart';
 import 'core/localization/app_strings.dart';
 import 'core/theme/app_theme.dart';
 import 'core/utils/date_utils.dart';
-import 'models/expense.dart';
-import 'models/monthly_dashboard.dart';
-import 'models/user_profile.dart';
 import 'routes/app_routes.dart';
 import 'services/local_database_service.dart';
 import 'services/local_storage_service.dart';
@@ -98,130 +95,15 @@ Future<_BootstrapResult> _bootstrapApp() async {
     onTimeout: () => null,
   );
 
-  if (_previewLocalMode) {
-    await _seedPreviewSession();
-  }
-
   if (LocalStorageService.currentUserId != null) {
     await LocalStorageService.waitForSync(timeoutSeconds: 2);
   }
 
-  final initialRoute =
-      _previewLocalMode && LocalStorageService.getUserProfile() != null
-          ? AppRoutes.dashboard
-          : AppRoutes.login;
-
   return _BootstrapResult(
     firebaseReady: firebaseReady,
     cloudEnabled: firebaseReady && !_previewLocalMode,
-    initialRoute: initialRoute,
+    initialRoute: AppRoutes.login,
   );
-}
-
-Future<void> _seedPreviewSession() async {
-  const previewEmail = 'preview@voolo.com.br';
-  const previewPassword = 'Voolo123!';
-
-  UserProfile? demoProfile;
-  final accounts = LocalStorageService.getAccounts();
-  for (final account in accounts) {
-    if (account.email.trim().toLowerCase() == previewEmail) {
-      demoProfile = account;
-      break;
-    }
-  }
-
-  if (demoProfile == null) {
-    demoProfile = UserProfile(
-      firstName: 'Emerson',
-      lastName: 'Moraes',
-      email: previewEmail,
-      password: previewPassword,
-      profession: 'Analista financeiro',
-      monthlyIncome: 7200,
-      gender: 'Nao informado',
-      objectives: const [
-        'objective_save',
-        'objective_invest',
-        'objective_security',
-      ],
-      setupCompleted: true,
-      isPremium: true,
-      isActive: true,
-      propertyValue: 320000,
-      investBalance: 28000,
-    );
-    final created = await LocalStorageService.createAccount(demoProfile);
-    if (!created) {
-      final login = await LocalStorageService.login(
-        email: previewEmail,
-        password: previewPassword,
-      );
-      if (login == null) return;
-      demoProfile = login;
-    }
-  }
-
-  demoProfile = demoProfile.copyWith(
-    firstName: 'Emerson',
-    lastName: 'Moraes',
-    profession: 'Analista financeiro',
-    monthlyIncome: 7200,
-    setupCompleted: true,
-    isPremium: true,
-    objectives: const [
-      'objective_save',
-      'objective_invest',
-      'objective_security',
-    ],
-    propertyValue: 320000,
-    investBalance: 28000,
-  );
-  await LocalStorageService.saveUserProfile(demoProfile);
-
-  final now = DateTime.now();
-  final previewMonth = DateTime(now.year, now.month, 1);
-  final previewDashboard = MonthlyDashboard(
-    month: previewMonth.month,
-    year: previewMonth.year,
-    salary: demoProfile.monthlyIncome,
-    expenses: [
-      Expense(
-        id: 'preview-rent',
-        name: 'Aluguel',
-        type: ExpenseType.fixed,
-        category: ExpenseCategory.moradia,
-        amount: 2100,
-        date: DateTime(now.year, now.month, 5),
-        dueDay: 5,
-      ),
-      Expense(
-        id: 'preview-groceries',
-        name: 'Mercado',
-        type: ExpenseType.variable,
-        category: ExpenseCategory.alimentacao,
-        amount: 860,
-        date: DateTime(now.year, now.month, 12),
-      ),
-      Expense(
-        id: 'preview-transport',
-        name: 'Transporte',
-        type: ExpenseType.variable,
-        category: ExpenseCategory.transporte,
-        amount: 320,
-        date: DateTime(now.year, now.month, 18),
-      ),
-      Expense(
-        id: 'preview-invest',
-        name: 'Investimento',
-        type: ExpenseType.investment,
-        category: ExpenseCategory.investment,
-        amount: 950,
-        date: DateTime(now.year, now.month, 22),
-      ),
-    ],
-  );
-  await LocalStorageService.saveDashboard(previewDashboard);
 }
 
 class JetxApp extends StatelessWidget {

@@ -22,11 +22,12 @@
 4. Exports screenshots as build artifacts
 
 ## Generated screenshots
-- `01_dashboard`
-- `02_add_expense`
-- `03_profile`
-- `04_calculator`
-- `05_premium`
+- `01_login`
+- `02_dashboard`
+- `03_add_expense`
+- `04_profile`
+- `05_calculator`
+- `06_premium`
 
 ## Files added for screenshot automation
 - `integration_test/app_store_screenshots_test.dart`
@@ -56,5 +57,5 @@ base64 -i GoogleService-Info.plist | pbcopy
 
 ## Notes
 - The app runs with `SCREENSHOT_MODE=true` during screenshot generation.
-- This mode opens a seeded local session directly on the dashboard so the captured images show real in-app usage.
+- In screenshot mode, the app still starts on the login screen; the integration test creates a local demo account and logs in before capturing the in-app screens.
 - Run both screenshot workflows before uploading media to App Store Connect so the iPhone 6.7-inch and iPad 13-inch slots are covered.
