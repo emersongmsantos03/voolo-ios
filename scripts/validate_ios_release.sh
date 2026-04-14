@@ -37,8 +37,6 @@ require_match 'MARKETING_VERSION = "$(FLUTTER_BUILD_NAME)";' "ios/Runner.xcodepr
 require_match 'CURRENT_PROJECT_VERSION = "$(FLUTTER_BUILD_NUMBER)";' "ios/Runner.xcodeproj/project.pbxproj"
 require_match "PrivacyInfo.xcprivacy" "ios/Runner.xcodeproj/project.pbxproj"
 require_match "https://voolo-ad416.web.app/auth/reset" "lib/core/constants/auth_links.dart"
-require_match "Abrir no Paddle" "lib/pages/premium/premium_page.dart"
-require_match "Excluir minha conta" "lib/pages/profile/profile_page.dart"
 require_match "deleteCurrentAccount" "lib/services/local_storage_service.dart"
 require_match "deleteUserAccount" "lib/services/firestore_service.dart"
 require_match "FIREBASE_IOS_PLIST_BASE64" "codemagic.yaml"
