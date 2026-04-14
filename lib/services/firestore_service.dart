@@ -1494,6 +1494,13 @@ class FirestoreService {
     await Future.wait(tasks);
   }
 
+  static Future<void> deleteUserAccount({
+    required String uid,
+    String? legacyEmail,
+  }) async {
+    await deleteUserData(uid: uid, legacyEmail: legacyEmail);
+  }
+
   static Future<void> logEngagementEvent({
     required String uid,
     required String type,
