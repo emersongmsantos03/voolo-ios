@@ -9,10 +9,8 @@ workflows:
       xcode: latest
       cocoapods: default
       ios_signing:
-        provisioning_profiles:
-          - voolo_appstore_profile_prod
-        certificates:
-          - voolo_distribution_prod
+        distribution_type: app_store
+        bundle_identifier: com.voolo.jetx
       groups:
         - firebase
       vars:
@@ -93,25 +91,13 @@ workflows:
           /usr/libexec/PlistBuddy -c "Add :CFBundleURLTypes:0:CFBundleURLSchemes array" ios/Runner/Info.plist
           /usr/libexec/PlistBuddy -c "Add :CFBundleURLTypes:0:CFBundleURLSchemes:0 string $REVERSED_CLIENT_ID" ios/Runner/Info.plist
 
-      - name: Set up keychain and certificates
-        script: |
-          keychain initialize
-          keychain add-certificates
-
       - name: Set up code signing settings on Xcode project
         script: |
           xcode-project use-profiles
 
-      - name: Debug signing files
-        script: |
-          echo "Certificates in keychain:"
-          keychain list-certificates || true
-          echo "Provisioning profiles found:"
-          find "$HOME/Library/MobileDevice/Provisioning Profiles" "$HOME/Library/Developer/Xcode/UserData/Provisioning Profiles" -maxdepth 1 -type f \( -name "*.mobileprovision" -o -name "*.provisionprofile" \) 2>/dev/null | sed 's|^| - |' || true
-
       - name: Verify signing settings
         script: |
-          xcode-project show-build-settings --project ios/Runner.xcodeproj --scheme Runner | grep -E "CODE_SIGN_STYLE|DEVELOPMENT_TEAM|PROVISIONING_PROFILE_SPECIFIER|PRODUCT_BUNDLE_IDENTIFIER"
+          xcode-project show-build-settings --project ios/Runner.xcodeproj --scheme Runner | grep -E "CODE_SIGN_STYLE|DEVELOPMENT_TEAM|PRODUCT_BUNDLE_IDENTIFIER|CODE_SIGN_IDENTITY" || true
 
       - name: Set unique iOS build number
         script: |
@@ -126,69 +112,11 @@ workflows:
       - name: Build signed IPA
         script: |
           set -e
-          flutter build ipa --release --no-codesign \
+          flutter build ipa --release \
             --build-number="$CM_FLUTTER_BUILD_NUMBER" \
             --dart-define=APP_STORE_REVIEW_MODE=true \
             --dart-define=VOOLO_IOS_MONTHLY_SUBSCRIPTION_ID="$VOOLO_IOS_MONTHLY_SUBSCRIPTION_ID" \
             --dart-define=VOOLO_IOS_YEARLY_SUBSCRIPTION_ID="$VOOLO_IOS_YEARLY_SUBSCRIPTION_ID"
-
-      - name: Export signed IPA with App Store profile
-        script: |
-          set -e
-          mkdir -p build/ios/ipa
-
-          ARCHIVE_PATH="$(find build/ios/archive -maxdepth 1 -type d -name '*.xcarchive' | head -n 1)"
-          if [ -z "$ARCHIVE_PATH" ]; then
-            echo "ERROR: xcarchive not found after flutter build."
-            exit 1
-          fi
-
-          PROFILE_PATH="$(find "$HOME/Library/MobileDevice/Provisioning Profiles" "$HOME/Library/Developer/Xcode/UserData/Provisioning Profiles" -maxdepth 1 -type f \( -name '*.mobileprovision' -o -name '*.provisionprofile' \) -size +1c 2>/dev/null | head -n 1)"
-          if [ -z "$PROFILE_PATH" ]; then
-            echo "ERROR: No provisioning profile found in Codemagic machine."
-            echo "Checked paths:"
-            echo " - $HOME/Library/MobileDevice/Provisioning Profiles"
-            echo " - $HOME/Library/Developer/Xcode/UserData/Provisioning Profiles"
-            exit 1
-          fi
-
-          security cms -D -i "$PROFILE_PATH" > /tmp/profile.plist
-          PROFILE_NAME="$(/usr/libexec/PlistBuddy -c 'Print :Name' /tmp/profile.plist)"
-          if [ -z "$PROFILE_NAME" ]; then
-            echo "ERROR: Could not read provisioning profile name."
-            exit 1
-          fi
-
-          cat > /tmp/ExportOptions.plist <<EOF
-          <?xml version="1.0" encoding="UTF-8"?>
-          <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
-          <plist version="1.0">
-          <dict>
-            <key>method</key>
-            <string>app-store</string>
-            <key>signingStyle</key>
-            <string>manual</string>
-            <key>teamID</key>
-            <string>VYJN27MQ6V</string>
-            <key>provisioningProfiles</key>
-            <dict>
-              <key>${BUNDLE_ID}</key>
-              <string>${PROFILE_NAME}</string>
-            </dict>
-            <key>stripSwiftSymbols</key>
-            <true/>
-            <key>uploadBitcode</key>
-            <false/>
-            <key>uploadSymbols</key>
-            <true/>
-          </dict>
-          </plist>
-          EOF
-
-          xcodebuild -exportArchive \
-            -archivePath "$ARCHIVE_PATH" \
-            -exportPath build/ios/ipa \
-            -exportOptionsPlist /tmp/ExportOptions.plist
 
       - name: Validate and collect IPA
         script: |
