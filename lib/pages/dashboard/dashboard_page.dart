@@ -9,6 +9,7 @@ import 'package:jetx/core/localization/app_strings.dart';
 import 'package:jetx/models/credit_card.dart';
 import 'package:jetx/models/debt_v2.dart';
 import 'package:jetx/models/expense.dart';
+import 'package:jetx/models/income_source.dart';
 import 'package:jetx/models/monthly_dashboard.dart';
 import 'package:jetx/models/user_profile.dart';
 import 'package:jetx/core/plans/user_plan.dart';
@@ -34,6 +35,7 @@ import 'package:jetx/utils/date_utils.dart';
 import 'package:jetx/utils/budget_rule_utils.dart';
 import 'package:jetx/utils/finance_score_utils.dart';
 import 'package:jetx/utils/finance_overview_utils.dart';
+import 'package:jetx/utils/income_category_utils.dart';
 import 'package:jetx/widgets/educational_empty_state.dart';
 import 'package:jetx/widgets/money_visibility_button.dart';
 import 'package:jetx/widgets/modals/income_modal.dart';
@@ -167,7 +169,7 @@ class _DashboardPageState extends State<DashboardPage> {
         MonthlyDashboard(
           month: _currentMonth.month,
           year: _currentMonth.year,
-          salary: _user!.monthlyIncome,
+          salary: LocalStorageService.incomeTotalForMonth(_currentMonth),
           expenses: const [],
         );
 
@@ -408,6 +410,16 @@ class _DashboardPageState extends State<DashboardPage> {
     return fixed.map((e) => copyExpenseForMonth(e, year, month)).toList();
   }
 
+  int _monthKey(DateTime date) => date.year * 12 + date.month;
+
+  DateTime _accountStartMonth() {
+    final createdAt = _user?.createdAt;
+    if (createdAt == null) {
+      return DateTime(_currentMonth.year, _currentMonth.month, 1);
+    }
+    return DateTime(createdAt.year, createdAt.month, 1);
+  }
+
   void _changeMonth(int delta) {
     final next = DateTime(_currentMonth.year, _currentMonth.month + delta, 1);
     if (!_isWithinWindow(next)) return;
@@ -416,10 +428,10 @@ class _DashboardPageState extends State<DashboardPage> {
   }
 
   bool _isWithinWindow(DateTime month) {
-    final now = DateTime.now();
-    final start = DateTime(now.year, now.month, 1);
-    final end = DateTime(now.year, now.month + 11, 1);
-    return !(month.isBefore(start) || month.isAfter(end));
+    final current = DateTime(DateTime.now().year, DateTime.now().month, 1);
+    final start = _accountStartMonth();
+    final key = _monthKey(month);
+    return key >= _monthKey(start) && key <= _monthKey(current);
   }
 
   void _snack(String msg) {
@@ -700,7 +712,8 @@ class _DashboardPageState extends State<DashboardPage> {
                   if (!isInvestment) ...[
                     SwitchListTile(
                       contentPadding: EdgeInsets.zero,
-                      title: const Text('Cartão de crédito'),
+                      title: Text(
+                          AppStrings.t(context, 'monthly_report_card_credit')),
                       value: isCard,
                       activeThumbColor: Theme.of(context).colorScheme.primary,
                       activeTrackColor: Theme.of(
@@ -776,11 +789,12 @@ class _DashboardPageState extends State<DashboardPage> {
                       initialValue: cards.isEmpty ? null : creditCardId,
                       decoration: const InputDecoration(labelText: 'Cartão'),
                       items: cards.isEmpty
-                          ? const [
+                          ? [
                               DropdownMenuItem<String?>(
                                 value: null,
                                 child: Text(
-                                  'Sem cartão cadastrado',
+                                  AppStrings.t(
+                                      context, 'monthly_report_no_card'),
                                   overflow: TextOverflow.ellipsis,
                                 ),
                               ),
@@ -811,7 +825,9 @@ class _DashboardPageState extends State<DashboardPage> {
                     ),
                     const SizedBox(height: 6),
                     Text(
-                      'Vencimento do cartão: dia ${cardDueDay ?? '-'}',
+                      AppStrings.tr(context, 'monthly_report_card_due_day', {
+                        'day': '${cardDueDay ?? '-'}',
+                      }),
                       style: TextStyle(
                         color: AppTheme.textSecondary(context),
                         fontSize: 12,
@@ -823,13 +839,16 @@ class _DashboardPageState extends State<DashboardPage> {
                     DropdownButtonFormField<int?>(
                       isExpanded: true,
                       initialValue: billDueDay,
-                      decoration: const InputDecoration(
-                        labelText: 'Dia de vencimento (opcional)',
+                      decoration: InputDecoration(
+                        labelText: AppStrings.t(
+                          context,
+                          'monthly_report_due_day_optional',
+                        ),
                       ),
                       items: [
-                        const DropdownMenuItem<int?>(
+                        DropdownMenuItem<int?>(
                           value: null,
-                          child: Text('Sem vencimento'),
+                          child: Text(AppStrings.t(context, 'no_due_date')),
                         ),
                         ...List.generate(
                           31,
@@ -928,11 +947,13 @@ class _DashboardPageState extends State<DashboardPage> {
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context, 'month'),
-            child: const Text('Somente este mês'),
+            child: Text(
+                AppStrings.t(context, 'profile_income_delete_scope_month')),
           ),
           ElevatedButton(
             onPressed: () => Navigator.pop(context, 'all'),
-            child: const Text('Meses seguintes'),
+            child: Text(
+                AppStrings.t(context, 'profile_income_delete_scope_future')),
           ),
         ],
       ),
@@ -1149,11 +1170,12 @@ class _DashboardPageState extends State<DashboardPage> {
             child: ValueListenableBuilder<int>(
               valueListenable: LocalStorageService.incomeNotifier,
               builder: (context, _, __) {
-                final incomes = LocalStorageService.getIncomes().toList()
-                  ..sort((a, b) {
-                    if (a.isPrimary == b.isPrimary) return 0;
-                    return a.isPrimary ? -1 : 1;
-                  });
+                final month = _currentMonth;
+                final incomes = LocalStorageService.getIncomes()
+                    .where((income) => income.appliesToMonth(month))
+                    .toList()
+                  ..sort((a, b) =>
+                      a.title.toLowerCase().compareTo(b.title.toLowerCase()));
 
                 return SizedBox(
                   height: maxHeight,
@@ -1161,7 +1183,7 @@ class _DashboardPageState extends State<DashboardPage> {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
-                        'Editar rendas',
+                        AppStrings.t(context, 'income_modal_edit_title'),
                         style: TextStyle(
                           color: AppTheme.textPrimary(context),
                           fontSize: 18,
@@ -1170,28 +1192,16 @@ class _DashboardPageState extends State<DashboardPage> {
                       ),
                       const SizedBox(height: 4),
                       Text(
-                        'Toque em uma renda para editar.',
+                        'Toque em uma entrada para editar.',
                         style: TextStyle(
                           color: AppTheme.textSecondary(context),
                         ),
                       ),
-                      const SizedBox(height: 8),
-                      Align(
-                        alignment: Alignment.centerLeft,
-                        child: TextButton.icon(
-                          onPressed: () async {
-                            await IncomeModal.show(context);
-                          },
-                          icon: const Icon(Icons.add),
-                          label: const Text('Adicionar renda'),
-                        ),
-                      ),
-                      const SizedBox(height: 6),
                       Expanded(
                         child: incomes.isEmpty
                             ? Center(
                                 child: Text(
-                                  'Nenhuma renda cadastrada.',
+                                  'Nenhuma entrada cadastrada.',
                                   style: TextStyle(
                                     color: AppTheme.textSecondary(context),
                                   ),
@@ -1213,18 +1223,17 @@ class _DashboardPageState extends State<DashboardPage> {
                                         borderRadius: BorderRadius.circular(12),
                                       ),
                                       title: Text(
-                                        income.title,
+                                        _displayIncomeTitle(income),
                                         style: TextStyle(
                                           color: AppTheme.textPrimary(context),
                                           fontWeight: FontWeight.w600,
                                         ),
                                       ),
                                       subtitle: Text(
-                                        income.isPrimary
-                                            ? 'Renda principal'
-                                            : (income.type == 'variable'
-                                                ? 'Renda variável'
-                                                : 'Renda fixa'),
+                                        IncomeCategoryUtils.label(
+                                          context,
+                                          income.type,
+                                        ),
                                         style: TextStyle(
                                           color: AppTheme.textSecondary(
                                             context,
@@ -1284,7 +1293,8 @@ class _DashboardPageState extends State<DashboardPage> {
     final entries = d.salary;
     final exits =
         d.fixedExpensesTotal + d.variableExpensesTotal + d.investmentsTotal;
-    final balance = d.remainingSalary;
+    final monthBalance = d.monthBalance;
+    final accumulated = d.totalBalance;
     showDialog<void>(
       context: context,
       builder: (_) => AlertDialog(
@@ -1307,9 +1317,14 @@ class _DashboardPageState extends State<DashboardPage> {
             const SizedBox(height: 6),
             Text(
               AppStrings.tr(context, 'essential_balance_free', {
-                'value': SensitiveDisplay.money(context, balance),
+                'value': SensitiveDisplay.money(context, monthBalance),
               }),
               style: const TextStyle(fontWeight: FontWeight.w700),
+            ),
+            const SizedBox(height: 6),
+            Text(
+              'Saldo acumulado: ${SensitiveDisplay.money(context, accumulated)}',
+              style: const TextStyle(fontWeight: FontWeight.w600),
             ),
           ],
         ),
@@ -2190,55 +2205,120 @@ class _DashboardPageState extends State<DashboardPage> {
     );
   }
 
+  String _displayIncomeTitle(IncomeSource income) {
+    final title = income.title.trim();
+    if (title.isEmpty ||
+        title.toLowerCase() == 'renda principal' ||
+        income.id == 'main_income') {
+      return IncomeCategoryUtils.label(context, income.type);
+    }
+    return title;
+  }
+
   Widget _financialPositionCard(FinanceOverview overview) {
     final scheme = Theme.of(context).colorScheme;
+    final currentMonthBalance = _dashboard?.monthBalance ?? overview.availableNow;
+    final accumulatedBalance =
+        _dashboard?.totalBalance ?? currentMonthBalance;
     return Container(
-      padding: const EdgeInsets.all(24),
+      padding: const EdgeInsets.all(18),
       decoration: AppTheme.premiumCardDecoration(context),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Container(
-            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
+            width: double.infinity,
+            padding: const EdgeInsets.all(16),
             decoration: BoxDecoration(
-              color: scheme.primary.withValues(alpha: 0.08),
-              borderRadius: BorderRadius.circular(999),
-            ),
-            child: Text(
-              AppStrings.t(context, 'financial_position_available'),
-              style: TextStyle(
-                color: scheme.primary,
-                fontSize: 12,
-                fontWeight: FontWeight.w700,
+              color: AppTheme.warning.withValues(alpha: 0.12),
+              borderRadius: BorderRadius.circular(18),
+              border: Border.all(
+                color: AppTheme.warning.withValues(alpha: 0.22),
               ),
             ),
-          ),
-          const SizedBox(height: 10),
-          Text(
-            SensitiveDisplay.money(context, overview.availableNow),
-            style: TextStyle(
-              color: AppTheme.textPrimary(context),
-              fontSize: 34,
-              fontWeight: FontWeight.w900,
-              letterSpacing: -1,
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  AppStrings.t(context, 'financial_position_paid_out'),
+                  style: TextStyle(
+                    color: AppTheme.textSecondary(context),
+                    fontSize: 12,
+                    fontWeight: FontWeight.w800,
+                    letterSpacing: 0.35,
+                  ),
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  SensitiveDisplay.money(context, overview.totalCommitted),
+                  style: TextStyle(
+                    color: AppTheme.warning,
+                    fontSize: 22,
+                    fontWeight: FontWeight.w900,
+                  ),
+                ),
+              ],
             ),
           ),
-          const SizedBox(height: 10),
-          Text(
-            overview.currentInvoice > 0
-                ? AppStrings.tr(context, 'financial_position_with_invoice', {
-                    'value': SensitiveDisplay.money(
-                      context,
-                      overview.availableNow,
-                    ),
-                  })
-                : AppStrings.t(context, 'financial_position_without_invoice'),
-            style: TextStyle(
-              color: AppTheme.textSecondary(context),
-              height: 1.4,
+          const SizedBox(height: 14),
+          Container(
+            width: double.infinity,
+            padding: const EdgeInsets.all(16),
+            decoration: BoxDecoration(
+              color: Theme.of(context).colorScheme.surfaceContainerLow,
+              borderRadius: BorderRadius.circular(20),
+              border: Border.all(
+                color: Theme.of(context)
+                    .colorScheme
+                    .outline
+                    .withValues(alpha: 0.08),
+              ),
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  AppStrings.t(context, 'financial_position_available'),
+                  style: TextStyle(
+                    color: AppTheme.textSecondary(context),
+                    fontSize: 12,
+                    fontWeight: FontWeight.w800,
+                    letterSpacing: 0.35,
+                  ),
+                ),
+                const SizedBox(height: 6),
+                Text(
+                  SensitiveDisplay.money(context, currentMonthBalance),
+                  style: TextStyle(
+                    color: AppTheme.textPrimary(context),
+                    fontSize: 32,
+                    fontWeight: FontWeight.w900,
+                    letterSpacing: -1,
+                  ),
+                ),
+                const SizedBox(height: 6),
+                Text(
+                  overview.currentInvoice > 0
+                      ? AppStrings.tr(
+                          context, 'financial_position_with_invoice', {
+                          'value': SensitiveDisplay.money(
+                            context,
+                            currentMonthBalance,
+                          ),
+                        })
+                      : AppStrings.t(
+                          context,
+                          'financial_position_without_invoice',
+                        ),
+                  style: TextStyle(
+                    color: AppTheme.textSecondary(context),
+                    height: 1.35,
+                  ),
+                ),
+              ],
             ),
           ),
-          const SizedBox(height: 16),
+          const SizedBox(height: 14),
           Wrap(
             spacing: 10,
             runSpacing: 10,
@@ -2295,6 +2375,44 @@ class _DashboardPageState extends State<DashboardPage> {
                 ),
               ),
             ],
+          ),
+          const SizedBox(height: 14),
+          Container(
+            width: double.infinity,
+            padding: const EdgeInsets.all(16),
+            decoration: BoxDecoration(
+              color: Theme.of(context).colorScheme.surfaceContainerLow,
+              borderRadius: BorderRadius.circular(20),
+              border: Border.all(
+                color: Theme.of(context)
+                    .colorScheme
+                    .outline
+                    .withValues(alpha: 0.08),
+              ),
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'Saldo acumulado',
+                  style: TextStyle(
+                    color: AppTheme.textSecondary(context),
+                    fontSize: 12,
+                    fontWeight: FontWeight.w800,
+                    letterSpacing: 0.35,
+                  ),
+                ),
+                const SizedBox(height: 6),
+                Text(
+                  SensitiveDisplay.money(context, accumulatedBalance),
+                  style: TextStyle(
+                    color: AppTheme.textPrimary(context),
+                    fontSize: 22,
+                    fontWeight: FontWeight.w900,
+                  ),
+                ),
+              ],
+            ),
           ),
         ],
       ),
@@ -2659,14 +2777,19 @@ class _DashboardPageState extends State<DashboardPage> {
                 ),
               ),
               const SizedBox(width: 12),
-              FilledButton.tonal(
-                onPressed: card.invoiceTotal <= 0
-                    ? null
-                    : () => _showPayBillPopup(card),
-                child: Text(
-                  AppStrings.t(
-                    context,
-                    card.isPaid ? 'bills_reopen_cta' : 'bills_pay_cta',
+              Flexible(
+                child: Align(
+                  alignment: Alignment.centerRight,
+                  child: FilledButton.tonal(
+                    onPressed: card.invoiceTotal <= 0
+                        ? null
+                        : () => _showPayBillPopup(card),
+                    child: Text(
+                      AppStrings.t(
+                        context,
+                        card.isPaid ? 'bills_reopen_cta' : 'bills_pay_cta',
+                      ),
+                    ),
                   ),
                 ),
               ),
@@ -3080,6 +3203,18 @@ class _DashboardPageState extends State<DashboardPage> {
             mainAxisSize: MainAxisSize.min,
             children: [
               _sheetItem(
+                icon: Icons.add_circle_outline,
+                title: AppStrings.t(context, 'add_extra_income'),
+                onTap: () {
+                  Navigator.pop(context);
+                  WidgetsBinding.instance.addPostFrameCallback((_) {
+                    if (mounted) {
+                      IncomeModal.show(context);
+                    }
+                  });
+                },
+              ),
+              _sheetItem(
                 icon: Icons.lock_outline,
                 title: 'Adicionar gasto fixo',
                 onTap: () {
@@ -3224,7 +3359,10 @@ class _DashboardPageState extends State<DashboardPage> {
     }
 
     Widget? highExpenseTip() {
-      final income = _dashboard?.salary ?? _user?.monthlyIncome ?? 0;
+      final income = _dashboard?.salary ??
+          LocalStorageService.incomeTotalForMonth(
+            _currentMonth,
+          );
       if (income <= 0) return null;
       final amount = parseMoneyInput(amountController.text);
       if (amount <= 0) return null;
@@ -3459,8 +3597,11 @@ class _DashboardPageState extends State<DashboardPage> {
                     DropdownButtonFormField<int?>(
                       isExpanded: true,
                       initialValue: dueDay,
-                      decoration: const InputDecoration(
-                        labelText: 'Dia de vencimento (opcional)',
+                      decoration: InputDecoration(
+                        labelText: AppStrings.t(
+                          context,
+                          'monthly_report_due_day_optional',
+                        ),
                       ),
                       items: [
                         const DropdownMenuItem<int?>(
@@ -3488,8 +3629,9 @@ class _DashboardPageState extends State<DashboardPage> {
                     DropdownButtonFormField<String?>(
                       isExpanded: true,
                       initialValue: hasCards ? creditCardId : null,
-                      decoration: const InputDecoration(
-                        labelText: 'Cartão de crédito',
+                      decoration: InputDecoration(
+                        labelText:
+                            AppStrings.t(context, 'monthly_report_card_credit'),
                       ),
                       items: hasCards
                           ? cards
@@ -3503,11 +3645,12 @@ class _DashboardPageState extends State<DashboardPage> {
                                 ),
                               )
                               .toList()
-                          : const [
+                          : [
                               DropdownMenuItem<String?>(
                                 value: null,
                                 child: Text(
-                                  'Sem cartão cadastrado',
+                                  AppStrings.t(
+                                      context, 'monthly_report_no_card'),
                                   overflow: TextOverflow.ellipsis,
                                 ),
                               ),
@@ -3525,7 +3668,9 @@ class _DashboardPageState extends State<DashboardPage> {
                     ),
                     const SizedBox(height: 8),
                     Text(
-                      'Vencimento do cartão: dia ${selectedCardDueDay ?? '-'}',
+                      AppStrings.tr(context, 'monthly_report_card_due_day', {
+                        'day': '${selectedCardDueDay ?? '-'}',
+                      }),
                       style: TextStyle(
                         color: AppTheme.textSecondary(context),
                         fontSize: 12,
@@ -4085,39 +4230,39 @@ class _DashboardPageState extends State<DashboardPage> {
         SystemNavigator.pop();
       },
       child: Scaffold(
-        drawer: _JetxDrawer(
-          user: _user!,
-          timeline: _timeline,
-          onLocaleChanged: () {
-            unawaited(_syncDueReminders());
-          },
-        ),
+        drawer: Responsive.width(context) >= 1024
+            ? null
+            : _JetxDrawer(
+                user: _user!,
+                timeline: _timeline,
+                onLocaleChanged: () {
+                  unawaited(_syncDueReminders());
+                },
+              ),
         appBar: AppBar(
           title: Text(title),
           actions: [
             const MoneyVisibilityButton(),
             IconButton(
-              onPressed: (_user?.isPremium ?? false) &&
-                      _isWithinWindow(
-                        DateTime(
-                          _currentMonth.year,
-                          _currentMonth.month - 1,
-                          1,
-                        ),
-                      )
+              onPressed: _isWithinWindow(
+                DateTime(
+                  _currentMonth.year,
+                  _currentMonth.month - 1,
+                  1,
+                ),
+              )
                   ? () => _changeMonth(-1)
                   : null,
               icon: const Icon(Icons.chevron_left),
             ),
             IconButton(
-              onPressed: (_user?.isPremium ?? false) &&
-                      _isWithinWindow(
-                        DateTime(
-                          _currentMonth.year,
-                          _currentMonth.month + 1,
-                          1,
-                        ),
-                      )
+              onPressed: _isWithinWindow(
+                DateTime(
+                  _currentMonth.year,
+                  _currentMonth.month + 1,
+                  1,
+                ),
+              )
                   ? () => _changeMonth(1)
                   : null,
               icon: const Icon(Icons.chevron_right),
@@ -4175,24 +4320,74 @@ class _DashboardPageState extends State<DashboardPage> {
                 style: TextStyle(color: AppTheme.textSecondary(context)),
               ),
               const SizedBox(height: 6),
-              Row(
-                children: [
-                  Expanded(
-                    child: Text(
-                      SensitiveDisplay.money(context, d.salary),
-                      style: TextStyle(
-                        color: Theme.of(context).colorScheme.primary,
-                        fontSize: 26,
-                        fontWeight: FontWeight.bold,
-                      ),
+              Builder(
+                builder: (context) {
+                  final wide = MediaQuery.sizeOf(context).width >= 680;
+                  final buttonStyle = OutlinedButton.styleFrom(
+                    foregroundColor: AppTheme.yellow,
+                    side: BorderSide(
+                      color: AppTheme.yellow.withValues(alpha: 0.45),
                     ),
-                  ),
-                  TextButton.icon(
-                    onPressed: _openIncomeEditorPopup,
-                    icon: const Icon(Icons.edit, size: 18),
-                    label: Text(AppStrings.t(context, 'edit_short')),
-                  ),
-                ],
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 14,
+                      vertical: 14,
+                    ),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(14),
+                    ),
+                    visualDensity: VisualDensity.compact,
+                  );
+
+                  final actions = [
+                    OutlinedButton.icon(
+                      style: buttonStyle,
+                      onPressed: _openIncomeEditorPopup,
+                      icon: const Icon(Icons.edit, size: 18),
+                      label: Text(AppStrings.t(context, 'edit_short')),
+                    ),
+                  ];
+
+                  if (wide) {
+                    return Row(
+                      children: [
+                        Expanded(
+                          child: Text(
+                            SensitiveDisplay.money(context, d.salary),
+                            style: TextStyle(
+                              color: Theme.of(context).colorScheme.primary,
+                              fontSize: 26,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                        ),
+                        Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: actions,
+                        ),
+                      ],
+                    );
+                  }
+
+                  return Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        SensitiveDisplay.money(context, d.salary),
+                        style: TextStyle(
+                          color: Theme.of(context).colorScheme.primary,
+                          fontSize: 26,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                      const SizedBox(height: 10),
+                      Wrap(
+                        spacing: 10,
+                        runSpacing: 10,
+                        children: actions,
+                      ),
+                    ],
+                  );
+                },
               ),
               const SizedBox(height: 18),
               _financialPositionCard(overview),
@@ -4433,7 +4628,7 @@ class _DashboardPageState extends State<DashboardPage> {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
-                        'Como seu mês está distribuído',
+                        AppStrings.t(context, 'ratio_distribution_title'),
                         style: TextStyle(
                           color: AppTheme.textPrimary(context),
                           fontWeight: FontWeight.w800,
@@ -4442,7 +4637,7 @@ class _DashboardPageState extends State<DashboardPage> {
                       ),
                       const SizedBox(height: 6),
                       Text(
-                        'Visualização rápida do que está em fixo, variável, crédito e investimento.',
+                        AppStrings.t(context, 'ratio_distribution_subtitle'),
                         style: TextStyle(
                           color: AppTheme.textSecondary(context),
                           fontSize: 12,
@@ -4520,7 +4715,7 @@ class _DashboardPageState extends State<DashboardPage> {
                       AppRoutes.transactions,
                     ),
                     icon: const Icon(Icons.receipt_long_outlined, size: 18),
-                    label: const Text('Ver todos os lançamentos'),
+                    label: Text(AppStrings.t(context, 'view_all_entries')),
                   ),
                 ),
               ],

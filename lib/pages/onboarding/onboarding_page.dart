@@ -10,6 +10,7 @@ import '../../models/income_source.dart';
 import '../../models/user_profile.dart';
 import '../../routes/app_routes.dart';
 import '../../services/local_storage_service.dart';
+import '../../utils/income_category_utils.dart';
 import '../../utils/currency_utils.dart';
 import '../../utils/money_input.dart';
 
@@ -25,10 +26,13 @@ class _OnboardingPageState extends State<OnboardingPage> {
   final professionController = TextEditingController();
   final List<Map<String, dynamic>> _incomeSources = [
     {
-      'id': 'main_income',
-      'label': 'Salario principal',
+      'id': 'entry_1',
+      'label': AppStrings.byCode(
+        WidgetsBinding.instance.platformDispatcher.locale.languageCode,
+        'income_category_other',
+      ),
       'value': '',
-      'type': 'fixed',
+      'type': IncomeCategoryUtils.other,
     },
   ];
   final Set<String> _selectedObjectives = {};
@@ -54,11 +58,11 @@ class _OnboardingPageState extends State<OnboardingPage> {
                 (src['id'] ?? DateTime.now().millisecondsSinceEpoch).toString(),
             'label': src['label'] ?? '',
             'value': src['value'].toString(),
-            'type': (src['type'] ?? 'fixed').toString(),
+            'type': IncomeCategoryUtils.normalize(
+              (src['type'] ?? IncomeCategoryUtils.other).toString(),
+            ),
           });
         }
-      } else if (_user!.monthlyIncome > 0) {
-        _incomeSources[0]['value'] = formatMoneyInput(_user!.monthlyIncome);
       }
       _selectedObjectives.addAll(_user!.objectives);
     }
@@ -69,7 +73,10 @@ class _OnboardingPageState extends State<OnboardingPage> {
       );
     }
     if (_incomeSources.first['label'].toString().trim().isEmpty) {
-      _incomeSources.first['label'] = 'Salario principal';
+      _incomeSources.first['label'] = AppStrings.t(
+        context,
+        'income_category_other',
+      );
     }
   }
 
@@ -176,7 +183,7 @@ class _OnboardingPageState extends State<OnboardingPage> {
                 context,
                 'onboarding_extra_income_label',
               ),
-              initialType: 'fixed',
+              initialType: IncomeCategoryUtils.salary,
             );
             if (data == null) return;
             setState(() {
@@ -184,7 +191,9 @@ class _OnboardingPageState extends State<OnboardingPage> {
                 'id': DateTime.now().millisecondsSinceEpoch.toString(),
                 'label': data['label'] ?? '',
                 'value': data['value'] ?? '',
-                'type': data['type'] ?? 'fixed',
+                'type': IncomeCategoryUtils.normalize(
+                  (data['type'] ?? IncomeCategoryUtils.salary).toString(),
+                ),
               });
             });
           },
@@ -200,14 +209,17 @@ class _OnboardingPageState extends State<OnboardingPage> {
             final data = await _openIncomeEditor(
               initialLabel: src['label'].toString(),
               initialValue: src['value'].toString(),
-              initialType: (src['type'] ?? 'fixed').toString(),
-              isPrimary: idx == 0,
+              initialType: IncomeCategoryUtils.normalize(
+                (src['type'] ?? IncomeCategoryUtils.salary).toString(),
+              ),
             );
             if (data == null) return;
             setState(() {
               _incomeSources[idx]['label'] = data['label'] ?? '';
               _incomeSources[idx]['value'] = data['value'] ?? '';
-              _incomeSources[idx]['type'] = data['type'] ?? 'fixed';
+              _incomeSources[idx]['type'] = IncomeCategoryUtils.normalize(
+                (data['type'] ?? IncomeCategoryUtils.salary).toString(),
+              );
             });
           },
         );
@@ -217,8 +229,7 @@ class _OnboardingPageState extends State<OnboardingPage> {
   Future<Map<String, String>?> _openIncomeEditor({
     String initialLabel = '',
     String initialValue = '',
-    String initialType = 'fixed',
-    bool isPrimary = false,
+    String initialType = IncomeCategoryUtils.salary,
   }) {
     return showModalBottomSheet<Map<String, String>>(
       context: context,
@@ -228,7 +239,6 @@ class _OnboardingPageState extends State<OnboardingPage> {
         initialLabel: initialLabel,
         initialValue: initialValue,
         initialType: initialType,
-        isPrimary: isPrimary,
       ),
     );
   }
@@ -243,15 +253,21 @@ class _OnboardingPageState extends State<OnboardingPage> {
     for (var i = 0; i < _incomeSources.length; i++) {
       final src = _incomeSources[i];
       final amount = parseMoneyInput(src['value'].toString());
-      if (amount <= 0) continue;
+      if (amount < 0) continue;
       totalIncome += amount;
       normalizedSources.add({
         'id': src['id'].toString(),
         'label': src['label'].toString().trim().isEmpty
-            ? 'Renda ${i + 1}'
+            ? AppStrings.tr(
+                context,
+                'onboarding_income_fallback_label',
+                {'n': '${i + 1}'},
+              )
             : src['label'].toString().trim(),
         'value': formatMoneyInput(amount),
-        'type': (src['type'] ?? 'fixed').toString(),
+        'type': IncomeCategoryUtils.normalize(
+          (src['type'] ?? IncomeCategoryUtils.salary).toString(),
+        ),
       });
     }
 
@@ -265,42 +281,20 @@ class _OnboardingPageState extends State<OnboardingPage> {
       setState(() => _saving = false);
       return;
     }
-    if (totalIncome < 1) {
-      _snack(AppStrings.t(context, 'onboarding_income_required_hint'));
-      setState(() => _saving = false);
-      return;
-    }
-
     if (_user == null) {
       _snack(AppStrings.t(context, 'session_expired_login'));
       setState(() => _saving = false);
       return;
     }
 
-    final primaryAmount = parseMoneyInput(
-      normalizedSources.first['value'].toString(),
-    );
     final currentMonthKey = _monthKey(DateTime.now());
-    final primaryType = normalizedSources.first['type'].toString();
-    final primaryIsVariable = primaryType == 'variable';
-    final primaryIncome = IncomeSource(
-      id: 'main_income',
-      title: normalizedSources.first['label'].toString(),
-      amount: primaryAmount,
-      type: primaryType,
-      activeFrom: primaryIsVariable ? currentMonthKey : null,
-      activeUntil: primaryIsVariable ? currentMonthKey : null,
-      isPrimary: true,
-      isActive: true,
-      createdAt: DateTime.now(),
-    );
 
     final existingIncomes = LocalStorageService.getIncomes();
     final normalizedIds =
         normalizedSources.map((src) => src['id'].toString()).toSet();
 
     for (final income in existingIncomes.where(
-      (i) => !normalizedIds.contains(i.id) && !i.isPrimary,
+      (i) => !normalizedIds.contains(i.id),
     )) {
       final ok = await LocalStorageService.deleteIncome(income.id);
       if (!mounted) return;
@@ -311,39 +305,14 @@ class _OnboardingPageState extends State<OnboardingPage> {
       }
     }
 
-    for (final income in existingIncomes.where(
-      (i) => i.isPrimary && i.id != 'main_income',
-    )) {
-      final ok = await LocalStorageService.saveIncome(
-        income.copyWith(isPrimary: false),
-      );
-      if (!mounted) return;
-      if (!ok) {
-        _snack(AppStrings.t(context, 'save_failed_try_again'));
-        setState(() => _saving = false);
-        return;
-      }
-    }
-
-    final primaryOk = await LocalStorageService.saveIncome(primaryIncome);
-    if (!mounted) return;
-    if (!primaryOk) {
-      _snack(AppStrings.t(context, 'save_failed_try_again'));
-      setState(() => _saving = false);
-      return;
-    }
-
-    for (var i = 1; i < normalizedSources.length; i++) {
-      final src = normalizedSources[i];
-      final type = src['type'].toString();
-      final isVariable = type == 'variable';
+    for (final src in normalizedSources) {
       final extraIncome = IncomeSource(
         id: src['id'].toString(),
         title: src['label'].toString(),
         amount: parseMoneyInput(src['value'].toString()),
-        type: type,
-        activeFrom: isVariable ? currentMonthKey : null,
-        activeUntil: isVariable ? currentMonthKey : null,
+        type: IncomeCategoryUtils.normalize(src['type'].toString()),
+        activeFrom: currentMonthKey,
+        activeUntil: currentMonthKey,
         isPrimary: false,
         isActive: true,
         createdAt: DateTime.now(),
@@ -835,7 +804,7 @@ class _IncomeStep extends StatelessWidget {
               children: [
                 Expanded(
                   child: Text(
-                    'Qual e sua renda mensal?',
+                    'Qual é sua entrada mensal?',
                     style: TextStyle(
                       color: AppTheme.textPrimary(context),
                       fontSize: 22,
@@ -847,7 +816,7 @@ class _IncomeStep extends StatelessWidget {
             ),
             const SizedBox(height: 10),
             Text(
-              'Comece com sua renda principal. Se quiser, adicione renda extra depois.',
+              'Comece com sua entrada principal. Se quiser, adicione outra entrada depois.',
               style: TextStyle(color: AppTheme.textSecondary(context)),
             ),
             const SizedBox(height: 10),
@@ -920,9 +889,11 @@ class _IncomeStep extends StatelessWidget {
                   final src = incomeSources[index];
                   final label = src['label'].toString();
                   final value = src['value'].toString();
-                  final type = (src['type'] ?? 'fixed').toString();
+                  final type = IncomeCategoryUtils.normalize(
+                    (src['type'] ?? IncomeCategoryUtils.salary).toString(),
+                  );
                   final hasValue = parseMoneyInput(value) > 0;
-                  final typeLabel = type == 'variable' ? 'Variavel' : 'Fixa';
+                  final typeLabel = IncomeCategoryUtils.label(context, type);
                   return Material(
                     color: Theme.of(context).colorScheme.surfaceContainerLow,
                     borderRadius: BorderRadius.circular(16),
@@ -983,13 +954,11 @@ class _IncomeInputSheet extends StatefulWidget {
   final String initialLabel;
   final String initialValue;
   final String initialType;
-  final bool isPrimary;
 
   const _IncomeInputSheet({
     required this.initialLabel,
     required this.initialValue,
     required this.initialType,
-    required this.isPrimary,
   });
 
   @override
@@ -999,14 +968,14 @@ class _IncomeInputSheet extends StatefulWidget {
 class _IncomeInputSheetState extends State<_IncomeInputSheet> {
   late final TextEditingController _labelController;
   late final TextEditingController _valueController;
-  late String _type;
+  late String _category;
 
   @override
   void initState() {
     super.initState();
     _labelController = TextEditingController(text: widget.initialLabel);
     _valueController = TextEditingController(text: widget.initialValue);
-    _type = widget.initialType == 'variable' ? 'variable' : 'fixed';
+    _category = IncomeCategoryUtils.normalize(widget.initialType);
   }
 
   @override
@@ -1025,29 +994,21 @@ class _IncomeInputSheetState extends State<_IncomeInputSheet> {
       return;
     }
     final label = _labelController.text.trim().isEmpty
-        ? (widget.isPrimary ? 'Salario principal' : 'Renda extra')
+        ? IncomeCategoryUtils.label(context, _category)
         : _labelController.text.trim();
 
     Navigator.of(
       context,
-    ).pop({'label': label, 'value': formatMoneyInput(value), 'type': _type});
+    ).pop({
+      'label': label,
+      'value': formatMoneyInput(value),
+      'type': IncomeCategoryUtils.normalize(_category),
+    });
   }
 
   @override
   Widget build(BuildContext context) {
     final insets = MediaQuery.viewInsetsOf(context);
-    final isFixed = _type == 'fixed';
-    final infoBg = isFixed
-        ? Colors.green.withValues(alpha: 0.12)
-        : Colors.orange.withValues(alpha: 0.12);
-    final infoBorder = isFixed
-        ? Colors.green.withValues(alpha: 0.35)
-        : Colors.orange.withValues(alpha: 0.35);
-    final infoIcon = isFixed ? Icons.event_repeat : Icons.calendar_month;
-    final infoTitle = isFixed ? 'Renda Fixa' : 'Renda Variavel';
-    final infoText = isFixed
-        ? 'Esta renda sera replicada automaticamente para os proximos meses.'
-        : 'Esta renda sera considerada somente no mes atual.';
     return AnimatedPadding(
       duration: const Duration(milliseconds: 180),
       curve: Curves.easeOut,
@@ -1060,141 +1021,165 @@ class _IncomeInputSheetState extends State<_IncomeInputSheet> {
             borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
           ),
           padding: const EdgeInsets.fromLTRB(16, 16, 16, 24),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Center(
-                child: Container(
-                  width: 44,
-                  height: 5,
-                  decoration: BoxDecoration(
-                    color: Colors.white.withValues(alpha: 0.24),
-                    borderRadius: BorderRadius.circular(99),
+          child: SingleChildScrollView(
+            keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Center(
+                  child: Container(
+                    width: 44,
+                    height: 5,
+                    decoration: BoxDecoration(
+                      color: Colors.white.withValues(alpha: 0.24),
+                      borderRadius: BorderRadius.circular(99),
+                    ),
                   ),
                 ),
-              ),
-              const SizedBox(height: 10),
-              Text(
-                widget.isPrimary ? 'Renda principal' : 'Nova renda',
-                style: const TextStyle(
-                  color: Colors.amber,
-                  fontSize: 16,
-                  fontWeight: FontWeight.w700,
-                ),
-              ),
-              const SizedBox(height: 12),
-              TextField(
-                controller: _labelController,
-                textInputAction: TextInputAction.next,
-                decoration: InputDecoration(
-                  labelText: 'Nome da renda',
-                  hintText: AppStrings.t(
-                    context,
-                    'onboarding_income_source_hint',
+                const SizedBox(height: 10),
+                Text(
+                  AppStrings.t(context, 'income_modal_new_title'),
+                  style: const TextStyle(
+                    color: Colors.amber,
+                    fontSize: 16,
+                    fontWeight: FontWeight.w700,
                   ),
                 ),
-              ),
-              const SizedBox(height: 10),
-              TextField(
-                controller: _valueController,
-                autofocus: true,
-                textInputAction: TextInputAction.done,
-                keyboardType: const TextInputType.numberWithOptions(
-                  decimal: true,
+                const SizedBox(height: 12),
+                Text(
+                  'Categoria da entrada',
+                  style: TextStyle(
+                    color: AppTheme.textPrimary(context),
+                    fontWeight: FontWeight.w800,
+                  ),
                 ),
-                inputFormatters: const <TextInputFormatter>[
-                  MoneyTextInputFormatter(),
-                ],
-                onSubmitted: (_) => _submit(),
-                decoration: const InputDecoration(
-                  labelText: 'Valor mensal',
-                  prefixText: 'R\$ ',
-                  hintText: '0,00',
+                const SizedBox(height: 4),
+                Text(
+                  'Selecione uma categoria.',
+                  style: TextStyle(color: AppTheme.textSecondary(context)),
                 ),
-              ),
-              const SizedBox(height: 12),
-              Text(
-                'Tipo da renda',
-                style: TextStyle(color: AppTheme.textSecondary(context)),
-              ),
-              const SizedBox(height: 8),
-              SegmentedButton<String>(
-                segments: const [
-                  ButtonSegment<String>(
-                    value: 'fixed',
-                    icon: Icon(Icons.lock_outline),
-                    label: Text('Fixa'),
-                  ),
-                  ButtonSegment<String>(
-                    value: 'variable',
-                    icon: Icon(Icons.show_chart),
-                    label: Text('Variavel'),
-                  ),
-                ],
-                selected: <String>{_type},
-                onSelectionChanged: (selection) {
-                  setState(() {
-                    _type = selection.first;
-                  });
-                },
-              ),
-              const SizedBox(height: 10),
-              AnimatedSwitcher(
-                duration: const Duration(milliseconds: 180),
-                child: Container(
-                  key: ValueKey<String>(_type),
-                  width: double.infinity,
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 12,
-                    vertical: 10,
-                  ),
-                  decoration: BoxDecoration(
-                    color: infoBg,
-                    borderRadius: BorderRadius.circular(12),
-                    border: Border.all(color: infoBorder),
-                  ),
-                  child: Row(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Icon(infoIcon, size: 18, color: Colors.white),
-                      const SizedBox(width: 8),
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              infoTitle,
-                              style: const TextStyle(
-                                color: Colors.white,
-                                fontWeight: FontWeight.w700,
-                              ),
-                            ),
-                            const SizedBox(height: 2),
-                            Text(
-                              infoText,
-                              style: TextStyle(
-                                color: AppTheme.textSecondary(context),
-                                fontSize: 12,
-                                height: 1.3,
-                              ),
-                            ),
-                          ],
-                        ),
+                const SizedBox(height: 10),
+                DropdownButtonFormField<String>(
+                  value: _category,
+                  dropdownColor: const Color(0xFF171717),
+                  iconEnabledColor: AppTheme.textSecondary(context),
+                  decoration: InputDecoration(
+                    filled: true,
+                    fillColor:
+                        Theme.of(context).colorScheme.surfaceContainerLow,
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(16),
+                      borderSide: BorderSide(
+                        color: Colors.white.withValues(alpha: 0.07),
                       ),
-                    ],
+                    ),
+                    enabledBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(16),
+                      borderSide: BorderSide(
+                        color: Colors.white.withValues(alpha: 0.07),
+                      ),
+                    ),
+                    focusedBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(16),
+                      borderSide: BorderSide(
+                        color: AppTheme.yellow.withValues(alpha: 0.8),
+                      ),
+                    ),
+                    contentPadding: const EdgeInsets.symmetric(
+                      horizontal: 14,
+                      vertical: 14,
+                    ),
+                  ),
+                  items: IncomeCategoryUtils.all
+                      .map(
+                        (category) => DropdownMenuItem<String>(
+                          value: category,
+                          child: Row(
+                            children: [
+                              Container(
+                                padding: const EdgeInsets.all(7),
+                                decoration: BoxDecoration(
+                                  color:
+                                      AppTheme.yellow.withValues(alpha: 0.12),
+                                  borderRadius: BorderRadius.circular(10),
+                                ),
+                                child: Icon(
+                                  IncomeCategoryUtils.icon(category),
+                                  color: AppTheme.yellow,
+                                  size: 16,
+                                ),
+                              ),
+                              const SizedBox(width: 10),
+                              Text(
+                                IncomeCategoryUtils.label(context, category),
+                                style: TextStyle(
+                                  color: AppTheme.textPrimary(context),
+                                  fontWeight: FontWeight.w700,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      )
+                      .toList(),
+                  onChanged: (value) {
+                    if (value == null) return;
+                    setState(() => _category = value);
+                  },
+                ),
+                const SizedBox(height: 10),
+                TextField(
+                  controller: _labelController,
+                  textInputAction: TextInputAction.next,
+                  decoration: InputDecoration(
+                    labelText:
+                        AppStrings.t(context, 'income_label_placeholder'),
+                    hintText: AppStrings.t(
+                      context,
+                      'onboarding_income_source_hint',
+                    ),
                   ),
                 ),
-              ),
-              const SizedBox(height: 14),
-              SizedBox(
-                width: double.infinity,
-                child: ElevatedButton(
-                  onPressed: _submit,
-                  child: const Text('Salvar renda'),
+                const SizedBox(height: 10),
+                TextField(
+                  controller: _valueController,
+                  autofocus: true,
+                  textInputAction: TextInputAction.done,
+                  keyboardType: const TextInputType.numberWithOptions(
+                    decimal: true,
+                  ),
+                  inputFormatters: const <TextInputFormatter>[
+                    MoneyTextInputFormatter(),
+                  ],
+                  onSubmitted: (_) => _submit(),
+                  decoration: InputDecoration(
+                    labelText:
+                        AppStrings.t(context, 'income_modal_amount_label'),
+                    prefixText: 'R\$ ',
+                    hintText: AppStrings.t(context, 'income_modal_amount_hint'),
+                  ),
                 ),
-              ),
-            ],
+                const SizedBox(height: 16),
+                Row(
+                  children: [
+                    Expanded(
+                      child: OutlinedButton(
+                        onPressed: () => Navigator.of(context).pop(),
+                        child: Text(AppStrings.t(context, 'cancel')),
+                      ),
+                    ),
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: ElevatedButton(
+                        onPressed: _submit,
+                        child: const Text('Salvar entrada'),
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+            ),
           ),
         ),
       ),

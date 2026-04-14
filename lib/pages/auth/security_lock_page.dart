@@ -22,7 +22,6 @@ class _SecurityLockPageState extends State<SecurityLockPage> {
     if (user == null) return false;
     if (!user.setupCompleted) return true;
     if (user.profession.trim().isEmpty) return true;
-    if (user.monthlyIncome <= 0) return true;
     if (user.objectives.isEmpty) return true;
     return false;
   }

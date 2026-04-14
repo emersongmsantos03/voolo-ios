@@ -7,6 +7,9 @@ class MonthlyDashboard {
   final List<Expense> expenses;
   final Map<String, bool> creditCardPayments;
   final List<String> fixedExclusions; // seriesIds excluded for this month
+  final double balanceBeforeMonth;
+  final double monthBalance;
+  final double totalBalance;
 
   MonthlyDashboard({
     required this.month,
@@ -15,8 +18,26 @@ class MonthlyDashboard {
     required this.expenses,
     Map<String, bool>? creditCardPayments,
     List<String>? fixedExclusions,
+    this.balanceBeforeMonth = 0.0,
+    double? monthBalance,
+    double? totalBalance,
   })  : creditCardPayments = Map<String, bool>.from(creditCardPayments ?? const {}),
-        fixedExclusions = List<String>.from(fixedExclusions ?? const []);
+        fixedExclusions = List<String>.from(fixedExclusions ?? const []),
+        monthBalance = monthBalance ??
+            _roundMoney(salary - _expensesTotal(expenses)),
+        totalBalance = totalBalance ??
+            _roundMoney(
+              balanceBeforeMonth +
+                  (monthBalance ?? _roundMoney(salary - _expensesTotal(expenses))),
+            );
+
+  static double _expensesTotal(List<Expense> expenses) {
+    return expenses.fold(0.0, (sum, expense) => sum + expense.amount);
+  }
+
+  static double _roundMoney(double value) {
+    return double.parse(value.toStringAsFixed(2));
+  }
 
   double get fixedExpensesTotal =>
       expenses.where((e) => e.isFixed).fold(0, (a, b) => a + b.amount);
@@ -30,12 +51,15 @@ class MonthlyDashboard {
   double get totalExpenses =>
       fixedExpensesTotal + variableExpensesTotal + investmentsTotal;
 
-  double get remainingSalary => salary - totalExpenses;
+  double get remainingSalary => monthBalance;
 
   Map<String, dynamic> toJson() => {
         'month': month,
         'year': year,
         'salary': salary,
+        'balanceBeforeMonth': balanceBeforeMonth,
+        'monthBalance': monthBalance,
+        'totalBalance': totalBalance,
         'expenses': expenses.map((e) => e.toJson()).toList(),
         'creditCardPayments': creditCardPayments,
         'fixedExclusions': fixedExclusions,
@@ -55,6 +79,9 @@ class MonthlyDashboard {
       month: (json['month'] as num?)?.toInt() ?? fallbackMonth ?? 1,
       year: (json['year'] as num?)?.toInt() ?? fallbackYear ?? 2024,
       salary: (json['salary'] as num?)?.toDouble() ?? 0.0,
+      balanceBeforeMonth: (json['balanceBeforeMonth'] as num?)?.toDouble() ?? 0.0,
+      monthBalance: (json['monthBalance'] as num?)?.toDouble(),
+      totalBalance: (json['totalBalance'] as num?)?.toDouble(),
       expenses: (json['expenses'] as List<dynamic>? ?? [])
           .map((e) => Expense.fromJson(e as Map))
           .toList(),
@@ -75,14 +102,28 @@ class MonthlyDashboard {
     List<Expense>? expenses,
     Map<String, bool>? creditCardPayments,
     List<String>? fixedExclusions,
+    double? balanceBeforeMonth,
+    double? monthBalance,
+    double? totalBalance,
   }) {
+    final nextSalary = salary ?? this.salary;
+    final nextExpenses = expenses ?? this.expenses;
+    final nextBalanceBeforeMonth = balanceBeforeMonth ?? this.balanceBeforeMonth;
+    final nextMonthBalance =
+        monthBalance ?? _roundMoney(nextSalary - _expensesTotal(nextExpenses));
+    final nextTotalBalance =
+        totalBalance ?? _roundMoney(nextBalanceBeforeMonth + nextMonthBalance);
+
     return MonthlyDashboard(
       month: month ?? this.month,
       year: year ?? this.year,
-      salary: salary ?? this.salary,
-      expenses: expenses ?? this.expenses,
+      salary: nextSalary,
+      expenses: nextExpenses,
       creditCardPayments: creditCardPayments ?? this.creditCardPayments,
       fixedExclusions: fixedExclusions ?? this.fixedExclusions,
+      balanceBeforeMonth: nextBalanceBeforeMonth,
+      monthBalance: nextMonthBalance,
+      totalBalance: nextTotalBalance,
     );
   }
 }

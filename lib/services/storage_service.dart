@@ -1,12 +1,12 @@
 import 'dart:io';
-import 'dart:typed_data';
 import 'package:flutter/foundation.dart';
 import 'package:firebase_storage/firebase_storage.dart';
 
 class StorageService {
   StorageService._();
 
-  static FirebaseStorage get _storage => FirebaseStorage.instanceFor(bucket: 'voolo-ad416.firebasestorage.app');
+  static FirebaseStorage get _storage =>
+      FirebaseStorage.instanceFor(bucket: 'voolo-ad416.firebasestorage.app');
 
   static Future<String?> uploadUserPhoto({
     required String userId,
@@ -19,33 +19,41 @@ class StorageService {
     }
 
     try {
-      final ref = _storage.ref().child('users/$userId/profile.jpg');
+      final stamp = DateTime.now().millisecondsSinceEpoch;
+      final ref = _storage.ref().child('users/$userId/profile_$stamp.jpg');
       debugPrint('StorageService: Target Path: ${ref.fullPath}');
       debugPrint('StorageService: Target Bucket: ${ref.bucket}');
-      
-      Uint8List? data = fileBytes;
-      if (data == null) {
+
+      final contentType = () {
+        final lower = filePath.toLowerCase();
+        if (lower.endsWith('.png')) return 'image/png';
+        if (lower.endsWith('.webp')) return 'image/webp';
+        if (lower.endsWith('.gif')) return 'image/gif';
+        if (lower.endsWith('.heic')) return 'image/heic';
+        if (lower.endsWith('.heif')) return 'image/heif';
+        return 'image/jpeg';
+      }();
+
+      if (fileBytes != null) {
+        debugPrint('StorageService: Byte count: ${fileBytes.length}');
+        debugPrint('StorageService: Starting putData...');
+        final task = await ref.putData(
+          fileBytes,
+          SettableMetadata(contentType: contentType),
+        );
+        debugPrint('StorageService: putData finished. State: ${task.state}');
+      } else {
         final file = File(filePath);
         if (!file.existsSync()) {
           debugPrint('StorageService: File not found at $filePath');
           return null;
         }
-        data = await file.readAsBytes();
-      }
-
-      debugPrint('StorageService: Byte count: ${data.length}');
-      
-      // Experiment: Try to upload first, then catch specific errors
-      try {
-        debugPrint('StorageService: Starting putData...');
-        final task = await ref.putData(
-          data, 
-          SettableMetadata(contentType: 'image/jpeg')
+        debugPrint('StorageService: Starting putFile...');
+        final task = await ref.putFile(
+          file,
+          SettableMetadata(contentType: contentType),
         );
-        debugPrint('StorageService: putData finished. State: ${task.state}');
-      } on FirebaseException catch (e) {
-        debugPrint('StorageService: putData FAILED! Code: ${e.code}, Msg: ${e.message}');
-        rethrow;
+        debugPrint('StorageService: putFile finished. State: ${task.state}');
       }
 
       debugPrint('StorageService: Requesting download URL...');
@@ -53,11 +61,29 @@ class StorageService {
       debugPrint('StorageService: URL received: $url');
       return url;
     } on FirebaseException catch (e) {
-      debugPrint('StorageService: FirebaseException catch-all! Code: ${e.code}, Message: ${e.message}');
+      debugPrint(
+          'StorageService: FirebaseException catch-all! Code: ${e.code}, Message: ${e.message}');
       return null;
     } catch (e) {
       debugPrint('StorageService: General Error: $e');
       return null;
+    }
+  }
+
+  static Future<void> deleteUserPhoto(String? photoPath) async {
+    if (photoPath == null || photoPath.trim().isEmpty) return;
+
+    try {
+      if (photoPath.startsWith('http://') || photoPath.startsWith('https://')) {
+        await _storage.refFromURL(photoPath).delete();
+        return;
+      }
+      final file = File(photoPath);
+      if (await file.exists()) {
+        await file.delete();
+      }
+    } catch (_) {
+      // best effort cleanup
     }
   }
 }

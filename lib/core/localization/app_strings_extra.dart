@@ -30,16 +30,16 @@ const Map<String, Map<String, String>> appStringsExtra = {
     'ratio_fixed': 'Fixos',
     'ratio_invest': 'Invest.',
     'ratio_buffer': 'Sobra',
-    'ratio_distribution_title': 'Distribuicao do mes',
+    'ratio_distribution_title': 'Distribuição do mês',
     'ratio_distribution_subtitle':
-        'Fixo, variavel, investimento e sobra em uma leitura rapida.',
+        'Fixo, variável, investimento e sobra em uma leitura rápida.',
     'ratio_tip_fixed': 'Aqui entram as despesas mais recorrentes do seu mes.',
     'ratio_tip_variable':
         'Aqui entra o que oscila conforme seu consumo no mes.',
     'ratio_tip_invest': 'Tente investir pelo menos 15-20% de sua renda mensal.',
     'ratio_tip_buffer':
         'Este e o valor que ainda esta livre no fim do seu mes.',
-    'dashboard_base_income': 'Entrada base do mes',
+    'dashboard_base_income': 'Lançamentos do mês',
     'edit_short': 'Editar',
     'financial_position_available': 'Restante do mes',
     'financial_position_with_invoice':
@@ -48,18 +48,19 @@ const Map<String, Map<String, String>> appStringsExtra = {
         'Ja considera a fatura em aberto deste mes.',
     'financial_position_without_invoice':
         'Sem pressao relevante de cartao neste mes.',
-    'financial_position_paid_out': 'Comprometido',
+    'financial_position_paid_out': 'Saídas do mês',
     'financial_position_current_invoice': 'Fatura atual',
     'financial_position_invested': 'Investido',
+    'financial_position_total_account': 'Saldo total da conta',
     'bills_home_title': 'Faturas em aberto',
     'bills_home_subtitle':
         'Acompanhe o que esta pendente no cartao e marque quando pagar.',
-    'bills_compact_title': 'Cartoes e faturas',
+    'bills_compact_title': 'Cartões e faturas',
     'bills_compact_subtitle':
         'Veja, adicione e acompanhe suas faturas sem sair da home.',
     'bills_add_card': 'Adicionar cartao',
-    'bills_empty_title': 'Nenhum cartao cadastrado',
-    'bills_empty_subtitle': 'Adicione um cartao para acompanhar a fatura aqui.',
+    'bills_empty_title': 'Nenhum cartão cadastrado',
+    'bills_empty_subtitle': 'Adicione um cartão para acompanhar a fatura aqui.',
     'bills_selected_due': 'Vence dia {day}',
     'bills_selected_clear': 'Sem fatura aberta neste ciclo.',
     'bills_selected_open': 'Em aberto',
@@ -69,7 +70,7 @@ const Map<String, Map<String, String>> appStringsExtra = {
     'bills_pay_cta': 'Pagar',
     'bills_paid_badge': 'Paga',
     'bills_reopen_cta': 'Reabrir',
-    'bills_help_title': 'Cartoes e faturas',
+    'bills_help_title': 'Cartões e faturas',
     'bills_help_body':
         'O app nao paga a fatura por voce. Aqui voce acompanha o valor do ciclo e pode apenas marcar se a fatura esta aberta ou ja foi paga fora do app.',
     'financial_position_committed_help_title': 'Comprometido',
@@ -86,9 +87,9 @@ const Map<String, Map<String, String>> appStringsExtra = {
     'drawer_premium_active': 'Conta premium ativa',
     'drawer_essential_plan': 'Plano essencial do Voolo',
     'ratio_housing': 'Moradia',
-    'essential_balance_title': 'Saldo do mes',
+    'essential_balance_title': 'Saldo do mês',
     'essential_balance_entries': 'Entradas: {value}',
-    'essential_balance_exits': 'Saidas: {value}',
+    'essential_balance_exits': 'Saídas: {value}',
     'essential_balance_free': 'Saldo livre: {value}',
     'essential_guide_title': 'Trilha essencial',
     'essential_guide_subtitle_free':
@@ -194,8 +195,9 @@ const Map<String, Map<String, String>> appStringsExtra = {
     'weekly_plan_streak_label': 'Streak',
     'weekly_plan_insights_label': 'Insights',
     'weekly_plan_follow_cta': 'Seguir passo da semana',
-    'weekly_plan_add_income_title': 'Cadastrar renda base',
-    'weekly_plan_add_income_desc': 'Sem renda ativa o plano perde precisao.',
+    'weekly_plan_add_income_title': 'Adicionar entrada do mês',
+    'weekly_plan_add_income_desc':
+        'Sem entradas ativas o plano perde precisão.',
     'weekly_plan_negative_balance_title': 'Voltar para saldo positivo',
     'weekly_plan_negative_balance_desc':
         'Seu mes esta no vermelho. Priorize corte de variaveis e renegociacao de fixos.',
@@ -266,9 +268,9 @@ const Map<String, Map<String, String>> appStringsExtra = {
     'notif_weekly_review_title': 'Fechamento da semana',
     'notif_weekly_review_body':
         'Confira seu resumo e ajuste o que for necessario.',
-    'notif_monthly_invest_title': 'Lembrete de investimento',
-    'notif_monthly_invest_body':
-        'Se fizer sentido, defina um valor para investir este mes.',
+    'notif_monthly_entries_title': 'Hora de atualizar suas entradas',
+    'notif_monthly_entries_body':
+        'Você provavelmente já recebeu suas entradas deste mês. Deseja adicioná-las no Volo para manter sua saúde financeira atualizada?',
     'goals_title_hint': 'Ex: Quitar cartao em 6 meses',
     'goals_title_required':
         'Digite um titulo claro para a meta. Exemplo: Guardar R\$ 200 por mes.',
@@ -285,9 +287,65 @@ const Map<String, Map<String, String>> appStringsExtra = {
         'Perfeito. Agora vamos para o painel com seus proximos passos.',
     'onboarding_profession_label': 'Profissao',
     'onboarding_profession_hint': 'Ex: Assistente administrativo',
-    'onboarding_extra_income_label': 'Renda extra',
-    'onboarding_income_source_hint': 'Ex: Salario principal',
-    'onboarding_add_extra_income': 'Adicionar renda extra',
+    'onboarding_extra_income_label': 'Entrada extra',
+    'onboarding_income_source_hint': 'Ex: Salário, prestação de serviço',
+    'onboarding_add_extra_income': 'Adicionar entrada',
+    'investment_step_safety_note':
+        'Antes de aumentar o risco, priorize montar uma reserva de emergência.',
+    'investment_step_aggressive_ipca_label':
+        'Tesouro IPCA+ curto/médio / renda fixa mais longa',
+    'investment_step_aggressive_equity_label':
+        'ETF de ações amplo (Brasil e/ou global)',
+    'investment_step_moderate_ipca_label': 'Tesouro IPCA+ curto/médio',
+    'investment_step_moderate_equity_label':
+        'ETF de ações amplo (Brasil e/ou global)',
+    'investment_step_conservative_ipca_label': 'Tesouro IPCA+ curto/médio',
+    'investment_plan_reserve_range_error':
+        'Defina uma meta de reserva entre 1 e 24 meses.',
+    'investment_plan_monthly_amount_error': 'Defina um aporte mensal válido.',
+    'investment_plan_saved': 'Plano salvo.',
+    'investment_plan_choice_saved_snack': 'Escolha salva.',
+    'investment_plan_setup_help':
+        'Defina metas simples (reserva e aporte). Você pode ajustar depois.',
+    'investment_plan_reserve_months_hint': 'Ex.: 3, 4, 6',
+    'investment_plan_profile_summary': 'Perfil: {risk} • Valor usado: {amount}',
+    'investment_plan_suggestions_title': 'Sugestões para este mês',
+    'investment_plan_suggestions_empty':
+        'Defina um valor (aporte) para ver sugestões.',
+    'investment_profile_saved_hint':
+        'Se quiser, você pode refazer o questionário.',
+    'investment_profile_mission_title': 'Missão: definir seu perfil',
+    'investment_profile_calculating': 'Calculando…',
+    'investment_profile_calculate_button': 'Calcular perfil',
+    'investment_plan_quick_summary_label': 'Resumo rápido do seu mês',
+    'investment_plan_progress_label': 'Progresso',
+    'investment_profile_local_fallback':
+        'Não foi possível calcular online; usei um cálculo local simples.',
+    'investment_question_1':
+        'Por quanto tempo você pretende deixar o dinheiro investido?',
+    'investment_question_1_option_1': 'Até 1 ano',
+    'investment_question_1_option_2': '1 a 3 anos',
+    'investment_question_1_option_3': '3+ anos',
+    'investment_question_2': 'Como você reage a oscilações no curto prazo?',
+    'investment_question_2_option_1': 'Me incomoda',
+    'investment_question_2_option_2': 'Depende',
+    'investment_question_2_option_3': 'Tranquilo',
+    'investment_question_3': 'Qual sua experiência com investimentos?',
+    'investment_question_3_option_1': 'Nenhuma',
+    'investment_question_3_option_2': 'Alguma',
+    'investment_question_3_option_3': 'Boa',
+    'investment_question_4': 'Você tem reserva de emergência?',
+    'investment_question_4_option_1': 'Não',
+    'investment_question_4_option_2': 'Parcial',
+    'investment_question_4_option_3': 'Sim',
+    'investment_question_5': 'Qual sua prioridade hoje?',
+    'investment_question_5_option_1': 'Segurança',
+    'investment_question_5_option_2': 'Equilíbrio',
+    'investment_question_5_option_3': 'Crescimento',
+    'investment_question_6': 'Se um investimento cair 10%, você...',
+    'investment_question_6_option_1': 'Vende',
+    'investment_question_6_option_2': 'Espera',
+    'investment_question_6_option_3': 'Aporta mais',
   },
   'en': {
     'budgets': 'Budgets',
@@ -330,7 +388,7 @@ const Map<String, Map<String, String>> appStringsExtra = {
     'ratio_tip_invest': 'Try to invest at least 15-20% of your monthly income.',
     'ratio_tip_buffer':
         'This is the amount still free at the end of your month.',
-    'dashboard_base_income': 'Base income for the month',
+    'dashboard_base_income': 'Monthly entries',
     'edit_short': 'Edit',
     'financial_position_available': 'Left for the month',
     'financial_position_with_invoice':
@@ -339,9 +397,10 @@ const Map<String, Map<String, String>> appStringsExtra = {
         'This already includes the open bill for this month.',
     'financial_position_without_invoice':
         'No meaningful card pressure this month.',
-    'financial_position_paid_out': 'Committed',
+    'financial_position_paid_out': 'Monthly exits',
     'financial_position_current_invoice': 'Current bill',
     'financial_position_invested': 'Invested',
+    'financial_position_total_account': 'Total account balance',
     'bills_home_title': 'Open bills',
     'bills_home_subtitle':
         'Track what is still pending on your card and mark it when paid.',
@@ -485,9 +544,9 @@ const Map<String, Map<String, String>> appStringsExtra = {
     'weekly_plan_streak_label': 'Streak',
     'weekly_plan_insights_label': 'Insights',
     'weekly_plan_follow_cta': 'Follow weekly step',
-    'weekly_plan_add_income_title': 'Add base income',
+    'weekly_plan_add_income_title': 'Add monthly entries',
     'weekly_plan_add_income_desc':
-        'Without active income, the plan loses accuracy.',
+        'Without active entries, the plan loses accuracy.',
     'weekly_plan_negative_balance_title': 'Return to positive balance',
     'weekly_plan_negative_balance_desc':
         'Your month is in the red. Prioritize cutting variable spending and renegotiating fixed costs.',
@@ -559,9 +618,9 @@ const Map<String, Map<String, String>> appStringsExtra = {
         'Your {name} card bill is due in 3 days. Avoid interest.',
     'notif_weekly_review_title': 'Weekly review',
     'notif_weekly_review_body': 'Check your summary and adjust what is needed.',
-    'notif_monthly_invest_title': 'Investment reminder',
-    'notif_monthly_invest_body':
-        'If it makes sense, define an amount to invest this month.',
+    'notif_monthly_entries_title': 'Time to update your entries',
+    'notif_monthly_entries_body':
+        'You have probably already received your income or other entries this month. Would you like to add them in Volo to keep your financial health up to date?',
     'goals_title_hint': 'Ex: Pay off card in 6 months',
     'goals_title_required':
         'Enter a clear goal title. Example: Save R\$ 200 per month.',
@@ -578,9 +637,67 @@ const Map<String, Map<String, String>> appStringsExtra = {
         'Great. Now let us go to your dashboard with your next steps.',
     'onboarding_profession_label': 'Profession',
     'onboarding_profession_hint': 'Ex: Administrative assistant',
-    'onboarding_extra_income_label': 'Extra income',
-    'onboarding_income_source_hint': 'Ex: Main salary',
-    'onboarding_add_extra_income': 'Add extra income',
+    'onboarding_extra_income_label': 'Extra entry',
+    'onboarding_income_source_hint': 'Ex: Salary, service income',
+    'onboarding_add_extra_income': 'Add entry',
+    'investment_step_safety_note':
+        'Before increasing risk, prioritize building an emergency reserve.',
+    'investment_step_aggressive_ipca_label':
+        'Inflation-linked bonds / longer fixed income',
+    'investment_step_aggressive_equity_label':
+        'Broad equity ETF (Brazil and/or global)',
+    'investment_step_moderate_ipca_label':
+        'Inflation-linked bonds / shorter-term fixed income',
+    'investment_step_moderate_equity_label':
+        'Broad equity ETF (Brazil and/or global)',
+    'investment_step_conservative_ipca_label':
+        'Inflation-linked bonds / shorter-term fixed income',
+    'investment_plan_reserve_range_error':
+        'Set an emergency reserve goal between 1 and 24 months.',
+    'investment_plan_monthly_amount_error': 'Set a valid monthly contribution.',
+    'investment_plan_saved': 'Plan saved.',
+    'investment_plan_choice_saved_snack': 'Choice saved.',
+    'investment_plan_setup_help':
+        'Set simple goals (reserve and contribution). You can adjust them later.',
+    'investment_plan_reserve_months_hint': 'Ex: 3, 4, 6',
+    'investment_plan_profile_summary':
+        'Profile: {risk} • Amount used: {amount}',
+    'investment_plan_suggestions_title': 'Suggestions for this month',
+    'investment_plan_suggestions_empty':
+        'Set an amount (contribution) to see suggestions.',
+    'investment_profile_saved_hint':
+        'If you want, you can retake the questionnaire.',
+    'investment_profile_mission_title': 'Mission: define your profile',
+    'investment_profile_calculating': 'Calculating…',
+    'investment_profile_calculate_button': 'Calculate profile',
+    'investment_plan_quick_summary_label': 'Quick summary of your month',
+    'investment_plan_progress_label': 'Progress',
+    'investment_profile_local_fallback':
+        'Could not calculate online; used a simple local calculation.',
+    'investment_question_1': 'How long do you plan to keep the money invested?',
+    'investment_question_1_option_1': 'Up to 1 year',
+    'investment_question_1_option_2': '1 to 3 years',
+    'investment_question_1_option_3': '3+ years',
+    'investment_question_2': 'How do you react to short-term swings?',
+    'investment_question_2_option_1': 'It bothers me',
+    'investment_question_2_option_2': 'It depends',
+    'investment_question_2_option_3': "I'm fine",
+    'investment_question_3': 'How much investing experience do you have?',
+    'investment_question_3_option_1': 'None',
+    'investment_question_3_option_2': 'Some',
+    'investment_question_3_option_3': 'Good',
+    'investment_question_4': 'Do you have an emergency fund?',
+    'investment_question_4_option_1': 'No',
+    'investment_question_4_option_2': 'Partial',
+    'investment_question_4_option_3': 'Yes',
+    'investment_question_5': 'What is your priority today?',
+    'investment_question_5_option_1': 'Safety',
+    'investment_question_5_option_2': 'Balance',
+    'investment_question_5_option_3': 'Growth',
+    'investment_question_6': 'If an investment drops 10%, you...',
+    'investment_question_6_option_1': 'Sell',
+    'investment_question_6_option_2': 'Wait',
+    'investment_question_6_option_3': 'Add more',
   },
   'es': {
     'budgets': 'Presupuestos',
@@ -624,7 +741,7 @@ const Map<String, Map<String, String>> appStringsExtra = {
         'Intenta invertir al menos 15-20% de tu ingreso mensual.',
     'ratio_tip_buffer':
         'Este es el valor que todavia queda libre al final del mes.',
-    'dashboard_base_income': 'Ingreso base del mes',
+    'dashboard_base_income': 'Entradas del mes',
     'edit_short': 'Editar',
     'financial_position_available': 'Restante del mes',
     'financial_position_with_invoice':
@@ -633,9 +750,10 @@ const Map<String, Map<String, String>> appStringsExtra = {
         'Esto ya considera la factura abierta de este mes.',
     'financial_position_without_invoice':
         'Sin presion relevante de tarjeta este mes.',
-    'financial_position_paid_out': 'Comprometido',
+    'financial_position_paid_out': 'Salidas del mes',
     'financial_position_current_invoice': 'Factura actual',
     'financial_position_invested': 'Invertido',
+    'financial_position_total_account': 'Saldo total de la cuenta',
     'bills_home_title': 'Facturas abiertas',
     'bills_home_subtitle':
         'Sigue lo pendiente en la tarjeta y marcalo cuando pagues.',
@@ -780,9 +898,9 @@ const Map<String, Map<String, String>> appStringsExtra = {
     'weekly_plan_streak_label': 'Racha',
     'weekly_plan_insights_label': 'Insights',
     'weekly_plan_follow_cta': 'Seguir paso semanal',
-    'weekly_plan_add_income_title': 'Registrar ingreso base',
+    'weekly_plan_add_income_title': 'Agregar entradas del mes',
     'weekly_plan_add_income_desc':
-        'Sin un ingreso activo, el plan pierde precision.',
+        'Sin entradas activas, el plan pierde precisión.',
     'weekly_plan_negative_balance_title': 'Volver al saldo positivo',
     'weekly_plan_negative_balance_desc':
         'Tu mes esta en rojo. Prioriza recortar variables y renegociar fijos.',
@@ -857,9 +975,9 @@ const Map<String, Map<String, String>> appStringsExtra = {
     'notif_weekly_review_title': 'Cierre de la semana',
     'notif_weekly_review_body':
         'Revisa tu resumen y ajusta lo que sea necesario.',
-    'notif_monthly_invest_title': 'Recordatorio de inversion',
-    'notif_monthly_invest_body':
-        'Si tiene sentido, define un valor para invertir este mes.',
+    'notif_monthly_entries_title': 'Es hora de actualizar tus entradas',
+    'notif_monthly_entries_body':
+        'Probablemente ya recibiste tu ingreso u otras entradas de este mes. ¿Quieres agregarlas en Volo para mantener tu salud financiera actualizada?',
     'goals_title_hint': 'Ej: Pagar tarjeta en 6 meses',
     'goals_title_required':
         'Escribe un titulo claro para la meta. Ejemplo: Ahorrar R\$ 200 por mes.',
@@ -876,8 +994,67 @@ const Map<String, Map<String, String>> appStringsExtra = {
         'Perfecto. Ahora vamos al panel con tus proximos pasos.',
     'onboarding_profession_label': 'Profesion',
     'onboarding_profession_hint': 'Ej: Asistente administrativo',
-    'onboarding_extra_income_label': 'Ingreso extra',
-    'onboarding_income_source_hint': 'Ej: Salario principal',
-    'onboarding_add_extra_income': 'Agregar ingreso extra',
+    'onboarding_extra_income_label': 'Entrada extra',
+    'onboarding_income_source_hint': 'Ej: Salario, prestación de servicios',
+    'onboarding_add_extra_income': 'Agregar entrada',
+    'investment_step_safety_note':
+        'Antes de aumentar el riesgo, prioriza construir una reserva de emergencia.',
+    'investment_step_aggressive_ipca_label':
+        'Bonos ligados a la inflaci?n / renta fija m?s larga',
+    'investment_step_aggressive_equity_label':
+        'ETF de acciones amplio (Brasil y/o global)',
+    'investment_step_moderate_ipca_label':
+        'Bonos ligados a la inflaci?n / renta fija m?s corta',
+    'investment_step_moderate_equity_label':
+        'ETF de acciones amplio (Brasil y/o global)',
+    'investment_step_conservative_ipca_label':
+        'Bonos ligados a la inflaci?n / renta fija m?s corta',
+    'investment_plan_reserve_range_error':
+        'Define una meta de reserva entre 1 y 24 meses.',
+    'investment_plan_monthly_amount_error': 'Define un aporte mensual v?lido.',
+    'investment_plan_saved': 'Plan guardado.',
+    'investment_plan_choice_saved_snack': 'Elecci?n guardada.',
+    'investment_plan_setup_help':
+        'Define metas simples (reserva y aporte). Puedes ajustarlas despu?s.',
+    'investment_plan_reserve_months_hint': 'Ej.: 3, 4, 6',
+    'investment_plan_profile_summary': 'Perfil: {risk} • Valor usado: {amount}',
+    'investment_plan_suggestions_title': 'Sugerencias para este mes',
+    'investment_plan_suggestions_empty':
+        'Define un valor (aporte) para ver sugerencias.',
+    'investment_profile_saved_hint':
+        'Si quieres, puedes rehacer el cuestionario.',
+    'investment_profile_mission_title': 'Misi?n: definir tu perfil',
+    'investment_profile_calculating': 'Calculando…',
+    'investment_profile_calculate_button': 'Calcular perfil',
+    'investment_plan_quick_summary_label': 'Resumen r?pido de tu mes',
+    'investment_plan_progress_label': 'Progreso',
+    'investment_profile_local_fallback':
+        'No fue posible calcular en l?nea; us? un c?lculo local simple.',
+    'investment_question_1':
+        '?Cu?nto tiempo piensas dejar el dinero invertido?',
+    'investment_question_1_option_1': 'Hasta 1 a?o',
+    'investment_question_1_option_2': '1 a 3 a?os',
+    'investment_question_1_option_3': '3+ a?os',
+    'investment_question_2':
+        '?C?mo reaccionas a las oscilaciones de corto plazo?',
+    'investment_question_2_option_1': 'Me molesta',
+    'investment_question_2_option_2': 'Depende',
+    'investment_question_2_option_3': 'Tranquilo',
+    'investment_question_3': '?Qu? experiencia tienes con inversiones?',
+    'investment_question_3_option_1': 'Ninguna',
+    'investment_question_3_option_2': 'Alguna',
+    'investment_question_3_option_3': 'Buena',
+    'investment_question_4': '?Tienes fondo de emergencia?',
+    'investment_question_4_option_1': 'No',
+    'investment_question_4_option_2': 'Parcial',
+    'investment_question_4_option_3': 'S?',
+    'investment_question_5': '?Cu?l es tu prioridad hoy?',
+    'investment_question_5_option_1': 'Seguridad',
+    'investment_question_5_option_2': 'Equilibrio',
+    'investment_question_5_option_3': 'Crecimiento',
+    'investment_question_6': 'Si una inversi?n cae 10%, t?...',
+    'investment_question_6_option_1': 'Vendes',
+    'investment_question_6_option_2': 'Esperas',
+    'investment_question_6_option_3': 'Aportas m?s',
   },
 };

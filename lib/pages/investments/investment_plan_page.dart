@@ -30,7 +30,7 @@ class _SuggestionBlock {
   final String label;
   final double percent;
 
-  const _SuggestionBlock({required this.label, required this.percent});
+  _SuggestionBlock({required this.label, required this.percent});
 }
 
 class _SuggestionCard {
@@ -68,6 +68,7 @@ class _InvestmentPlanPageState extends State<InvestmentPlanPage> {
   bool _showEditor = false;
   bool _showPlanEditor = false;
   String? _selectedSuggestionTitle;
+  InvestmentPlanDoc? _latestPlan;
 
   void _stopEditing() {
     FocusManager.instance.primaryFocus?.unfocus();
@@ -101,7 +102,9 @@ class _InvestmentPlanPageState extends State<InvestmentPlanPage> {
       );
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Perfil atualizado.')),
+          SnackBar(
+              content:
+                  Text(AppStrings.t(context, 'investment_profile_updated'))),
         );
       }
     } catch (_) {
@@ -116,9 +119,10 @@ class _InvestmentPlanPageState extends State<InvestmentPlanPage> {
         );
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
+            SnackBar(
               content: Text(
-                  'Não foi possível calcular online; usei um cálculo local simples.'),
+                AppStrings.t(context, 'investment_profile_local_fallback'),
+              ),
             ),
           );
         }
@@ -127,7 +131,9 @@ class _InvestmentPlanPageState extends State<InvestmentPlanPage> {
       }
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Perfil aplicado localmente.')),
+          SnackBar(
+              content: Text(
+                  AppStrings.t(context, 'investment_profile_local_saved'))),
         );
       }
     } finally {
@@ -141,14 +147,14 @@ class _InvestmentPlanPageState extends State<InvestmentPlanPage> {
     }
   }
 
-  String _riskLabel(String risk) {
+  String _riskLabel(BuildContext context, String risk) {
     switch (risk) {
       case 'aggressive':
-        return 'Agressivo';
+        return AppStrings.t(context, 'investment_risk_aggressive');
       case 'moderate':
-        return 'Moderado';
+        return AppStrings.t(context, 'investment_risk_moderate');
       default:
-        return 'Conservador';
+        return AppStrings.t(context, 'investment_risk_conservative');
     }
   }
 
@@ -197,33 +203,35 @@ class _InvestmentPlanPageState extends State<InvestmentPlanPage> {
   }
 
   List<_SuggestionCard> _buildSimpleSuggestions({
+    required BuildContext context,
     required String risk,
     required double amount,
     required bool hasEmergencyFund,
   }) {
     if (!amount.isFinite || amount <= 0) return const [];
 
-    final smallAmount = amount < 100;
     final safetyNote = hasEmergencyFund
         ? null
-        : 'Antes de aumentar o risco, priorize montar uma reserva de emergência.';
+        : AppStrings.t(context, 'investment_step_safety_note');
 
-    final commonFixedLiquid = smallAmount
-        ? 'Tesouro Selic / CDB com liquidez diária'
-        : 'Tesouro Selic / CDB 100%+ CDI (liquidez diária)';
+    final commonFixedLiquid =
+        AppStrings.t(context, 'investment_fixed_liquid_label');
 
     if (!hasEmergencyFund) {
       return [
         _SuggestionCard(
-          title: 'Reserva de emergência (prioridade)',
-          subtitle: 'Simples e líquido — até completar a reserva.',
-          blocks: const [
+          title: AppStrings.t(context, 'investment_reserve_emergency_title'),
+          subtitle:
+              AppStrings.t(context, 'investment_reserve_emergency_subtitle'),
+          blocks: [
             _SuggestionBlock(
-                label: 'Renda fixa com liquidez (Selic/CDB)', percent: 1.0)
+              label: commonFixedLiquid,
+              percent: 1.0,
+            ),
           ],
-          notes: const [
-            'Objetivo: 3–6 meses de custos essenciais em liquidez diária.',
-            'Depois da reserva pronta, volte aqui e escolha uma alocação de longo prazo.',
+          notes: [
+            AppStrings.t(context, 'investment_reserve_emergency_note_1'),
+            AppStrings.t(context, 'investment_reserve_emergency_note_2'),
           ],
         ),
       ];
@@ -232,34 +240,50 @@ class _InvestmentPlanPageState extends State<InvestmentPlanPage> {
     if (risk == 'aggressive') {
       return [
         _SuggestionCard(
-          title: 'Primeiro passo (simples)',
-          subtitle: 'Equilíbrio entre segurança e crescimento.',
+          title: AppStrings.t(context, 'investment_step_simple_title'),
+          subtitle: AppStrings.t(context, 'investment_step_simple_subtitle'),
           blocks: [
             _SuggestionBlock(label: commonFixedLiquid, percent: 0.45),
-            const _SuggestionBlock(
-                label: 'Tesouro IPCA+ curto/médio / renda fixa mais longa',
-                percent: 0.20),
-            const _SuggestionBlock(
-                label: 'ETF de ações amplo (Brasil e/ou global)',
-                percent: 0.30),
-            const _SuggestionBlock(
-                label: 'Alto risco (opcional)', percent: 0.05),
+            _SuggestionBlock(
+              label: AppStrings.t(
+                  context, 'investment_step_aggressive_ipca_label'),
+              percent: 0.20,
+            ),
+            _SuggestionBlock(
+              label: AppStrings.t(
+                  context, 'investment_step_aggressive_equity_label'),
+              percent: 0.30,
+            ),
+            _SuggestionBlock(
+              label: AppStrings.t(context, 'investment_high_risk_label'),
+              percent: 0.05,
+            ),
           ],
           notes: [
             if (safetyNote != null) safetyNote,
-            'Se quiser deixar ainda mais simples: reduza “alto risco” para 0% e aumente o ETF.',
+            AppStrings.t(context, 'investment_step_simple_note'),
           ],
         ),
         _SuggestionCard(
-          title: 'Agressivo (diversificado)',
-          subtitle: 'Mais volatilidade, sempre com base segura.',
+          title: AppStrings.t(context, 'investment_step_aggressive_title'),
+          subtitle:
+              AppStrings.t(context, 'investment_step_aggressive_subtitle'),
           blocks: [
             _SuggestionBlock(label: commonFixedLiquid, percent: 0.35),
-            const _SuggestionBlock(
-                label: 'Tesouro IPCA+ / prefixados', percent: 0.20),
-            const _SuggestionBlock(label: 'ETF de ações amplo', percent: 0.40),
-            const _SuggestionBlock(
-                label: 'Alto risco (opcional)', percent: 0.05),
+            _SuggestionBlock(
+              label: AppStrings.t(
+                  context, 'investment_step_aggressive_ipca_label'),
+              percent: 0.20,
+            ),
+            _SuggestionBlock(
+              label: AppStrings.t(
+                  context, 'investment_step_aggressive_equity_label'),
+              percent: 0.40,
+            ),
+            _SuggestionBlock(
+              label: AppStrings.t(context, 'investment_high_risk_label'),
+              percent: 0.05,
+            ),
           ],
           notes: [if (safetyNote != null) safetyNote],
         ),
@@ -269,29 +293,42 @@ class _InvestmentPlanPageState extends State<InvestmentPlanPage> {
     if (risk == 'moderate') {
       return [
         _SuggestionCard(
-          title: 'Moderado (simples)',
-          subtitle: 'Para começar sem estresse.',
+          title: AppStrings.t(context, 'investment_step_moderate_title'),
+          subtitle: AppStrings.t(context, 'investment_step_moderate_subtitle'),
           blocks: [
             _SuggestionBlock(label: commonFixedLiquid, percent: 0.60),
-            const _SuggestionBlock(
-                label: 'Tesouro IPCA+ curto/médio', percent: 0.25),
-            const _SuggestionBlock(
-                label: 'ETF de ações amplo (Brasil e/ou global)',
-                percent: 0.15),
+            _SuggestionBlock(
+              label:
+                  AppStrings.t(context, 'investment_step_moderate_ipca_label'),
+              percent: 0.25,
+            ),
+            _SuggestionBlock(
+              label: AppStrings.t(
+                  context, 'investment_step_aggressive_equity_label'),
+              percent: 0.15,
+            ),
           ],
           notes: [
             if (safetyNote != null) safetyNote,
-            'Se oscilar te incomodar, aumente a parte “liquidez” e reduza o ETF.',
+            AppStrings.t(context, 'investment_step_moderate_note'),
           ],
         ),
         _SuggestionCard(
-          title: 'Moderado com IPCA',
-          subtitle: 'Mais proteção de longo prazo, mantendo simplicidade.',
+          title: AppStrings.t(context, 'investment_step_moderate_ipca_title'),
+          subtitle:
+              AppStrings.t(context, 'investment_step_moderate_ipca_subtitle'),
           blocks: [
             _SuggestionBlock(label: commonFixedLiquid, percent: 0.55),
-            const _SuggestionBlock(
-                label: 'Tesouro IPCA+ curto/médio', percent: 0.30),
-            const _SuggestionBlock(label: 'ETF de ações amplo', percent: 0.15),
+            _SuggestionBlock(
+              label:
+                  AppStrings.t(context, 'investment_step_moderate_ipca_label'),
+              percent: 0.30,
+            ),
+            _SuggestionBlock(
+              label: AppStrings.t(
+                  context, 'investment_step_aggressive_equity_label'),
+              percent: 0.15,
+            ),
           ],
           notes: [if (safetyNote != null) safetyNote],
         ),
@@ -300,23 +337,34 @@ class _InvestmentPlanPageState extends State<InvestmentPlanPage> {
 
     return [
       _SuggestionCard(
-        title: 'Começo conservador',
-        subtitle: 'Para sair do zero sem estresse.',
-        blocks: [_SuggestionBlock(label: commonFixedLiquid, percent: 1.0)],
+        title: AppStrings.t(context, 'investment_step_conservative_title'),
+        subtitle:
+            AppStrings.t(context, 'investment_step_conservative_subtitle'),
+        blocks: [
+          _SuggestionBlock(label: commonFixedLiquid, percent: 1.0),
+        ],
         notes: [
           if (safetyNote != null) safetyNote,
-          'Depois que a reserva estiver pronta, você pode adicionar um pouco de IPCA+ ou ETF.',
+          AppStrings.t(context, 'investment_step_conservative_note'),
         ],
       ),
       _SuggestionCard(
-        title: 'Conservador + longo prazo',
-        subtitle: 'Um toque de longo prazo, mantendo segurança.',
+        title: AppStrings.t(context, 'investment_step_conservative_long_title'),
+        subtitle: AppStrings.t(
+          context,
+          'investment_step_conservative_long_subtitle',
+        ),
         blocks: [
           _SuggestionBlock(label: commonFixedLiquid, percent: 0.80),
-          const _SuggestionBlock(
-              label: 'Tesouro IPCA+ curto/médio', percent: 0.20),
+          _SuggestionBlock(
+            label: AppStrings.t(context, 'investment_step_moderate_ipca_label'),
+            percent: 0.20,
+          ),
         ],
-        notes: [if (safetyNote != null) safetyNote],
+        notes: [
+          if (safetyNote != null) safetyNote,
+          AppStrings.t(context, 'investment_step_conservative_long_note'),
+        ],
       ),
     ];
   }
@@ -344,8 +392,11 @@ class _InvestmentPlanPageState extends State<InvestmentPlanPage> {
         (emergencyMonths <= 0 || emergencyMonths > 24)) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-              content: Text('Defina uma meta de reserva entre 1 e 24 meses.')),
+          SnackBar(
+            content: Text(
+              AppStrings.t(context, 'investment_plan_reserve_range_error'),
+            ),
+          ),
         );
       }
       return;
@@ -355,7 +406,11 @@ class _InvestmentPlanPageState extends State<InvestmentPlanPage> {
         (!monthlyContribution.isFinite || monthlyContribution < 0)) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Defina um aporte mensal válido.')),
+          SnackBar(
+            content: Text(
+              AppStrings.t(context, 'investment_plan_monthly_amount_error'),
+            ),
+          ),
         );
       }
       return;
@@ -374,7 +429,8 @@ class _InvestmentPlanPageState extends State<InvestmentPlanPage> {
       if (mounted) {
         _stopEditing();
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Plano salvo.')),
+          SnackBar(
+              content: Text(AppStrings.t(context, 'investment_plan_saved'))),
         );
         setState(() => _showPlanEditor = false);
       }
@@ -409,7 +465,11 @@ class _InvestmentPlanPageState extends State<InvestmentPlanPage> {
     if (selectedAmount <= 0) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Defina um valor para alocar.')),
+          SnackBar(
+            content: Text(
+              AppStrings.t(context, 'investment_allocation_define_value'),
+            ),
+          ),
         );
       }
       return;
@@ -438,7 +498,9 @@ class _InvestmentPlanPageState extends State<InvestmentPlanPage> {
       if (mounted) {
         _stopEditing();
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Escolha salva.')),
+          SnackBar(
+              content: Text(
+                  AppStrings.t(context, 'investment_plan_choice_saved_snack'))),
         );
         setState(() => _showPlanEditor = false);
       }
@@ -502,6 +564,7 @@ class _InvestmentPlanPageState extends State<InvestmentPlanPage> {
                       stream: FirestoreService.watchInvestmentPlan(uid),
                       builder: (context, planSnap) {
                         final plan = planSnap.data;
+                        _latestPlan = plan;
 
                         if (plan != null && !_hydratedFromPlan) {
                           WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -537,7 +600,10 @@ class _InvestmentPlanPageState extends State<InvestmentPlanPage> {
                           final investPct =
                               (targets['investPct'] as num?)?.toDouble() ??
                                   0.10;
-                          final income = user?.monthlyIncome ?? 0.0;
+                          final income =
+                              LocalStorageService.incomeTotalForMonth(
+                            DateTime.now(),
+                          );
                           final suggestedMonthly =
                               income > 0 ? income * investPct : 0.0;
 
@@ -580,6 +646,7 @@ class _InvestmentPlanPageState extends State<InvestmentPlanPage> {
                                 (fallbackMonthly > 0 ? fallbackMonthly : 0.0));
 
                         final suggestions = _buildSimpleSuggestions(
+                          context: context,
                           risk: effectiveRisk,
                           amount: amountForSuggestions,
                           hasEmergencyFund: hasEmergencyFund,
@@ -632,7 +699,8 @@ class _InvestmentPlanPageState extends State<InvestmentPlanPage> {
                                         children: [
                                           Expanded(
                                             child: Text(
-                                              'Metas',
+                                              AppStrings.t(context,
+                                                  'investment_plan_goals_title'),
                                               style: TextStyle(
                                                 color: AppTheme.textPrimary(
                                                     context),
@@ -651,13 +719,15 @@ class _InvestmentPlanPageState extends State<InvestmentPlanPage> {
                                                     ),
                                             child: Text(_savingPlan
                                                 ? 'Salvando…'
-                                                : 'Salvar'),
+                                                : AppStrings.t(context,
+                                                    'investment_plan_save_button')),
                                           ),
                                         ],
                                       ),
                                       const SizedBox(height: 10),
                                       Text(
-                                        'Defina metas simples (reserva e aporte). Você pode ajustar depois.',
+                                        AppStrings.t(context,
+                                            'investment_plan_setup_help'),
                                         style: TextStyle(
                                           color:
                                               AppTheme.textSecondary(context),
@@ -668,10 +738,13 @@ class _InvestmentPlanPageState extends State<InvestmentPlanPage> {
                                       TextField(
                                         controller: _emergencyMonthsController,
                                         keyboardType: TextInputType.number,
-                                        decoration: const InputDecoration(
-                                          labelText:
-                                              'Reserva de emergência (meses)',
-                                          hintText: 'Ex.: 3, 4, 6',
+                                        decoration: InputDecoration(
+                                          labelText: AppStrings.t(
+                                            context,
+                                            'investment_reserve_emergency_months_label',
+                                          ),
+                                          hintText: AppStrings.t(context,
+                                              'investment_plan_reserve_months_hint'),
                                         ),
                                       ),
                                       const SizedBox(height: 10),
@@ -683,8 +756,9 @@ class _InvestmentPlanPageState extends State<InvestmentPlanPage> {
                                         inputFormatters: const [
                                           MoneyTextInputFormatter(),
                                         ],
-                                        decoration: const InputDecoration(
-                                          labelText: 'Aporte mensal alvo (R\$)',
+                                        decoration: InputDecoration(
+                                          labelText: AppStrings.t(context,
+                                              'investment_plan_target_input_label'),
                                         ),
                                         onChanged: (_) => setState(() {}),
                                       ),
@@ -705,7 +779,10 @@ class _InvestmentPlanPageState extends State<InvestmentPlanPage> {
                                         CrossAxisAlignment.start,
                                     children: [
                                       Text(
-                                        'Sugestões para este mês',
+                                        AppStrings.t(
+                                          context,
+                                          'investment_plan_suggestions_title',
+                                        ),
                                         style: TextStyle(
                                           color: AppTheme.textPrimary(context),
                                           fontWeight: FontWeight.w700,
@@ -713,7 +790,17 @@ class _InvestmentPlanPageState extends State<InvestmentPlanPage> {
                                       ),
                                       const SizedBox(height: 6),
                                       Text(
-                                        'Perfil: ${_riskLabel(effectiveRisk)} • Valor usado: ${CurrencyUtils.format(amountForSuggestions)}',
+                                        AppStrings.tr(
+                                          context,
+                                          'investment_plan_profile_summary',
+                                          {
+                                            'risk': _riskLabel(
+                                                context, effectiveRisk),
+                                            'amount': CurrencyUtils.format(
+                                              amountForSuggestions,
+                                            ),
+                                          },
+                                        ),
                                         style: TextStyle(
                                           color:
                                               AppTheme.textSecondary(context),
@@ -728,17 +815,19 @@ class _InvestmentPlanPageState extends State<InvestmentPlanPage> {
                                         inputFormatters: const [
                                           MoneyTextInputFormatter(),
                                         ],
-                                        decoration: const InputDecoration(
-                                          labelText: 'Simular valor (opcional)',
-                                          hintText:
-                                              'Se vazio, usamos o aporte mensal alvo.',
+                                        decoration: InputDecoration(
+                                          labelText: AppStrings.t(context,
+                                              'investment_plan_simulate_label'),
+                                          hintText: AppStrings.t(context,
+                                              'investment_plan_simulate_hint'),
                                         ),
                                         onChanged: (_) => setState(() {}),
                                       ),
                                       const SizedBox(height: 12),
                                       if (suggestions.isEmpty)
                                         Text(
-                                          'Defina um valor (aporte) para ver sugestões.',
+                                          AppStrings.t(context,
+                                              'investment_plan_suggestions_empty'),
                                           style: TextStyle(
                                             color:
                                                 AppTheme.textSecondary(context),
@@ -880,7 +969,8 @@ class _InvestmentPlanPageState extends State<InvestmentPlanPage> {
                                                     ),
                                             child: Text(_savingAllocation
                                                 ? 'Salvando…'
-                                                : 'Salvar esta escolha'),
+                                                : AppStrings.t(context,
+                                                    'investment_plan_save_choice')),
                                           ),
                                         ),
                                       ],
@@ -903,7 +993,8 @@ class _InvestmentPlanPageState extends State<InvestmentPlanPage> {
                                               CrossAxisAlignment.start,
                                           children: [
                                             Text(
-                                              'Perfil salvo',
+                                              AppStrings.t(context,
+                                                  'investment_plan_choice_saved'),
                                               style: TextStyle(
                                                 color: AppTheme.textPrimary(
                                                     context),
@@ -912,7 +1003,8 @@ class _InvestmentPlanPageState extends State<InvestmentPlanPage> {
                                             ),
                                             const SizedBox(height: 4),
                                             Text(
-                                              'Se quiser, você pode refazer o questionário.',
+                                              AppStrings.t(context,
+                                                  'investment_profile_saved_hint'),
                                               style: TextStyle(
                                                 color: AppTheme.textSecondary(
                                                     context),
@@ -925,7 +1017,8 @@ class _InvestmentPlanPageState extends State<InvestmentPlanPage> {
                                       OutlinedButton(
                                         onPressed: () =>
                                             setState(() => _showEditor = true),
-                                        child: const Text('Editar perfil'),
+                                        child: Text(AppStrings.t(
+                                            context, 'profile_edit_short')),
                                       ),
                                     ],
                                   ),
@@ -951,7 +1044,8 @@ class _InvestmentPlanPageState extends State<InvestmentPlanPage> {
                                             : () => setState(
                                                   () => _showEditor = false,
                                                 ),
-                                        child: const Text('Cancelar'),
+                                        child: Text(
+                                            AppStrings.t(context, 'cancel')),
                                       ),
                                     ],
                                   ),
@@ -982,8 +1076,10 @@ class _InvestmentPlanPageState extends State<InvestmentPlanPage> {
                                         ? null
                                         : _compute,
                                     child: Text(_saving
-                                        ? 'Calculando…'
-                                        : 'Calcular perfil'),
+                                        ? AppStrings.t(context,
+                                            'investment_profile_calculating')
+                                        : AppStrings.t(context,
+                                            'investment_profile_calculate_button')),
                                   ),
                                 ),
                               ],
@@ -997,6 +1093,102 @@ class _InvestmentPlanPageState extends State<InvestmentPlanPage> {
               ),
       ),
     );
+  }
+
+  Widget _resultCard(dynamic profile) {
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: Theme.of(context).colorScheme.surface,
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: Colors.white10),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            AppStrings.t(context, 'investment_calculator'),
+            style: TextStyle(
+              color: AppTheme.textPrimary(context),
+              fontWeight: FontWeight.w700,
+            ),
+          ),
+          const SizedBox(height: 6),
+          Text(
+            AppStrings.t(context, 'investment_projection_title'),
+            style: TextStyle(
+              color: AppTheme.textSecondary(context),
+              fontSize: 12,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _summaryMetric({
+    required String label,
+    required String value,
+    required IconData icon,
+  }) {
+    return Container(
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: Theme.of(context).colorScheme.surface,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: Colors.white10),
+      ),
+      child: Row(
+        children: [
+          Icon(icon, size: 18, color: AppTheme.primary(context)),
+          const SizedBox(width: 8),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  label,
+                  style: TextStyle(
+                    color: AppTheme.textSecondary(context),
+                    fontSize: 11,
+                  ),
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  value,
+                  style: TextStyle(
+                    color: AppTheme.textPrimary(context),
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  String pctStr(String key) {
+    final allocation = _currentAllocation();
+    final value = allocation[key] ?? 0.0;
+    return '${(value * 100).toStringAsFixed(0)}%';
+  }
+
+  String amountStr(String key) {
+    final allocation = _currentAllocation();
+    final monthly = parseMoneyInput(_monthlyContributionController.text);
+    final value = allocation[key] ?? 0.0;
+    final amount = monthly * value;
+    return '\n${CurrencyUtils.format(amount)}';
+  }
+
+  Map<String, double> _currentAllocation() {
+    final selected = _latestPlan?.selectedAllocation;
+    if (selected != null && selected.blocks.isNotEmpty) {
+      return {for (final b in selected.blocks) b.label: b.percent};
+    }
+    return _computeLocalProfile(_answers.whereType<int>().toList()).allocation;
   }
 
   Widget _planSummaryCard({
@@ -1031,7 +1223,7 @@ class _InvestmentPlanPageState extends State<InvestmentPlanPage> {
             children: [
               Expanded(
                 child: Text(
-                  'Seu plano de investimentos',
+                  AppStrings.t(context, 'investment_plan_title'),
                   style: TextStyle(
                     color: AppTheme.textPrimary(context),
                     fontWeight: FontWeight.w700,
@@ -1040,13 +1232,14 @@ class _InvestmentPlanPageState extends State<InvestmentPlanPage> {
               ),
               OutlinedButton(
                 onPressed: onEdit,
-                child: const Text('Editar plano'),
+                child:
+                    Text(AppStrings.t(context, 'investment_plan_edit_button')),
               ),
             ],
           ),
           const SizedBox(height: 6),
           Text(
-            'Resumo r\u00e1pido do seu m\u00eas',
+            AppStrings.t(context, 'investment_plan_quick_summary_label'),
             style: TextStyle(
               color: AppTheme.textSecondary(context),
               fontSize: 12,
@@ -1057,7 +1250,7 @@ class _InvestmentPlanPageState extends State<InvestmentPlanPage> {
             children: [
               Expanded(
                 child: _summaryMetric(
-                  label: 'Aporte alvo',
+                  label: AppStrings.t(context, 'investment_plan_target_label'),
                   value: monthlyTargetText,
                   icon: Icons.savings_outlined,
                 ),
@@ -1065,7 +1258,7 @@ class _InvestmentPlanPageState extends State<InvestmentPlanPage> {
               const SizedBox(width: 10),
               Expanded(
                 child: _summaryMetric(
-                  label: 'Alocar agora',
+                  label: AppStrings.t(context, 'investment_allocate_now'),
                   value: selectedAmountText,
                   icon: Icons.trending_up,
                 ),
@@ -1077,15 +1270,15 @@ class _InvestmentPlanPageState extends State<InvestmentPlanPage> {
             children: [
               Expanded(
                 child: _summaryMetric(
-                  label: 'Perfil',
-                  value: _riskLabel(risk),
+                  label: AppStrings.t(context, 'investment_plan_profile_label'),
+                  value: _riskLabel(context, risk),
                   icon: Icons.shield_outlined,
                 ),
               ),
               const SizedBox(width: 10),
               Expanded(
                 child: _summaryMetric(
-                  label: 'Reserva',
+                  label: AppStrings.t(context, 'investment_plan_reserve_label'),
                   value: emergencyText == '-' ? '-' : '$emergencyText meses',
                   icon: Icons.health_and_safety_outlined,
                 ),
@@ -1094,156 +1287,7 @@ class _InvestmentPlanPageState extends State<InvestmentPlanPage> {
           ),
           const SizedBox(height: 16),
           Text(
-            'Aloca\u00e7\u00e3o escolhida',
-            style: TextStyle(
-              color: AppTheme.textPrimary(context),
-              fontWeight: FontWeight.w700,
-            ),
-          ),
-          const SizedBox(height: 8),
-          if (allocation == null || allocation.blocks.isEmpty)
-            Text(
-              'Aloca\u00e7\u00e3o ainda n\u00e3o definida.',
-              style: TextStyle(
-                color: AppTheme.textSecondary(context),
-                fontSize: 12,
-              ),
-            )
-          else ...[
-            Text(
-              allocation.title,
-              style: TextStyle(
-                color: AppTheme.textSecondary(context),
-                fontSize: 12,
-              ),
-            ),
-            const SizedBox(height: 8),
-            ...allocation.blocks.map((b) {
-              final pct = (b.percent * 100).round();
-              final amount =
-                  selectedAmount > 0 ? selectedAmount * b.percent : 0.0;
-              final amountText =
-                  selectedAmount > 0 ? CurrencyUtils.format(amount) : '-';
-              return Padding(
-                padding: const EdgeInsets.only(bottom: 6),
-                child: Row(
-                  children: [
-                    Expanded(
-                      child: Text(
-                        '${b.label} ($pct%)',
-                        style: TextStyle(
-                          color: AppTheme.textSecondary(context),
-                          fontSize: 12,
-                        ),
-                      ),
-                    ),
-                    Text(
-                      amountText,
-                      style: TextStyle(
-                        color: AppTheme.textPrimary(context),
-                        fontWeight: FontWeight.w700,
-                        fontSize: 12,
-                      ),
-                    ),
-                  ],
-                ),
-              );
-            }),
-          ],
-        ],
-      ),
-    );
-  }
-
-  Widget _summaryMetric({
-    required String label,
-    required String value,
-    required IconData icon,
-  }) {
-    return Container(
-      padding: const EdgeInsets.all(12),
-      decoration: BoxDecoration(
-        color: Theme.of(context).colorScheme.surface,
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: Colors.white10),
-      ),
-      child: Row(
-        children: [
-          Container(
-            width: 34,
-            height: 34,
-            decoration: BoxDecoration(
-              color: Theme.of(context).colorScheme.primary.withOpacity(0.12),
-              borderRadius: BorderRadius.circular(10),
-            ),
-            child: Icon(
-              icon,
-              color: Theme.of(context).colorScheme.primary,
-              size: 18,
-            ),
-          ),
-          const SizedBox(width: 10),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  label,
-                  style: TextStyle(
-                    color: AppTheme.textSecondary(context),
-                    fontSize: 11,
-                  ),
-                ),
-                const SizedBox(height: 2),
-                Text(
-                  value,
-                  style: TextStyle(
-                    color: AppTheme.textPrimary(context),
-                    fontWeight: FontWeight.w700,
-                    fontSize: 13,
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _resultCard(InvestmentProfile p) {
-    final alloc = p.allocation;
-    double pct(String key) =>
-        ((alloc[key] ?? 0) * 100).clamp(0, 100).toDouble();
-
-    String pctStr(String key) => '${pct(key).toStringAsFixed(0)}%';
-    final baseAmount = parseMoneyInput(_amountController.text);
-    String amountStr(String key) {
-      if (baseAmount <= 0) return '';
-      final share = (alloc[key] ?? 0) * baseAmount;
-      return ' • ${CurrencyUtils.format(share)}';
-    }
-
-    return Container(
-      padding: const EdgeInsets.all(14),
-      decoration: BoxDecoration(
-        color: Theme.of(context).colorScheme.surface,
-        borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: Colors.white10),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            'Seu perfil: ${_riskLabel(p.risk)}',
-            style: TextStyle(
-              color: AppTheme.textPrimary(context),
-              fontWeight: FontWeight.w700,
-            ),
-          ),
-          const SizedBox(height: 8),
-          Text(
-            'Alocação sugerida (classes de ativos):',
+            AppStrings.t(context, 'investment_allocation_title'),
             style: TextStyle(
               color: AppTheme.textSecondary(context),
               fontSize: 12,
@@ -1251,19 +1295,19 @@ class _InvestmentPlanPageState extends State<InvestmentPlanPage> {
           ),
           const SizedBox(height: 8),
           _allocRow(
-            'Renda fixa líquida',
+            AppStrings.t(context, 'investment_fixed_liquid_label'),
             '${pctStr('fixedLiquid')}${amountStr('fixedLiquid')}',
           ),
           _allocRow(
-            'Renda fixa longa',
+            AppStrings.t(context, 'investment_fixed_long_label'),
             '${pctStr('fixedLong')}${amountStr('fixedLong')}',
           ),
           _allocRow(
-            'Variável diversificada',
+            AppStrings.t(context, 'investment_variable_diversified_label'),
             '${pctStr('equity')}${amountStr('equity')}',
           ),
           _allocRow(
-            'Maior risco',
+            AppStrings.t(context, 'investment_high_risk_label'),
             '${pctStr('highRisk')}${amountStr('highRisk')}',
           ),
         ],
@@ -1283,7 +1327,7 @@ class _InvestmentPlanPageState extends State<InvestmentPlanPage> {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text(
-            'Simular valor (opcional)',
+            AppStrings.t(context, 'investment_plan_simulate_label'),
             style: TextStyle(
               color: AppTheme.textPrimary(context),
               fontWeight: FontWeight.w700,
@@ -1291,7 +1335,7 @@ class _InvestmentPlanPageState extends State<InvestmentPlanPage> {
           ),
           const SizedBox(height: 6),
           Text(
-            'Usamos esse valor apenas para exibir quanto vai para cada classe.',
+            AppStrings.t(context, 'investment_plan_simulate_hint'),
             style: TextStyle(
               color: AppTheme.textSecondary(context),
               fontSize: 12,
@@ -1302,8 +1346,9 @@ class _InvestmentPlanPageState extends State<InvestmentPlanPage> {
             controller: _amountController,
             keyboardType: const TextInputType.numberWithOptions(decimal: true),
             inputFormatters: const [MoneyTextInputFormatter()],
-            decoration: const InputDecoration(
-              labelText: 'Aporte mensal (R\$)',
+            decoration: InputDecoration(
+              labelText:
+                  AppStrings.t(context, 'investment_monthly_contribution'),
             ),
             onChanged: (_) => setState(() {}),
           ),
@@ -1336,21 +1381,46 @@ class _InvestmentPlanPageState extends State<InvestmentPlanPage> {
   }
 
   Widget _questionTile(int i) {
-    const labels = [
-      'Quanto tempo você pretende deixar o dinheiro investido?',
-      'Como você reage a oscilações no curto prazo?',
-      'Qual sua experiência com investimentos?',
-      'Você tem reserva de emergência?',
-      'Qual sua prioridade hoje?',
-      'Se um investimento cair 10%, você…',
+    final questionKeys = [
+      'investment_question_1',
+      'investment_question_2',
+      'investment_question_3',
+      'investment_question_4',
+      'investment_question_5',
+      'investment_question_6',
     ];
-    const options = [
-      ['Até 1 ano', '1–3 anos', '3+ anos'],
-      ['Me incomoda', 'Depende', 'Tranquilo'],
-      ['Nenhuma', 'Alguma', 'Boa'],
-      ['Não', 'Parcial', 'Sim'],
-      ['Segurança', 'Equilíbrio', 'Crescimento'],
-      ['Vendo', 'Espero', 'Aporto mais'],
+
+    final optionKeys = [
+      [
+        'investment_question_1_option_1',
+        'investment_question_1_option_2',
+        'investment_question_1_option_3',
+      ],
+      [
+        'investment_question_2_option_1',
+        'investment_question_2_option_2',
+        'investment_question_2_option_3',
+      ],
+      [
+        'investment_question_3_option_1',
+        'investment_question_3_option_2',
+        'investment_question_3_option_3',
+      ],
+      [
+        'investment_question_4_option_1',
+        'investment_question_4_option_2',
+        'investment_question_4_option_3',
+      ],
+      [
+        'investment_question_5_option_1',
+        'investment_question_5_option_2',
+        'investment_question_5_option_3',
+      ],
+      [
+        'investment_question_6_option_1',
+        'investment_question_6_option_2',
+        'investment_question_6_option_3',
+      ],
     ];
 
     return Container(
@@ -1365,7 +1435,7 @@ class _InvestmentPlanPageState extends State<InvestmentPlanPage> {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text(
-            labels[i],
+            AppStrings.t(context, questionKeys[i]),
             style: TextStyle(color: AppTheme.textPrimary(context)),
           ),
           const SizedBox(height: 10),
@@ -1375,7 +1445,7 @@ class _InvestmentPlanPageState extends State<InvestmentPlanPage> {
             children: List.generate(
               3,
               (v) => ChoiceChip(
-                label: Text(options[i][v]),
+                label: Text(AppStrings.t(context, optionKeys[i][v])),
                 selected: _answers[i] == v,
                 onSelected: (_) => setState(() => _answers[i] = v),
               ),
@@ -1405,7 +1475,7 @@ class _InvestmentPlanPageState extends State<InvestmentPlanPage> {
             children: [
               Expanded(
                 child: Text(
-                  'Progresso',
+                  AppStrings.t(context, 'investment_plan_progress_label'),
                   style: TextStyle(
                     color: AppTheme.textSecondary(context),
                     fontSize: 12,

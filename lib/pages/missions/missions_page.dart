@@ -395,7 +395,8 @@ class _MissionsPageState extends State<MissionsPage> {
       currentMonth.month,
       currentMonth.year,
     );
-    final salary = baseDashboard?.salary ?? _user!.monthlyIncome;
+    final salary = baseDashboard?.salary ??
+        LocalStorageService.incomeTotalForMonth(currentMonth);
     final dashboard = MonthlyDashboard(
       month: currentMonth.month,
       year: currentMonth.year,
@@ -689,34 +690,37 @@ class _MissionsBody extends StatelessWidget {
         location: AppStrings.t(context, 'premium_tour_missions_location'),
         tip: AppStrings.t(context, 'premium_tour_missions_tip'),
       ),
-        child: Padding(
-          padding: Responsive.pagePadding(context),
-          child: ListView(
-            children: [
-              _FixedText(
-                AppStrings.t(context, 'missions_tagline'),
-                style: TextStyle(color: AppTheme.textSecondary(context)),
-              ),
-              if (catalogMessage != null) ...[
-                const SizedBox(height: 10),
-                Text(
-                  catalogMessage!,
-                  style: TextStyle(
-                    color: AppTheme.danger,
-                    fontSize: 13,
-                    fontWeight: FontWeight.w600,
-                  ),
+      child: Padding(
+        padding: Responsive.pagePadding(context),
+        child: ListView(
+          children: [
+            _FixedText(
+              AppStrings.t(context, 'missions_tagline'),
+              style: TextStyle(color: AppTheme.textSecondary(context)),
+            ),
+            if (catalogMessage != null) ...[
+              const SizedBox(height: 10),
+              Text(
+                catalogMessage!,
+                style: TextStyle(
+                  color: AppTheme.danger,
+                  fontSize: 13,
+                  fontWeight: FontWeight.w600,
                 ),
-              ],
-              const SizedBox(height: 16),
-              // --- XP DASHBOARD (Web Style) ---
-              Container(
-                padding: Responsive.pagePadding(context),
-                decoration: BoxDecoration(
+              ),
+            ],
+            const SizedBox(height: 16),
+            // --- XP DASHBOARD (Web Style) ---
+            Container(
+              padding: Responsive.pagePadding(context),
+              decoration: BoxDecoration(
                 color: AppTheme.highlight(context),
                 borderRadius: BorderRadius.circular(24),
                 border: Border.all(
-                  color: Theme.of(context).colorScheme.primary.withValues(alpha: 0.24),
+                  color: Theme.of(context)
+                      .colorScheme
+                      .primary
+                      .withValues(alpha: 0.24),
                 ),
               ),
               child: Column(
@@ -757,9 +761,15 @@ class _MissionsBody extends StatelessWidget {
                         padding: const EdgeInsets.symmetric(
                             horizontal: 16, vertical: 8),
                         decoration: BoxDecoration(
-                          color: Theme.of(context).colorScheme.primary.withValues(alpha: 0.14),
+                          color: Theme.of(context)
+                              .colorScheme
+                              .primary
+                              .withValues(alpha: 0.14),
                           border: Border.all(
-                            color: Theme.of(context).colorScheme.primary.withValues(alpha: 0.24),
+                            color: Theme.of(context)
+                                .colorScheme
+                                .primary
+                                .withValues(alpha: 0.24),
                           ),
                           borderRadius: BorderRadius.circular(99),
                         ),
@@ -805,8 +815,9 @@ class _MissionsBody extends StatelessWidget {
                         borderRadius: BorderRadius.circular(6),
                         child: LinearProgressIndicator(
                           value: progress,
-                          backgroundColor:
-                              Theme.of(context).colorScheme.surfaceContainerHighest,
+                          backgroundColor: Theme.of(context)
+                              .colorScheme
+                              .surfaceContainerHighest,
                           valueColor: const AlwaysStoppedAnimation<Color>(
                             AppTheme.success,
                           ),

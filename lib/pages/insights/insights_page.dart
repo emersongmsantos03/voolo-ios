@@ -331,6 +331,7 @@ class _InsightsPageState extends State<InsightsPage> {
             children: [
               _moneyMetric(
                   'Disponivel', overview.availableNow, AppTheme.success),
+              _moneyMetric('Acumulado', d.totalBalance, AppTheme.info),
               _moneyMetric(
                 'Fatura',
                 overview.currentInvoice,

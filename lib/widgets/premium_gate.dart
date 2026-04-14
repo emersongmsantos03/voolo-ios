@@ -1,4 +1,3 @@
-import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 
 import '../core/localization/app_strings.dart';
@@ -96,97 +95,117 @@ class PremiumGate extends StatelessWidget {
     final textSecondary = scheme.onSurfaceVariant;
     final ctaBackground = isDark ? scheme.primary : AppTheme.yellow;
     final ctaForeground = isDark ? scheme.onPrimary : const Color(0xFFFFFBF2);
+    final maxHeight = MediaQuery.of(context).size.height * 0.85;
 
     return ConstrainedBox(
       constraints: const BoxConstraints(maxWidth: 460),
       child: Padding(
         padding: Responsive.pagePadding(context),
         child: Container(
-          padding: const EdgeInsets.all(24),
+          padding: const EdgeInsets.fromLTRB(24, 28, 24, 24),
           decoration: AppTheme.premiumCardDecoration(context),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Row(
+          child: SizedBox(
+            height: maxHeight,
+            child: SingleChildScrollView(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.center,
                 children: [
                   Container(
-                    width: 48,
-                    height: 48,
+                    width: 54,
+                    height: 54,
                     decoration: BoxDecoration(
                       color: scheme.primary
-                          .withValues(alpha: isDark ? 0.10 : 0.07),
-                      borderRadius: BorderRadius.circular(16),
+                          .withValues(alpha: isDark ? 0.12 : 0.08),
+                      borderRadius: BorderRadius.circular(18),
                     ),
-                    child: Icon(Icons.lock_rounded, color: scheme.primary),
+                    child: Icon(Icons.lock_rounded,
+                        color: scheme.primary, size: 28),
                   ),
-                  const SizedBox(width: 12),
-                  Expanded(
+                  const SizedBox(height: 16),
+                  Container(
+                    padding:
+                        const EdgeInsets.symmetric(horizontal: 14, vertical: 7),
+                    decoration: BoxDecoration(
+                      color: scheme.primary
+                          .withValues(alpha: isDark ? 0.12 : 0.08),
+                      borderRadius: BorderRadius.circular(999),
+                      border: Border.all(
+                        color: scheme.primary
+                            .withValues(alpha: isDark ? 0.18 : 0.16),
+                      ),
+                    ),
                     child: Text(
                       AppStrings.t(context, 'premium_badge'),
                       style: TextStyle(
                         color: scheme.primary,
                         fontWeight: FontWeight.w800,
-                        letterSpacing: 0.3,
+                        letterSpacing: 0.2,
+                        fontSize: 12,
                       ),
+                    ),
+                  ),
+                  const SizedBox(height: 18),
+                  Text(
+                    title,
+                    textAlign: TextAlign.center,
+                    style: TextStyle(
+                        color: textPrimary,
+                        fontSize: 22,
+                        fontWeight: FontWeight.w800),
+                  ),
+                  const SizedBox(height: 10),
+                  Text(
+                    subtitle,
+                    textAlign: TextAlign.center,
+                    style: TextStyle(color: textSecondary, height: 1.45),
+                  ),
+                  const SizedBox(height: 14),
+                  ...perks.map((p) => _perkRow(context, p)),
+                  const SizedBox(height: 18),
+                  SizedBox(
+                    width: double.infinity,
+                    child: ElevatedButton(
+                      onPressed: onCta ??
+                          () => Navigator.of(context)
+                              .pushNamed(AppRoutes.premium),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: ctaBackground,
+                        foregroundColor: ctaForeground,
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 22,
+                          vertical: 16,
+                        ),
+                        side: BorderSide(
+                          color: scheme.primary
+                              .withValues(alpha: isDark ? 0.0 : 0.12),
+                        ),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(14),
+                        ),
+                      ),
+                      child: Text(
+                        ctaLabel.isEmpty
+                            ? AppStrings.t(context, 'premium_cta')
+                            : ctaLabel,
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 10),
+                  Text(
+                    AppStrings.t(context, 'premium_cancel_anytime') ==
+                            'premium_cancel_anytime'
+                        ? 'Cancele quando quiser.'
+                        : AppStrings.t(context, 'premium_cancel_anytime'),
+                    style: TextStyle(
+                      color: textSecondary,
+                      fontSize: 12,
+                      height: 1.35,
                     ),
                   ),
                 ],
               ),
-              const SizedBox(height: 12),
-              Text(
-                title,
-                style: TextStyle(
-                  color: textPrimary,
-                  fontSize: 22,
-                  fontWeight: FontWeight.w800,
-                ),
-              ),
-              const SizedBox(height: 10),
-              Text(
-                subtitle,
-                style: TextStyle(color: textSecondary, height: 1.4),
-              ),
-              const SizedBox(height: 14),
-              ...perks.map((p) => _perkRow(context, p)),
-              const SizedBox(height: 18),
-              SizedBox(
-                width: double.infinity,
-                child: ElevatedButton(
-                  onPressed: onCta ??
-                      () => Navigator.of(context).pushNamed(AppRoutes.premium),
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: ctaBackground,
-                    foregroundColor: ctaForeground,
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 22,
-                      vertical: 16,
-                    ),
-                    side: BorderSide(
-                      color:
-                          scheme.primary.withValues(alpha: isDark ? 0.0 : 0.12),
-                    ),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(14),
-                    ),
-                  ),
-                  child: Text(
-                    ctaLabel.isEmpty
-                        ? AppStrings.t(context, 'premium_cta')
-                        : ctaLabel,
-                  ),
-                ),
-              ),
-              const SizedBox(height: 10),
-              Text(
-                'Cancele quando quiser.',
-                style: TextStyle(
-                  color: textSecondary,
-                  fontSize: 12,
-                  height: 1.35,
-                ),
-              ),
-            ],
+            ),
           ),
         ),
       ),
@@ -201,7 +220,7 @@ class PremiumGate extends StatelessWidget {
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Icon(Icons.auto_awesome, size: 18, color: scheme.primary),
+          Icon(Icons.check_rounded, size: 18, color: scheme.primary),
           const SizedBox(width: 8),
           Expanded(
             child: Text(
@@ -378,15 +397,6 @@ class _PremiumBadge extends StatelessWidget {
 
 void showPremiumDialog(BuildContext context) {
   final scheme = Theme.of(context).colorScheme;
-  final isApplePlatform = defaultTargetPlatform == TargetPlatform.iOS ||
-      defaultTargetPlatform == TargetPlatform.macOS;
-  final navigator = Navigator.of(context, rootNavigator: true);
-
-  if (isApplePlatform) {
-    navigator.pushNamed(AppRoutes.premium);
-    return;
-  }
-
   String selectedPlan = 'monthly';
 
   showDialog<void>(
@@ -396,66 +406,70 @@ void showPremiumDialog(BuildContext context) {
       builder: (context, setDialogState) => Dialog(
         backgroundColor: scheme.surface,
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-        child: Padding(
-          padding: const EdgeInsets.all(18),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Row(
+        child: SizedBox(
+          height: MediaQuery.of(context).size.height * 0.85,
+          child: SingleChildScrollView(
+            child: Padding(
+              padding: const EdgeInsets.all(18),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Expanded(
-                    child: Text(
-                      AppStrings.t(context, 'premium_dialog_title'),
-                      style: const TextStyle(
-                        fontWeight: FontWeight.w800,
-                        fontSize: 18,
+                  Row(
+                    children: [
+                      Expanded(
+                        child: Text(
+                          AppStrings.t(context, 'premium_dialog_title'),
+                          style: const TextStyle(
+                            fontWeight: FontWeight.w800,
+                            fontSize: 18,
+                          ),
+                        ),
                       ),
-                    ),
+                      IconButton(
+                        onPressed: () => Navigator.pop(context),
+                        icon: const Icon(Icons.close_rounded),
+                        tooltip: AppStrings.t(context, 'close'),
+                      ),
+                    ],
                   ),
-                  IconButton(
-                    onPressed: () => Navigator.pop(context),
-                    icon: const Icon(Icons.close_rounded),
-                    tooltip: AppStrings.t(context, 'close'),
+                  Text(
+                    AppStrings.t(context, 'premium_dialog_choose_plan'),
+                    style: TextStyle(color: scheme.onSurfaceVariant),
+                  ),
+                  const SizedBox(height: 14),
+                  _DialogPlanTile(
+                    title: AppStrings.t(context, 'premium_plan_monthly_title'),
+                    subtitle:
+                        AppStrings.t(context, 'premium_plan_monthly_subtitle'),
+                    selected: selectedPlan == 'monthly',
+                    onTap: () => setDialogState(() => selectedPlan = 'monthly'),
+                  ),
+                  const SizedBox(height: 10),
+                  _DialogPlanTile(
+                    title: AppStrings.t(context, 'premium_plan_yearly_title'),
+                    subtitle:
+                        AppStrings.t(context, 'premium_plan_yearly_subtitle'),
+                    selected: selectedPlan == 'yearly',
+                    onTap: () => setDialogState(() => selectedPlan = 'yearly'),
+                  ),
+                  const SizedBox(height: 16),
+                  SizedBox(
+                    width: double.infinity,
+                    child: ElevatedButton(
+                      onPressed: () {
+                        Navigator.pop(context);
+                        Navigator.of(context).pushNamed(
+                          AppRoutes.premium,
+                          arguments: {'plan': selectedPlan},
+                        );
+                      },
+                      child: Text(AppStrings.t(context, 'premium_cta')),
+                    ),
                   ),
                 ],
               ),
-              Text(
-                'Escolha uma opcao premium:',
-                style: TextStyle(color: scheme.onSurfaceVariant),
-              ),
-              const SizedBox(height: 14),
-              _DialogPlanTile(
-                title: 'Plano mensal - R\$ 29,90/mes',
-                subtitle: 'Renovacao automatica. Cancele quando quiser.',
-                selected: selectedPlan == 'monthly',
-                onTap: () => setDialogState(() => selectedPlan = 'monthly'),
-              ),
-              const SizedBox(height: 10),
-              _DialogPlanTile(
-                title: 'Plano anual - R\$ 299,90/ano',
-                subtitle:
-                    'Pagamento anual com acesso premium durante todos os meses do periodo.',
-                selected: selectedPlan == 'yearly',
-                onTap: () => setDialogState(() => selectedPlan = 'yearly'),
-              ),
-              const SizedBox(height: 16),
-              SizedBox(
-                width: double.infinity,
-                child: ElevatedButton(
-                  onPressed: () {
-                    navigator.pop();
-                    Future.microtask(
-                      () => navigator.pushNamed(
-                        AppRoutes.premium,
-                        arguments: {'plan': selectedPlan},
-                      ),
-                    );
-                  },
-                  child: Text(AppStrings.t(context, 'premium_cta')),
-                ),
-              ),
-            ],
+            ),
           ),
         ),
       ),

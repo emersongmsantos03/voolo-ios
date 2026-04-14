@@ -20,7 +20,7 @@ class UserState extends ChangeNotifier {
     required String lastName,
     required String email,
     required String password,
-    DateTime? birthDate,
+    required DateTime birthDate,
     required String profession,
     required double monthlyIncome,
     String gender = 'Nao informado',

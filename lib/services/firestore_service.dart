@@ -73,16 +73,6 @@ class FirestoreService {
     return _userDoc(uid).collection('investmentPlan').doc('current');
   }
 
-  static Future<void> deleteUserAccount(String uid) async {
-    try {
-      await _userDoc(uid).delete();
-      final user = _auth.currentUser;
-      if (user != null && user.uid == uid) {
-        await user.delete();
-      }
-    } catch (_) {}
-  }
-
   // --- FIXED SERIES (Recurring Monthly) ---
   static CollectionReference<Map<String, dynamic>> _fixedSeries(String uid) {
     return _userDoc(uid).collection('fixedSeries');
@@ -1231,29 +1221,10 @@ class FirestoreService {
     required String monthYear, // Format: YYYY-MM
     required List<IncomeSource> incomes,
   }) async {
-    bool isIncomeActiveForMonth(IncomeSource income, String monthKey) {
-      if (!income.isActive) return false;
-      if (income.excludedMonths.contains(monthKey)) return false;
-      if (income.activeFrom != null &&
-          monthKey.compareTo(income.activeFrom!) < 0) {
-        return false;
-      }
-      if (income.activeUntil != null &&
-          monthKey.compareTo(income.activeUntil!) > 0) {
-        return false;
-      }
-      return true;
-    }
-
-    double fixedBaseline = 0.0;
     double monthTotal = 0.0;
 
     for (final income in incomes) {
-      final type = (income.type.isEmpty ? 'fixed' : income.type);
-      if (income.isActive && type == 'fixed') {
-        fixedBaseline += income.amount;
-      }
-      if (isIncomeActiveForMonth(income, monthYear)) {
+      if (income.appliesToMonthKey(monthYear)) {
         monthTotal += income.amount;
       }
     }
@@ -1264,7 +1235,7 @@ class FirestoreService {
       final dashboardRef = _dashboards(uid).doc(monthYear);
 
       batch.update(userRef, {
-        'monthlyIncome': fixedBaseline,
+        'monthlyIncome': monthTotal,
         'updatedAt': FieldValue.serverTimestamp(),
       });
 
@@ -1457,14 +1428,70 @@ class FirestoreService {
       final snapshot = await ref.get();
       if (snapshot.docs.isEmpty) return;
 
-      final batch = _db.batch();
-      for (final doc in snapshot.docs) {
-        batch.delete(doc.reference);
+      const chunkSize = 450;
+      for (var i = 0; i < snapshot.docs.length; i += chunkSize) {
+        final batch = _db.batch();
+        final chunk = snapshot.docs.sublist(
+          i,
+          i + chunkSize > snapshot.docs.length
+              ? snapshot.docs.length
+              : i + chunkSize,
+        );
+        for (final doc in chunk) {
+          batch.delete(doc.reference);
+        }
+        await batch.commit();
       }
-      await batch.commit();
     } on FirebaseException {
       // ignore to avoid crashing UI when permissions are not ready
     }
+  }
+
+  static Future<void> _deleteDocument(
+    DocumentReference<Map<String, dynamic>> ref,
+  ) async {
+    try {
+      await ref.delete();
+    } on FirebaseException {
+      // ignore
+    }
+  }
+
+  static Future<void> deleteUserData({
+    required String uid,
+    String? legacyEmail,
+  }) async {
+    if (uid.trim().isEmpty) return;
+
+    final tasks = <Future<void>>[
+      _deleteSubcollection(_incomes(uid)),
+      _deleteSubcollection(_dashboards(uid)),
+      _deleteSubcollection(_goals(uid)),
+      _deleteSubcollection(_budgets(uid)),
+      _deleteSubcollection(_budgetSuggestionRuns(uid)),
+      _deleteSubcollection(_debts(uid)),
+      _deleteSubcollection(_debtPlans(uid)),
+      _deleteSubcollection(_fixedSeries(uid)),
+      _deleteSubcollection(_transactions(uid)),
+      _deleteSubcollection(_userDoc(uid).collection('engagementEvents')),
+      _deleteDocument(_investmentProfile(uid)),
+      _deleteDocument(_investmentPlan(uid)),
+      _deleteDocument(_habitsDoc(uid)),
+      _deleteDocument(_userDoc(uid)),
+    ];
+
+    final normalizedLegacy = legacyEmail?.trim().toLowerCase();
+    if (normalizedLegacy != null &&
+        normalizedLegacy.isNotEmpty &&
+        normalizedLegacy != uid.toLowerCase()) {
+      tasks.addAll([
+        _deleteSubcollection(_legacyUserDoc(normalizedLegacy).collection('dashboards')),
+        _deleteSubcollection(_legacyUserDoc(normalizedLegacy).collection('goals')),
+        _deleteDocument(_legacyUserDoc(normalizedLegacy)),
+      ]);
+    }
+
+    await Future.wait(tasks);
   }
 
   static Future<void> logEngagementEvent({
@@ -1547,6 +1574,40 @@ class FirestoreService {
         });
       }).toList();
     });
+  }
+
+  static Future<List<Expense>> getTransactionsForMonth(
+    String uid,
+    String monthYear,
+  ) async {
+    try {
+      final parts = monthYear.split('-');
+      if (parts.length != 2) return [];
+      final year = int.tryParse(parts[0]);
+      final month = int.tryParse(parts[1]);
+      if (year == null || month == null || month < 1 || month > 12) {
+        return [];
+      }
+
+      final start = DateTime(year, month, 1, 0, 0, 0);
+      final end = DateTime(year, month + 1, 0, 23, 59, 59, 999);
+
+      final snapshot = await _transactions(uid)
+          .where('dueDate', isGreaterThanOrEqualTo: Timestamp.fromDate(start))
+          .where('dueDate', isLessThanOrEqualTo: Timestamp.fromDate(end))
+          .orderBy('dueDate', descending: true)
+          .get();
+
+      return snapshot.docs.map((doc) {
+        final data = doc.data();
+        return Expense.fromJson({
+          ...data,
+          'id': doc.id,
+        });
+      }).toList();
+    } on FirebaseException {
+      return [];
+    }
   }
 
   static Future<void> backfillDueDatesForMonth(

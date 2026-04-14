@@ -1,10 +1,12 @@
-﻿import 'package:flutter/material.dart';
+import 'package:flutter/material.dart';
 
 import '../../core/localization/app_strings.dart';
 import '../../core/theme/app_theme.dart';
 import '../../core/ui/formatters/money_text_input_formatter.dart';
+import '../../core/utils/sensitive_display.dart';
 import '../../models/income_source.dart';
 import '../../services/local_storage_service.dart';
+import '../../utils/income_category_utils.dart';
 import '../../utils/money_input.dart';
 
 class IncomeModal extends StatefulWidget {
@@ -26,23 +28,22 @@ class IncomeModal extends StatefulWidget {
 }
 
 class _IncomeModalState extends State<IncomeModal> {
-  late TextEditingController _titleController;
-  late TextEditingController _amountController;
-  bool _isPrimary = false;
+  late final TextEditingController _titleController;
+  late final TextEditingController _amountController;
+  String _category = IncomeCategoryUtils.salary;
+  String? _editingId;
   bool _saving = false;
-  String _type = 'fixed';
 
   @override
   void initState() {
     super.initState();
+    _editingId = widget.income?.id;
     _titleController = TextEditingController(text: widget.income?.title ?? '');
     _amountController = TextEditingController(
-      text: widget.income != null ? formatMoneyInput(widget.income!.amount) : '',
+      text:
+          widget.income != null ? formatMoneyInput(widget.income!.amount) : '',
     );
-    _isPrimary = widget.income?.isPrimary ?? false;
-    _type = (widget.income?.type ?? 'fixed').isEmpty
-        ? 'fixed'
-        : (widget.income?.type ?? 'fixed');
+    _category = IncomeCategoryUtils.normalize(widget.income?.type ?? _category);
   }
 
   @override
@@ -52,16 +53,62 @@ class _IncomeModalState extends State<IncomeModal> {
     super.dispose();
   }
 
+  String _monthKey(DateTime date) {
+    return '${date.year}-${date.month.toString().padLeft(2, '0')}';
+  }
+
+  List<IncomeSource> _monthIncomes() {
+    final month = DateTime.now();
+    final incomes = LocalStorageService.getIncomes()
+        .where((income) => income.appliesToMonth(month))
+        .toList()
+      ..sort((a, b) => a.title.toLowerCase().compareTo(b.title.toLowerCase()));
+    return incomes;
+  }
+
+  void _loadIncome(IncomeSource income) {
+    setState(() {
+      _editingId = income.id;
+      _titleController.text = income.title;
+      _amountController.text = formatMoneyInput(income.amount);
+      _category = IncomeCategoryUtils.normalize(income.type);
+    });
+  }
+
+  Future<void> _removeIncome(IncomeSource income) async {
+    final ok = await LocalStorageService.deleteIncome(income.id);
+    if (!mounted) return;
+    if (ok) {
+      if (_editingId == income.id) {
+        setState(() {
+          _editingId = null;
+          _titleController.clear();
+          _amountController.clear();
+          _category = IncomeCategoryUtils.salary;
+        });
+      }
+      setState(() {});
+    } else {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+            content: Text(AppStrings.t(context, 'income_modal_error_save'))),
+      );
+    }
+  }
+
   Future<void> _save() async {
     FocusScope.of(context).unfocus();
 
     final title = _titleController.text.trim();
     final amount = parseMoneyInput(_amountController.text);
+    final resolvedTitle =
+        title.isEmpty ? IncomeCategoryUtils.label(context, _category) : title;
 
-    if (title.isEmpty || amount <= 0) {
+    if (amount < 0) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-            content: Text('Preencha o nome e o valor corretamente.')),
+        SnackBar(
+          content: Text(AppStrings.t(context, 'income_modal_error_fill')),
+        ),
       );
       return;
     }
@@ -70,20 +117,15 @@ class _IncomeModalState extends State<IncomeModal> {
 
     final now = DateTime.now();
     final monthKey = _monthKey(now);
-    final isVariable = _type == 'variable';
-
-    final String? activeFrom = isVariable ? monthKey : null;
-    final String? activeUntil = isVariable ? monthKey : null;
-
     final income = IncomeSource(
-      id: widget.income?.id ?? DateTime.now().millisecondsSinceEpoch.toString(),
-      title: title,
+      id: _editingId ?? DateTime.now().millisecondsSinceEpoch.toString(),
+      title: resolvedTitle,
       amount: amount,
-      type: _type,
-      isPrimary: _isPrimary,
+      type: IncomeCategoryUtils.normalize(_category),
+      isPrimary: false,
       isActive: widget.income?.isActive ?? true,
-      activeFrom: activeFrom,
-      activeUntil: activeUntil,
+      activeFrom: monthKey,
+      activeUntil: monthKey,
       excludedMonths: widget.income?.excludedMonths ?? const [],
       createdAt: widget.income?.createdAt ?? DateTime.now(),
     );
@@ -96,31 +138,19 @@ class _IncomeModalState extends State<IncomeModal> {
         Navigator.of(context).pop();
       } else {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Erro ao salvar renda.')),
+          SnackBar(
+            content: Text(AppStrings.t(context, 'income_modal_error_save')),
+          ),
         );
       }
     }
   }
 
-  String _monthKey(DateTime date) {
-    return '${date.year}-${date.month.toString().padLeft(2, '0')}';
-  }
-
   @override
   Widget build(BuildContext context) {
     final insets = MediaQuery.viewInsetsOf(context);
-    final isFixed = _type == 'fixed';
-    final infoBg = isFixed
-        ? Colors.green.withValues(alpha: 0.12)
-        : Colors.orange.withValues(alpha: 0.12);
-    final infoBorder = isFixed
-        ? Colors.green.withValues(alpha: 0.35)
-        : Colors.orange.withValues(alpha: 0.35);
-    final infoIcon = isFixed ? Icons.event_repeat : Icons.calendar_month;
-    final infoTitle = isFixed ? 'Renda Fixa' : 'Renda Variavel';
-    final infoText = isFixed
-        ? 'Esta renda sera replicada automaticamente para os proximos meses.'
-        : 'Esta renda sera considerada somente no mes atual.';
+    final total = LocalStorageService.incomeTotalForMonth(DateTime.now());
+    final incomes = _monthIncomes();
 
     return GestureDetector(
       behavior: HitTestBehavior.opaque,
@@ -136,137 +166,374 @@ class _IncomeModalState extends State<IncomeModal> {
               color: Color(0xFF151515),
               borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
             ),
-            padding: const EdgeInsets.fromLTRB(16, 16, 16, 24),
+            padding: const EdgeInsets.fromLTRB(16, 14, 16, 20),
             child: SingleChildScrollView(
               keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
               child: Column(
-                mainAxisSize: MainAxisSize.min,
                 crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisSize: MainAxisSize.min,
                 children: [
-                  Center(
-                    child: Container(
-                      width: 44,
-                      height: 5,
-                      decoration: BoxDecoration(
-                        color: Colors.white.withValues(alpha: 0.24),
-                        borderRadius: BorderRadius.circular(99),
+                  Row(
+                    children: [
+                      Container(
+                        padding: const EdgeInsets.all(8),
+                        decoration: BoxDecoration(
+                          color: AppTheme.yellow.withValues(alpha: 0.12),
+                          borderRadius: BorderRadius.circular(12),
+                          border: Border.all(
+                            color: AppTheme.yellow.withValues(alpha: 0.35),
+                          ),
+                        ),
+                        child: Icon(
+                          Icons.account_balance_wallet_outlined,
+                          color: AppTheme.yellow,
+                          size: 18,
+                        ),
                       ),
-                    ),
-                  ),
-                  const SizedBox(height: 10),
-                  Text(
-                    widget.income == null ? 'Nova renda' : 'Editar renda',
-                    style: const TextStyle(
-                      color: Colors.amber,
-                      fontSize: 16,
-                      fontWeight: FontWeight.w700,
-                    ),
-                  ),
-                  const SizedBox(height: 12),
-                  SegmentedButton<String>(
-                    segments: const [
-                      ButtonSegment<String>(
-                        value: 'fixed',
-                        icon: Icon(Icons.lock_outline),
-                        label: Text('Fixa'),
+                      const SizedBox(width: 10),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              'Minhas entradas',
+                              style: TextStyle(
+                                color: AppTheme.textPrimary(context),
+                                fontSize: 18,
+                                fontWeight: FontWeight.w800,
+                              ),
+                            ),
+                            const SizedBox(height: 4),
+                            Text(
+                              'Cada entrada só vale para este mês.',
+                              style: TextStyle(
+                                color: AppTheme.textSecondary(context),
+                              ),
+                            ),
+                          ],
+                        ),
                       ),
-                      ButtonSegment<String>(
-                        value: 'variable',
-                        icon: Icon(Icons.show_chart),
-                        label: Text('Variavel'),
+                      IconButton(
+                        onPressed: () => Navigator.of(context).pop(),
+                        icon: const Icon(Icons.close_rounded),
+                        tooltip: AppStrings.t(context, 'close'),
                       ),
                     ],
-                    selected: <String>{_type},
-                    onSelectionChanged: _saving
-                        ? null
-                        : (selection) {
-                            setState(() {
-                              _type = selection.first;
-                            });
-                          },
                   ),
-                  const SizedBox(height: 10),
-                  AnimatedSwitcher(
-                    duration: const Duration(milliseconds: 180),
-                    child: Container(
-                      key: ValueKey<String>(_type),
-                      width: double.infinity,
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 12,
-                        vertical: 10,
+                  const SizedBox(height: 18),
+                  Container(
+                    width: double.infinity,
+                    padding: const EdgeInsets.all(18),
+                    decoration: BoxDecoration(
+                      color: Theme.of(context).colorScheme.surfaceContainerLow,
+                      borderRadius: BorderRadius.circular(22),
+                      border: Border.all(
+                        color: Colors.white.withValues(alpha: 0.07),
                       ),
-                      decoration: BoxDecoration(
-                        color: infoBg,
-                        borderRadius: BorderRadius.circular(12),
-                        border: Border.all(color: infoBorder),
-                      ),
-                      child: Row(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Icon(infoIcon, size: 18, color: Colors.white),
-                          const SizedBox(width: 8),
-                          Expanded(
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
+                    ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          'TOTAL MENSAL',
+                          style: TextStyle(
+                            color: AppTheme.textSecondary(context),
+                            fontSize: 12,
+                            fontWeight: FontWeight.w800,
+                            letterSpacing: 0.4,
+                          ),
+                        ),
+                        const SizedBox(height: 4),
+                        Text(
+                          SensitiveDisplay.money(context, total),
+                          style: TextStyle(
+                            color: AppTheme.yellow,
+                            fontSize: 28,
+                            fontWeight: FontWeight.w900,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: 14),
+                  if (incomes.isNotEmpty)
+                    ...incomes.map(
+                      (income) => Padding(
+                        padding: const EdgeInsets.only(bottom: 12),
+                        child: InkWell(
+                          borderRadius: BorderRadius.circular(18),
+                          onTap: () => _loadIncome(income),
+                          child: Container(
+                            padding: const EdgeInsets.all(16),
+                            decoration: BoxDecoration(
+                              color: Theme.of(context)
+                                  .colorScheme
+                                  .surfaceContainerLow,
+                              borderRadius: BorderRadius.circular(18),
+                              border: Border.all(
+                                color: income.id == _editingId
+                                    ? AppTheme.yellow.withValues(alpha: 0.5)
+                                    : Colors.white.withValues(alpha: 0.07),
+                              ),
+                            ),
+                            child: Row(
                               children: [
-                                Text(
-                                  infoTitle,
-                                  style: const TextStyle(
-                                    color: Colors.white,
-                                    fontWeight: FontWeight.w700,
+                                Expanded(
+                                  child: Column(
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.start,
+                                    children: [
+                                      Text(
+                                        _displayTitle(context, income),
+                                        style: TextStyle(
+                                          color: AppTheme.textPrimary(context),
+                                          fontSize: 18,
+                                          fontWeight: FontWeight.w800,
+                                        ),
+                                      ),
+                                      const SizedBox(height: 4),
+                                      Text(
+                                        SensitiveDisplay.money(
+                                          context,
+                                          income.amount,
+                                        ),
+                                        style: TextStyle(
+                                          color:
+                                              AppTheme.textSecondary(context),
+                                          fontSize: 15,
+                                          fontWeight: FontWeight.w700,
+                                        ),
+                                      ),
+                                    ],
                                   ),
                                 ),
-                                const SizedBox(height: 2),
+                                Container(
+                                  padding: const EdgeInsets.symmetric(
+                                    horizontal: 12,
+                                    vertical: 8,
+                                  ),
+                                  decoration: BoxDecoration(
+                                    color: AppTheme.yellow.withValues(
+                                      alpha: 0.08,
+                                    ),
+                                    borderRadius: BorderRadius.circular(999),
+                                    border: Border.all(
+                                      color: AppTheme.yellow.withValues(
+                                        alpha: 0.6,
+                                      ),
+                                    ),
+                                  ),
+                                  child: Row(
+                                    mainAxisSize: MainAxisSize.min,
+                                    children: [
+                                      Icon(
+                                        IncomeCategoryUtils.icon(income.type),
+                                        size: 16,
+                                        color: AppTheme.yellow,
+                                      ),
+                                      const SizedBox(width: 6),
+                                      Text(
+                                        IncomeCategoryUtils.label(
+                                          context,
+                                          income.type,
+                                        ),
+                                        style: TextStyle(
+                                          color: AppTheme.yellow,
+                                          fontWeight: FontWeight.w800,
+                                          fontSize: 12,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                                const SizedBox(width: 8),
+                                IconButton(
+                                  onPressed: _saving
+                                      ? null
+                                      : () => _loadIncome(income),
+                                  icon: const Icon(Icons.edit_outlined),
+                                  tooltip: AppStrings.t(context, 'edit_short'),
+                                ),
+                                IconButton(
+                                  onPressed: _saving
+                                      ? null
+                                      : () => _removeIncome(income),
+                                  icon: const Icon(Icons.delete_outline),
+                                  tooltip: 'Excluir entrada',
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
+                      ),
+                    ),
+                  const SizedBox(height: 8),
+                  Text(
+                    'Categoria da entrada',
+                    style: TextStyle(
+                      color: AppTheme.textPrimary(context),
+                      fontSize: 15,
+                      fontWeight: FontWeight.w800,
+                    ),
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    'Selecione uma categoria.',
+                    style: TextStyle(color: AppTheme.textSecondary(context)),
+                  ),
+                  const SizedBox(height: 10),
+                  DropdownButtonFormField<String>(
+                    value: _category,
+                    dropdownColor: const Color(0xFF171717),
+                    iconEnabledColor: AppTheme.textSecondary(context),
+                    decoration: InputDecoration(
+                      filled: true,
+                      fillColor:
+                          Theme.of(context).colorScheme.surfaceContainerLow,
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(16),
+                        borderSide: BorderSide(
+                          color: Colors.white.withValues(alpha: 0.07),
+                        ),
+                      ),
+                      enabledBorder: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(16),
+                        borderSide: BorderSide(
+                          color: Colors.white.withValues(alpha: 0.07),
+                        ),
+                      ),
+                      focusedBorder: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(16),
+                        borderSide: BorderSide(
+                          color: AppTheme.yellow.withValues(alpha: 0.8),
+                        ),
+                      ),
+                      contentPadding: const EdgeInsets.symmetric(
+                        horizontal: 14,
+                        vertical: 14,
+                      ),
+                    ),
+                    items: IncomeCategoryUtils.all
+                        .map(
+                          (category) => DropdownMenuItem<String>(
+                            value: category,
+                            child: Row(
+                              children: [
+                                Container(
+                                  padding: const EdgeInsets.all(7),
+                                  decoration: BoxDecoration(
+                                    color: AppTheme.yellow.withValues(
+                                      alpha: 0.12,
+                                    ),
+                                    borderRadius: BorderRadius.circular(10),
+                                  ),
+                                  child: Icon(
+                                    IncomeCategoryUtils.icon(category),
+                                    color: AppTheme.yellow,
+                                    size: 16,
+                                  ),
+                                ),
+                                const SizedBox(width: 10),
                                 Text(
-                                  infoText,
+                                  IncomeCategoryUtils.label(context, category),
                                   style: TextStyle(
-                                    color: AppTheme.textSecondary(context),
-                                    fontSize: 12,
-                                    height: 1.3,
+                                    color: AppTheme.textPrimary(context),
+                                    fontWeight: FontWeight.w700,
                                   ),
                                 ),
                               ],
                             ),
                           ),
-                        ],
-                      ),
-                    ),
+                        )
+                        .toList(),
+                    onChanged: _saving
+                        ? null
+                        : (value) {
+                            if (value == null) return;
+                            setState(() => _category = value);
+                          },
                   ),
                   const SizedBox(height: 14),
+                  Text(
+                    'Nome da entrada',
+                    style: TextStyle(
+                      color: AppTheme.textSecondary(context),
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                  const SizedBox(height: 8),
                   TextField(
                     controller: _titleController,
                     textInputAction: TextInputAction.next,
                     decoration: InputDecoration(
-                      labelText: AppStrings.t(context, 'income_label_placeholder'),
-                      hintText: 'Ex: Salario, Freelance',
+                      hintText: 'Ex: Salário, Freelance...',
+                      filled: true,
+                      fillColor:
+                          Theme.of(context).colorScheme.surfaceContainerLow,
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(16),
+                        borderSide: BorderSide(
+                          color: Colors.white.withValues(alpha: 0.07),
+                        ),
+                      ),
+                      enabledBorder: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(16),
+                        borderSide: BorderSide(
+                          color: Colors.white.withValues(alpha: 0.07),
+                        ),
+                      ),
+                      focusedBorder: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(16),
+                        borderSide: BorderSide(
+                          color: AppTheme.yellow.withValues(alpha: 0.8),
+                        ),
+                      ),
                     ),
                   ),
-                  const SizedBox(height: 10),
+                  const SizedBox(height: 14),
+                  Text(
+                    'Valor (R\$)',
+                    style: TextStyle(
+                      color: AppTheme.textSecondary(context),
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                  const SizedBox(height: 8),
                   TextField(
                     controller: _amountController,
                     textInputAction: TextInputAction.done,
                     onSubmitted: (_) => _save(),
-                    keyboardType:
-                        const TextInputType.numberWithOptions(decimal: true),
+                    keyboardType: const TextInputType.numberWithOptions(
+                      decimal: true,
+                    ),
                     inputFormatters: const [MoneyTextInputFormatter()],
-                    decoration: const InputDecoration(
-                      labelText: 'Valor mensal',
-                      prefixText: 'R\$ ',
+                    decoration: InputDecoration(
                       hintText: '0,00',
+                      prefixText: 'R\$ ',
+                      filled: true,
+                      fillColor:
+                          Theme.of(context).colorScheme.surfaceContainerLow,
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(16),
+                        borderSide: BorderSide(
+                          color: Colors.white.withValues(alpha: 0.07),
+                        ),
+                      ),
+                      enabledBorder: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(16),
+                        borderSide: BorderSide(
+                          color: Colors.white.withValues(alpha: 0.07),
+                        ),
+                      ),
+                      focusedBorder: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(16),
+                        borderSide: BorderSide(
+                          color: AppTheme.yellow.withValues(alpha: 0.8),
+                        ),
+                      ),
                     ),
                   ),
-                  if (widget.income != null) ...[
-                    const SizedBox(height: 8),
-                    SwitchListTile(
-                      contentPadding: EdgeInsets.zero,
-                      title: const Text('Renda Principal'),
-                      value: _isPrimary,
-                      onChanged: (widget.income!.isPrimary || _saving)
-                          ? null
-                          : (v) => setState(() => _isPrimary = v),
-                    ),
-                  ],
-                  const SizedBox(height: 12),
+                  const SizedBox(height: 18),
                   Row(
                     children: [
                       Expanded(
@@ -274,6 +541,16 @@ class _IncomeModalState extends State<IncomeModal> {
                           onPressed: _saving
                               ? null
                               : () => Navigator.of(context).pop(),
+                          style: OutlinedButton.styleFrom(
+                            padding: const EdgeInsets.symmetric(vertical: 16),
+                            foregroundColor: AppTheme.textPrimary(context),
+                            side: BorderSide(
+                              color: Colors.white.withValues(alpha: 0.12),
+                            ),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(16),
+                            ),
+                          ),
                           child: Text(AppStrings.t(context, 'cancel')),
                         ),
                       ),
@@ -281,14 +558,29 @@ class _IncomeModalState extends State<IncomeModal> {
                       Expanded(
                         child: ElevatedButton(
                           onPressed: _saving ? null : _save,
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: AppTheme.yellow,
+                            foregroundColor: Colors.black,
+                            padding: const EdgeInsets.symmetric(vertical: 16),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(16),
+                            ),
+                          ),
                           child: _saving
                               ? const SizedBox(
                                   width: 18,
                                   height: 18,
                                   child: CircularProgressIndicator(
-                                      strokeWidth: 2),
+                                    strokeWidth: 2,
+                                    color: Colors.black,
+                                  ),
                                 )
-                              : Text(AppStrings.t(context, 'save')),
+                              : Text(
+                                  AppStrings.t(context, 'save'),
+                                  style: const TextStyle(
+                                    fontWeight: FontWeight.w800,
+                                  ),
+                                ),
                         ),
                       ),
                     ],
@@ -300,5 +592,17 @@ class _IncomeModalState extends State<IncomeModal> {
         ),
       ),
     );
+  }
+
+  String _displayTitle(BuildContext context, IncomeSource income) {
+    final title = income.title.trim();
+    if (title.isEmpty) {
+      return IncomeCategoryUtils.label(context, income.type);
+    }
+    if (title.toLowerCase() == 'renda principal' ||
+        income.id == 'main_income') {
+      return IncomeCategoryUtils.label(context, income.type);
+    }
+    return title;
   }
 }

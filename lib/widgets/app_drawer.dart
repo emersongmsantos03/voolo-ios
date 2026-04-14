@@ -10,7 +10,8 @@ import '../services/local_storage_service.dart';
 import '../state/user_state.dart';
 
 class AppDrawer extends StatelessWidget {
-  const AppDrawer({super.key});
+  final bool isWebSidebar;
+  const AppDrawer({super.key, this.isWebSidebar = false});
 
   Widget _proBadge() {
     return Container(
@@ -59,11 +60,30 @@ class AppDrawer extends StatelessWidget {
     final userState = context.watch<UserState>();
     final user = userState.user;
     final isPremium = user?.isPremium ?? false;
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final brandLogo = isDark
+        ? 'assets/branding/Logo_dark_slogan.png'
+        : 'assets/branding/Logo_light_slogan.png';
 
     return Drawer(
       backgroundColor: AppColors.background,
       child: Column(
         children: [
+          Padding(
+            padding: EdgeInsets.fromLTRB(
+              isWebSidebar ? 14 : 16,
+              isWebSidebar ? 18 : 20,
+              isWebSidebar ? 14 : 16,
+              14,
+            ),
+            child: Center(
+              child: Image.asset(
+                brandLogo,
+                width: isWebSidebar ? 220 : 190,
+                fit: BoxFit.contain,
+              ),
+            ),
+          ),
           UserAccountsDrawerHeader(
             decoration: const BoxDecoration(
               color: AppColors.primary,
@@ -76,7 +96,7 @@ class AppDrawer extends StatelessWidget {
                 Text(user?.fullName ?? AppStrings.t(context, 'user_label')),
             accountEmail: Text(AppStrings.t(context, 'profile_edit_short')),
             onDetailsPressed: () {
-              Navigator.pop(context);
+              if (!isWebSidebar) Navigator.pop(context);
               Navigator.pushNamed(context, AppRoutes.profile);
             },
           ),
@@ -142,7 +162,7 @@ class AppDrawer extends StatelessWidget {
               color: isLogout ? Colors.redAccent : null)),
       trailing: premium && !isPremium ? _proBadge() : null,
       onTap: () async {
-        Navigator.pop(context); // Close drawer
+        if (!isWebSidebar) Navigator.pop(context); // Close drawer only if it's a mobile drawer
         if (isLogout) {
           await LocalStorageService.logout();
           if (context.mounted) {

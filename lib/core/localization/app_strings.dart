@@ -76,7 +76,9 @@ class AppStrings {
       'session_expired_login': 'Sessão expirada. Faça login novamente.',
       'save_failed_try_again': 'Não foi possível salvar. Tente novamente.',
       'profession': 'Profissão',
-      'monthly_income': 'Renda mensal (R\$)',
+      'onboarding_primary_income_label': 'Entrada principal',
+      'onboarding_income_fallback_label': 'Renda {n}',
+      'monthly_income': 'Entradas mensais (R\$)',
       'continue': 'Continuar',
       'language_pt': 'Português',
       'language_en': 'Inglês',
@@ -240,7 +242,7 @@ class AppStrings {
       'reset_resend_wait': 'Aguarde 60 segundos para reenviar.',
       'reset_rate_limited': 'Muitas tentativas. Tente novamente mais tarde.',
       'login_google_not_ready':
-          'Login com Google ainda nao configurado. Verifique a configuracao do Firebase para este ambiente.',
+          'Google ainda nao configurado. No Firebase, adicione o SHA-1 do Android e baixe novamente android/app/google-services.json.',
       'login_apple_not_ready': 'Login com Apple ainda não configurado.',
       'login_cancelled': 'Login cancelado.',
       'login_google': 'Entrar com Google',
@@ -282,6 +284,18 @@ class AppStrings {
           'Nenhum usuário encontrado.\nCrie uma conta e faça login.',
       'save': 'Salvar',
       'profile_change_photo': 'Alterar foto',
+      'profile_personal_data_title': 'Dados pessoais',
+      'profile_personal_data_subtitle':
+          'Mantenha seus dados principais atualizados para o app organizar melhor sua jornada.',
+      'profile_income_title': 'Renda',
+      'profile_income_subtitle':
+          'Sua renda é a base para limites, previsões e recomendações do mês.',
+      'profile_primary_income_label': 'Entrada principal',
+      'profile_income_delete_title': 'Apagar renda fixa',
+      'profile_income_delete_body':
+          'Deseja remover apenas este mês ou apagar para todos os meses seguintes?',
+      'profile_income_delete_scope_month': 'Somente este mês',
+      'profile_income_delete_scope_future': 'Meses seguintes',
       'select': 'Selecionar',
       'login_blocked':
           'Acesso bloqueado. Entre em contato pelo e-mail: contato@voolo.com',
@@ -292,6 +306,49 @@ class AppStrings {
       'premium_cta': 'Seja Premium',
       'premium_badge': 'Premium',
       'premium_dialog_title': 'Seja Premium',
+      'premium_cancel_anytime': 'Cancele quando quiser.',
+      'premium_dialog_choose_plan': 'Escolha seu plano premium:',
+      'premium_checkout_secure_title': 'Pagamento seguro via Paddle',
+      'premium_checkout_secure_body':
+          'A assinatura abre no navegador e fica vinculada à sua conta. Não há compra dentro do app.',
+      'premium_checkout_monthly_title': 'Plano mensal',
+      'premium_checkout_monthly_subtitle':
+          '7 dias de teste. Cancele quando quiser no portal do Paddle.',
+      'premium_checkout_yearly_title': 'Plano anual',
+      'premium_checkout_yearly_subtitle':
+          '7 dias de teste. Melhor custo-benefício para manter o Premium.',
+      'premium_checkout_includes_title': 'O que você libera',
+      'premium_checkout_feature_1':
+          'Relatórios inteligentes e detalhes premium.',
+      'premium_checkout_feature_2':
+          'Metas, missões e insights avançados.',
+      'premium_checkout_feature_3':
+          'Acesso contínuo enquanto a assinatura estiver ativa.',
+      'premium_checkout_cta': 'Abrir no Paddle',
+      'premium_checkout_footer':
+          'Depois de concluir a assinatura, volte ao app. O status premium será atualizado pelo servidor.',
+      'premium_checkout_login_required':
+          'Entre na conta para liberar o checkout do Paddle.',
+      'premium_checkout_open_error':
+          'Não foi possível abrir o checkout do Paddle agora.',
+      'premium_checkout_opened_snack':
+          'Checkout aberto no Paddle. Conclua a assinatura no navegador.',
+      'profile_premium_section_title': 'Assinatura Premium',
+      'profile_premium_section_subtitle':
+          'Sua assinatura está ativa no Paddle. Gerencie ou cancele pelo portal seguro.',
+      'profile_premium_section_body':
+          'Quando você cancelar, o acesso continua até o fim do período pago.',
+      'profile_premium_cancel_cta': 'Cancelar Premium',
+      'profile_paddle_portal_error':
+          'Não foi possível abrir o portal do Paddle agora.',
+      'profile_paddle_login_required':
+          'Entre na conta para gerenciar o Premium.',
+      'premium_plan_monthly_title': 'Plano mensal - R\$ 29,90/mês',
+      'premium_plan_monthly_subtitle':
+          'Renovação automática. Cancele quando quiser.',
+      'premium_plan_yearly_title': 'Plano anual - R\$ 299,90/ano',
+      'premium_plan_yearly_subtitle':
+          'Pagamento anual com acesso premium durante todos os meses do período.',
       'premium_dialog_body':
           'Desbloqueie missões, relatórios inteligentes, calculadora de investimentos e alertas de pagamentos.\n\nEntre em contato para ativar o Premium.',
       'premium_upsell_title': 'Mais controle, mais clareza, mais resultado',
@@ -367,6 +424,9 @@ class AppStrings {
       'premium_tour_insights_location': 'Onde fica: menu lateral > Insights.',
       'premium_tour_insights_tip': 'Siga o foco principal e ajuste seu mês.',
       'close': 'Fechar',
+      'ok': 'OK',
+      'previous_month': 'Mês anterior',
+      'next_month': 'Próximo mês',
       'user_label': 'Usuário',
       'security': 'Segurança',
       'settings': 'Configurações',
@@ -390,6 +450,80 @@ class AppStrings {
       'investment_total_contribution': 'Aporte total',
       'investment_profit': 'Rendimento',
       'investment_final_total': 'Total final',
+      'investment_reserve_emergency_title':
+          'Reserva de emergência (prioridade)',
+      'investment_reserve_emergency_subtitle':
+          'Simples e líquido até completar a reserva.',
+      'investment_fixed_liquid_label': 'Renda fixa com liquidez (Selic/CDB)',
+      'investment_fixed_long_label': 'Renda fixa longa',
+      'investment_variable_diversified_label': 'Variável diversificada',
+      'investment_reserve_emergency_months_label':
+          'Reserva de emergência (meses)',
+      'investment_allocation_title': 'Alocação sugerida (classes de ativos):',
+      'investment_high_risk_label': 'Maior risco',
+      'investment_risk_aggressive': 'Agressivo',
+      'investment_risk_moderate': 'Moderado',
+      'investment_risk_conservative': 'Conservador',
+      'investment_allocate_now': 'Alocar agora',
+      'investment_allocation_chosen': 'Alocação escolhida',
+      'investment_allocation_not_defined': 'Alocação ainda não definida.',
+      'investment_allocation_unlock_hint':
+          'Complete para desbloquear suas sugestões de alocação.',
+      'investment_allocation_define_value': 'Defina um valor para alocar.',
+      'investment_profile_updated': 'Perfil atualizado.',
+      'investment_profile_local_applied':
+          'N?o foi poss?vel calcular online; usei um c?lculo local simples.',
+      'investment_profile_local_saved': 'Perfil aplicado localmente.',
+      'investment_plan_title': 'Seu plano de investimentos',
+      'investment_plan_edit_button': 'Editar plano',
+      'investment_plan_quick_summary': 'Resumo r?pido do seu m?s',
+      'investment_plan_target_label': 'Aporte alvo',
+      'investment_plan_profile_label': 'Perfil',
+      'investment_plan_reserve_label': 'Reserva',
+      'investment_plan_goals_title': 'Metas',
+      'investment_plan_save_button': 'Salvar',
+      'investment_plan_saving_button': 'Salvando...',
+      'investment_plan_setup_help':
+          'Defina metas simples (reserva e aporte). Voc? pode ajustar depois.',
+      'investment_plan_target_input_label': 'Aporte mensal alvo (R\$)',
+      'investment_plan_suggestions_title': 'Sugest?es para este m?s',
+      'investment_plan_simulate_label': 'Simular valor (opcional)',
+      'investment_plan_simulate_hint': 'Se vazio, usamos o aporte mensal alvo.',
+      'investment_plan_suggestions_empty':
+          'Defina um valor (aporte) para ver sugest?es.',
+      'investment_plan_save_choice': 'Salvar esta escolha',
+      'investment_plan_choice_saved': 'Perfil salvo',
+      'investment_step_simple_title': 'Primeiro passo (simples)',
+      'investment_step_simple_subtitle':
+          'Equilíbrio entre segurança e crescimento.',
+      'investment_step_simple_note':
+          'Se quiser deixar ainda mais simples: reduza "alto risco" para 0% e aumente o ETF.',
+      'investment_step_aggressive_title': 'Agressivo (diversificado)',
+      'investment_step_aggressive_subtitle':
+          'Mais volatilidade, sempre com base segura.',
+      'investment_step_aggressive_note':
+          'Se oscilar te incomodar, aumente a parte "liquidez" e reduza o ETF.',
+      'investment_step_moderate_title': 'Moderado (simples)',
+      'investment_step_moderate_subtitle': 'Para começar sem estresse.',
+      'investment_step_moderate_note':
+          'Se oscilar te incomodar, aumente a parte "liquidez" e reduza o ETF.',
+      'investment_step_moderate_ipca_title': 'Moderado com IPCA',
+      'investment_step_moderate_ipca_subtitle':
+          'Mais proteção de longo prazo, mantendo simplicidade.',
+      'investment_reserve_emergency_note_1':
+          'Objetivo: 3–6 meses de custos essenciais em liquidez diária.',
+      'investment_reserve_emergency_note_2':
+          'Depois da reserva pronta, volte aqui e escolha uma alocação de longo prazo.',
+      'investment_step_conservative_title': 'Começo conservador',
+      'investment_step_conservative_subtitle':
+          'Para sair do zero sem estresse.',
+      'investment_step_conservative_note':
+          'Depois que a reserva estiver pronta, você pode adicionar um pouco de IPCA+ ou ETF.',
+      'investment_step_conservative_long_title': 'Conservador + longo prazo',
+      'investment_step_conservative_long_subtitle':
+          'Um toque de longo prazo, mantendo segurança.',
+      'investment_step_conservative_long_note':
+          'Aumente a parte de liquidez se preferir mais segurança.',
       'example_500': 'Ex: 500',
       'example_12': 'Ex: 12',
       'years_label': '{years} anos',
@@ -490,7 +624,7 @@ class AppStrings {
       'onboarding_profession_subtitle':
           'Queremos entender seu momento profissional para personalizar sua jornada.',
       'onboarding_profession_required': 'Informe sua profissão.',
-      'onboarding_income_title': 'Qual é a sua renda mensal?',
+      'onboarding_income_title': 'Qual é a sua entrada mensal?',
       'onboarding_income_subtitle':
           'Com esse dado, conseguimos montar metas realistas para você.',
       'summary_fixed': 'Fixos',
@@ -533,6 +667,29 @@ class AppStrings {
       'alert_negative_balance': 'Seu saldo do mês está negativo.',
       'alert_ok': 'Tudo certo por aqui. Continue consistente.',
       'tips_title': 'Dicas do mês',
+      'monthly_report_title': 'Relatório mensal',
+      'monthly_report_empty': 'Nenhum dado encontrado para este mês.',
+      'monthly_report_month_spending': 'Gastos do mês',
+      'monthly_report_total_spent': 'Total de gastos',
+      'monthly_report_total_invested': 'Total investido',
+      'monthly_report_total_invested_info':
+          'Este valor soma apenas o que foi investido ao longo dos meses. Os rendimentos não aparecem aqui.',
+      'monthly_report_balance': 'Saldo do mês',
+      'monthly_report_entries_filters': 'Lançamentos (filtros)',
+      'monthly_report_adjust_balance': 'Ajustar saldo do mês',
+      'monthly_report_timeline': 'Linha do tempo',
+      'monthly_report_card_credit': 'Cartão de crédito',
+      'monthly_report_no_card': 'Sem cartão cadastrado',
+      'monthly_report_card_due_day': 'Vencimento do cartão: dia {day}',
+      'monthly_report_due_day_optional': 'Dia de vencimento (opcional)',
+      'monthly_report_loading': 'Carregando...',
+      'monthly_report_login_required': 'Faça login para acessar relatórios.',
+      'monthly_report_premium_title': 'Relatórios inteligentes são Premium',
+      'monthly_report_premium_subtitle':
+          'Veja linha do tempo, evolução mensal e insights detalhados.',
+      'monthly_report_premium_perk1': 'Linha do tempo do seu dinheiro',
+      'monthly_report_premium_perk2': 'Score da saúde financeira',
+      'monthly_report_premium_perk3': 'Insights personalizados do mês',
       'tip_housing_high':
           'Moradia acima de 35%. Avalie alternativas para reduzir esse custo.',
       'compare_title': 'Comparativo mensal',
@@ -552,7 +709,41 @@ class AppStrings {
       'habit_invest_subtitle': 'Reserve um valor semanal.',
       'month_entries': 'Lançamentos do mês',
       'no_entries_yet': 'Nenhum lançamento ainda.',
-      'month_salary': 'Salário do mês',
+      'month_salary': 'Entradas do mês',
+      'view_all_entries': 'Ver todos os lançamentos',
+      'income_modal_new_title': 'Nova entrada',
+      'income_modal_edit_title': 'Editar entrada',
+      'income_modal_fixed': 'Fixa',
+      'income_modal_variable': 'Variável',
+      'income_modal_fixed_info_title': 'Entrada Fixa',
+      'income_modal_variable_info_title': 'Entrada Variável',
+      'income_modal_fixed_info_body':
+          'Esta entrada vale apenas para o mês atual, como uma entrada previsível.',
+      'income_modal_variable_info_body':
+          'Esta entrada vale apenas para o mês atual e não se repete sozinha.',
+      'income_modal_title_hint': 'Ex: Salário, Freelance',
+      'income_modal_amount_label': 'Valor da entrada',
+      'income_modal_amount_hint': '0,00',
+      'income_modal_primary_title': 'Entrada principal',
+      'income_modal_error_fill': 'Preencha o nome e o valor corretamente.',
+      'income_modal_error_save': 'Erro ao salvar entrada.',
+      'income_category_salary': 'Salário',
+      'income_category_service': 'Prestação de serviço',
+      'income_category_yield': 'Rendimento',
+      'income_category_bonus': 'Bônus',
+      'income_category_other': 'Outra entrada',
+      'profile_delete_account_title': 'Excluir conta',
+      'profile_delete_account_subtitle': 'Ação permanente e irreversível.',
+      'profile_delete_account_body':
+          'Isso remove seus dados locais e remotos e encerra seu acesso ao app.',
+      'profile_delete_account_password_label': 'Digite sua senha',
+      'profile_delete_account_confirm': 'Excluir conta',
+      'profile_delete_account_requires_password':
+          'Esta conta não usa senha para entrar. Use o método de login original.',
+      'profile_delete_account_invalid_password':
+          'Senha inválida. Tente novamente.',
+      'profile_delete_account_failed':
+          'Não foi possível excluir a conta agora.',
       'goals_title': 'Metas',
       'goals_add_new': 'Nova meta',
       'goals_title_label': 'Título da meta',
@@ -630,8 +821,8 @@ class AppStrings {
           'Fixos estão controlados em relação aos gastos variáveis.',
       'timeline_balanced_month': 'Mês equilibrado',
       'timeline_balanced_month_desc': 'Nenhuma variação relevante detectada.',
-      'add_extra_income': 'Adicionar renda extra',
-      'income_label_placeholder': 'Nome da fonte',
+      'add_extra_income': 'Adicionar entrada',
+      'income_label_placeholder': 'Nome da entrada',
       'offline_message': 'Você está offline. Conecte-se a uma rede.',
     },
     'en': {
@@ -696,7 +887,9 @@ class AppStrings {
       'session_expired_login': 'Session expired. Sign in again.',
       'save_failed_try_again': 'Unable to save. Try again.',
       'profession': 'Profession',
-      'monthly_income': 'Monthly income (R\$)',
+      'onboarding_primary_income_label': 'Primary entry',
+      'onboarding_income_fallback_label': 'Income {n}',
+      'monthly_income': 'Monthly entries (R\$)',
       'continue': 'Continue',
       'language_pt': 'Portuguese',
       'language_en': 'English',
@@ -807,7 +1000,7 @@ class AppStrings {
       'reset_resend_wait': 'Please wait 60 seconds to resend.',
       'reset_rate_limited': 'Too many attempts. Try again later.',
       'login_google_not_ready':
-          'Google login is not set up yet. Check the Firebase configuration for this environment.',
+          'Google login is not set up yet. In Firebase, add the Android SHA-1 and re-download android/app/google-services.json.',
       'login_apple_not_ready': 'Apple login is not set up yet.',
       'login_cancelled': 'Sign-in cancelled.',
       'login_google': 'Sign in with Google',
@@ -846,6 +1039,18 @@ class AppStrings {
       'profile_no_user_body': 'No user found.\nCreate an account and sign in.',
       'save': 'Save',
       'profile_change_photo': 'Change photo',
+      'profile_personal_data_title': 'Personal data',
+      'profile_personal_data_subtitle':
+          'Keep your main data updated so the app can better organize your journey.',
+      'profile_income_title': 'Income',
+      'profile_income_subtitle':
+          'Your income is the base for limits, projections, and monthly recommendations.',
+      'profile_primary_income_label': 'Primary entry',
+      'profile_income_delete_title': 'Delete fixed income',
+      'profile_income_delete_body':
+          'Do you want to remove only this month or delete it for all following months?',
+      'profile_income_delete_scope_month': 'Only this month',
+      'profile_income_delete_scope_future': 'Following months',
       'select': 'Select',
       'login_blocked': 'Access blocked. Contact us at: contato@voolo.com',
       'login_failed_try_again': 'Sign-in failed. Try again.',
@@ -855,6 +1060,48 @@ class AppStrings {
       'premium_cta': 'Go Premium',
       'premium_badge': 'Premium',
       'premium_dialog_title': 'Go Premium',
+      'premium_cancel_anytime': 'Cancel anytime.',
+      'premium_dialog_choose_plan': 'Choose your premium plan:',
+      'premium_checkout_secure_title': 'Secure payment via Paddle',
+      'premium_checkout_secure_body':
+          'The subscription opens in the browser and stays linked to your account. There is no in-app purchase.',
+      'premium_checkout_monthly_title': 'Monthly plan',
+      'premium_checkout_monthly_subtitle':
+          '7-day trial. Cancel anytime in the Paddle portal.',
+      'premium_checkout_yearly_title': 'Yearly plan',
+      'premium_checkout_yearly_subtitle':
+          '7-day trial. Best value for keeping Premium.',
+      'premium_checkout_includes_title': 'What you unlock',
+      'premium_checkout_feature_1':
+          'Smart reports and premium details.',
+      'premium_checkout_feature_2':
+          'Goals, missions, and advanced insights.',
+      'premium_checkout_feature_3':
+          'Continuous access while the subscription is active.',
+      'premium_checkout_cta': 'Open in Paddle',
+      'premium_checkout_footer':
+          'After finishing the subscription, come back to the app. Premium status will be refreshed by the server.',
+      'premium_checkout_login_required':
+          'Sign in to unlock the Paddle checkout.',
+      'premium_checkout_open_error':
+          'Could not open the Paddle checkout right now.',
+      'premium_checkout_opened_snack':
+          'Checkout opened in Paddle. Complete the subscription in the browser.',
+      'profile_premium_section_title': 'Premium subscription',
+      'profile_premium_section_subtitle':
+          'Your subscription is active in Paddle. Manage or cancel it through the secure portal.',
+      'profile_premium_section_body':
+          'When you cancel, access continues until the end of the paid period.',
+      'profile_premium_cancel_cta': 'Cancel Premium',
+      'profile_paddle_portal_error':
+          'Could not open the Paddle portal right now.',
+      'profile_paddle_login_required':
+          'Sign in to manage Premium.',
+      'premium_plan_monthly_title': 'Monthly plan - R\$ 29.90/month',
+      'premium_plan_monthly_subtitle': 'Automatic renewal. Cancel anytime.',
+      'premium_plan_yearly_title': 'Yearly plan - R\$ 299.90/year',
+      'premium_plan_yearly_subtitle':
+          'Annual payment with premium access for every month of the period.',
       'premium_dialog_body':
           'Unlock missions, smart reports, investment calculator, and payment alerts.\n\nContact us to activate Premium.',
       'premium_upsell_title': 'More control, more clarity, more results',
@@ -925,6 +1172,9 @@ class AppStrings {
       'premium_tour_insights_tip':
           'Follow the main focus to improve your month.',
       'close': 'Close',
+      'ok': 'OK',
+      'previous_month': 'Previous month',
+      'next_month': 'Next month',
       'user_label': 'User',
       'security': 'Security',
       'settings': 'Settings',
@@ -947,6 +1197,79 @@ class AppStrings {
       'investment_total_contribution': 'Total contribution',
       'investment_profit': 'Earnings',
       'investment_final_total': 'Final total',
+      'investment_reserve_emergency_title': 'Emergency reserve (priority)',
+      'investment_reserve_emergency_subtitle':
+          'Simple and liquid until the reserve is complete.',
+      'investment_fixed_liquid_label': 'Liquid fixed income (Treasury/CDB)',
+      'investment_fixed_long_label': 'Long-term fixed income',
+      'investment_variable_diversified_label': 'Diversified variable',
+      'investment_reserve_emergency_months_label': 'Emergency reserve (months)',
+      'investment_allocation_title': 'Suggested allocation (asset classes):',
+      'investment_high_risk_label': 'Higher risk',
+      'investment_risk_aggressive': 'Aggressive',
+      'investment_risk_moderate': 'Moderate',
+      'investment_risk_conservative': 'Conservative',
+      'investment_allocate_now': 'Allocate now',
+      'investment_allocation_chosen': 'Chosen allocation',
+      'investment_allocation_not_defined': 'Allocation not yet defined.',
+      'investment_allocation_unlock_hint':
+          'Complete it to unlock your allocation suggestions.',
+      'investment_allocation_define_value': 'Set an amount to allocate.',
+      'investment_profile_updated': 'Profile updated.',
+      'investment_profile_local_applied':
+          'Could not calculate online; used a simple local calculation.',
+      'investment_profile_local_saved': 'Profile applied locally.',
+      'investment_plan_title': 'Your investment plan',
+      'investment_plan_edit_button': 'Edit plan',
+      'investment_plan_quick_summary': 'Quick summary of your month',
+      'investment_plan_target_label': 'Target contribution',
+      'investment_plan_profile_label': 'Profile',
+      'investment_plan_reserve_label': 'Reserve',
+      'investment_plan_goals_title': 'Goals',
+      'investment_plan_save_button': 'Save',
+      'investment_plan_saving_button': 'Saving...',
+      'investment_plan_setup_help':
+          'Set simple goals (reserve and contribution). You can adjust them later.',
+      'investment_plan_target_input_label': 'Target monthly contribution (R\$)',
+      'investment_plan_suggestions_title': 'Suggestions for this month',
+      'investment_plan_simulate_label': 'Simulate amount (optional)',
+      'investment_plan_simulate_hint':
+          'If empty, we use the target monthly contribution.',
+      'investment_plan_suggestions_empty':
+          'Set an amount (contribution) to see suggestions.',
+      'investment_plan_save_choice': 'Save this choice',
+      'investment_plan_choice_saved': 'Profile saved',
+      'investment_step_simple_title': 'First step (simple)',
+      'investment_step_simple_subtitle': 'Balance between safety and growth.',
+      'investment_step_simple_note':
+          'If you want to keep it even simpler: reduce "high risk" to 0% and increase the ETF.',
+      'investment_step_aggressive_title': 'Aggressive (diversified)',
+      'investment_step_aggressive_subtitle':
+          'More volatility, always with a safe base.',
+      'investment_step_aggressive_note':
+          'If volatility bothers you, increase the "liquidity" part and reduce the ETF.',
+      'investment_step_moderate_title': 'Moderate (simple)',
+      'investment_step_moderate_subtitle': 'To get started without stress.',
+      'investment_step_moderate_note':
+          'If volatility bothers you, increase the "liquidity" part and reduce the ETF.',
+      'investment_step_moderate_ipca_title':
+          'Moderate with inflation protection',
+      'investment_step_moderate_ipca_subtitle':
+          'More long-term protection while staying simple.',
+      'investment_reserve_emergency_note_1':
+          'Goal: 3-6 months of essential costs in daily liquidity.',
+      'investment_reserve_emergency_note_2':
+          'After the reserve is ready, come back and choose a long-term allocation.',
+      'investment_step_conservative_title': 'Conservative start',
+      'investment_step_conservative_subtitle':
+          'To get off zero without stress.',
+      'investment_step_conservative_note':
+          'Once the reserve is ready, you can add a bit of inflation-protected or ETF exposure.',
+      'investment_step_conservative_long_title': 'Conservative + long term',
+      'investment_step_conservative_long_subtitle':
+          'A touch of long-term growth while keeping safety.',
+      'investment_step_conservative_long_note':
+          'Increase the liquidity portion if you want more safety.',
       'example_500': 'Ex: 500',
       'example_12': 'Ex: 12',
       'years_label': '{years} years',
@@ -1043,7 +1366,7 @@ class AppStrings {
       'onboarding_profession_subtitle':
           'We want to understand your professional moment to personalize your journey.',
       'onboarding_profession_required': 'Enter your profession.',
-      'onboarding_income_title': 'What is your monthly income?',
+      'onboarding_income_title': 'What is your monthly entry?',
       'onboarding_income_subtitle':
           'With this data, we can build realistic goals for you.',
       'summary_fixed': 'Fixed',
@@ -1083,6 +1406,29 @@ class AppStrings {
       'alert_negative_balance': 'Your monthly balance is negative.',
       'alert_ok': 'All good here. Stay consistent.',
       'tips_title': 'Tips of the month',
+      'monthly_report_title': 'Monthly report',
+      'monthly_report_empty': 'No data found for this month.',
+      'monthly_report_month_spending': 'Month spending',
+      'monthly_report_total_spent': 'Total spending',
+      'monthly_report_total_invested': 'Total invested',
+      'monthly_report_total_invested_info':
+          'This value includes only what was invested over the months. Earnings do not appear here.',
+      'monthly_report_balance': 'Month balance',
+      'monthly_report_entries_filters': 'Entries (filters)',
+      'monthly_report_adjust_balance': 'Adjust month balance',
+      'monthly_report_timeline': 'Timeline',
+      'monthly_report_card_credit': 'Credit card',
+      'monthly_report_no_card': 'No card registered',
+      'monthly_report_card_due_day': 'Card due day: {day}',
+      'monthly_report_due_day_optional': 'Due day (optional)',
+      'monthly_report_loading': 'Loading...',
+      'monthly_report_login_required': 'Log in to access reports.',
+      'monthly_report_premium_title': 'Smart reports are Premium',
+      'monthly_report_premium_subtitle':
+          'See timeline, monthly evolution, and detailed insights.',
+      'monthly_report_premium_perk1': 'Timeline of your money',
+      'monthly_report_premium_perk2': 'Financial health score',
+      'monthly_report_premium_perk3': 'Personalized monthly insights',
       'tip_housing_high':
           'Housing above 35%. Consider options to lower this cost.',
       'compare_title': 'Monthly comparison',
@@ -1101,7 +1447,41 @@ class AppStrings {
       'habit_invest_subtitle': 'Reserve a weekly amount.',
       'month_entries': 'Entries of the month',
       'no_entries_yet': 'No entries yet.',
-      'month_salary': 'Monthly salary',
+      'month_salary': 'Monthly entries',
+      'view_all_entries': 'View all entries',
+      'income_modal_new_title': 'New entry',
+      'income_modal_edit_title': 'Edit entry',
+      'income_modal_fixed': 'Fixed',
+      'income_modal_variable': 'Variable',
+      'income_modal_fixed_info_title': 'Fixed entry',
+      'income_modal_variable_info_title': 'Variable entry',
+      'income_modal_fixed_info_body':
+          'This entry applies only to the current month as a predictable entry.',
+      'income_modal_variable_info_body':
+          'This entry applies only to the current month and does not repeat by itself.',
+      'income_modal_title_hint': 'Ex: Salary, Freelance',
+      'income_modal_amount_label': 'Entry amount',
+      'income_modal_amount_hint': '0.00',
+      'income_modal_primary_title': 'Primary entry',
+      'income_modal_error_fill': 'Fill the name and amount correctly.',
+      'income_modal_error_save': 'Error saving entry.',
+      'income_category_salary': 'Salary',
+      'income_category_service': 'Service income',
+      'income_category_yield': 'Yield',
+      'income_category_bonus': 'Bonus',
+      'income_category_other': 'Other entry',
+      'profile_delete_account_title': 'Delete account',
+      'profile_delete_account_subtitle': 'Permanent and irreversible action.',
+      'profile_delete_account_body':
+          'This removes your local and remote data and ends access to the app.',
+      'profile_delete_account_password_label': 'Enter your password',
+      'profile_delete_account_confirm': 'Delete account',
+      'profile_delete_account_requires_password':
+          'This account does not use a password to sign in. Use the original login method.',
+      'profile_delete_account_invalid_password':
+          'Invalid password. Please try again.',
+      'profile_delete_account_failed':
+          'We could not delete the account right now.',
       'goals_title': 'Goals',
       'goals_add_new': 'New goal',
       'goals_title_label': 'Goal title',
@@ -1176,8 +1556,8 @@ class AppStrings {
           'Fixed are controlled relative to variable spending.',
       'timeline_balanced_month': 'Balanced month',
       'timeline_balanced_month_desc': 'No significant variation detected.',
-      'add_extra_income': 'Add extra income',
-      'income_label_placeholder': 'Source label',
+      'add_extra_income': 'Add entry',
+      'income_label_placeholder': 'Entry name',
       'offline_message': 'You are offline. Connect to a network.',
     },
     'es': {
@@ -1238,7 +1618,9 @@ class AppStrings {
       'session_expired_login': 'Sesión expirada. Inicia sesión nuevamente.',
       'save_failed_try_again': 'No fue posible guardar. Intenta de nuevo.',
       'profession': 'Profesión',
-      'monthly_income': 'Ingreso mensual (R\$)',
+      'onboarding_primary_income_label': 'Entrada principal',
+      'onboarding_income_fallback_label': 'Ingreso {n}',
+      'monthly_income': 'Entradas mensuales (R\$)',
       'continue': 'Continuar',
       'goals': 'Metas',
       'goal': 'Meta',
@@ -1361,7 +1743,7 @@ class AppStrings {
       'reset_resend_wait': 'Espera 60 segundos para reenviar.',
       'reset_rate_limited': 'Demasiados intentos. Intenta más tarde.',
       'login_google_not_ready':
-          'El inicio con Google aun no esta configurado. Revisa la configuracion de Firebase para este entorno.',
+          'El inicio con Google aun no esta configurado. En Firebase, agrega el SHA-1 de Android y vuelve a descargar android/app/google-services.json.',
       'login_apple_not_ready': 'El inicio con Apple aún no está configurado.',
       'login_cancelled': 'Inicio de sesion cancelado.',
       'login_google': 'Entrar con Google',
@@ -1403,6 +1785,18 @@ class AppStrings {
           'Ningún usuario encontrado.\nCrea una cuenta e inicia sesión.',
       'save': 'Guardar',
       'profile_change_photo': 'Cambiar foto',
+      'profile_personal_data_title': 'Datos personales',
+      'profile_personal_data_subtitle':
+          'Mantén tus datos principales actualizados para que la app organice mejor tu camino.',
+      'profile_income_title': 'Ingreso',
+      'profile_income_subtitle':
+          'Tu ingreso es la base de límites, proyecciones y recomendaciones del mes.',
+      'profile_primary_income_label': 'Entrada principal',
+      'profile_income_delete_title': 'Eliminar ingreso fijo',
+      'profile_income_delete_body':
+          '¿Quieres quitar solo este mes o eliminarlo para todos los meses siguientes?',
+      'profile_income_delete_scope_month': 'Solo este mes',
+      'profile_income_delete_scope_future': 'Meses siguientes',
       'select': 'Seleccionar',
       'login_blocked': 'Acceso bloqueado. Contacta a: contato@voolo.com',
       'login_failed_try_again': 'No se pudo iniciar sesión. Intenta de nuevo.',
@@ -1412,6 +1806,49 @@ class AppStrings {
       'premium_cta': 'Hazte Premium',
       'premium_badge': 'Premium',
       'premium_dialog_title': 'Hazte Premium',
+      'premium_cancel_anytime': 'Cancela cuando quieras.',
+      'premium_dialog_choose_plan': 'Elige tu plan premium:',
+      'premium_checkout_secure_title': 'Pago seguro vía Paddle',
+      'premium_checkout_secure_body':
+          'La suscripción se abre en el navegador y queda vinculada a tu cuenta. No hay compra dentro de la app.',
+      'premium_checkout_monthly_title': 'Plan mensual',
+      'premium_checkout_monthly_subtitle':
+          '7 días de prueba. Cancela cuando quieras en el portal de Paddle.',
+      'premium_checkout_yearly_title': 'Plan anual',
+      'premium_checkout_yearly_subtitle':
+          '7 días de prueba. Mejor costo-beneficio para mantener Premium.',
+      'premium_checkout_includes_title': 'Qué desbloqueas',
+      'premium_checkout_feature_1':
+          'Informes inteligentes y detalles premium.',
+      'premium_checkout_feature_2':
+          'Metas, misiones e insights avanzados.',
+      'premium_checkout_feature_3':
+          'Acceso continuo mientras la suscripción esté activa.',
+      'premium_checkout_cta': 'Abrir en Paddle',
+      'premium_checkout_footer':
+          'Después de completar la suscripción, vuelve a la app. El estado premium se actualizará desde el servidor.',
+      'premium_checkout_login_required':
+          'Inicia sesión para abrir el checkout de Paddle.',
+      'premium_checkout_open_error':
+          'No se pudo abrir el checkout de Paddle ahora.',
+      'premium_checkout_opened_snack':
+          'Checkout abierto en Paddle. Completa la suscripción en el navegador.',
+      'profile_premium_section_title': 'Suscripción Premium',
+      'profile_premium_section_subtitle':
+          'Tu suscripción está activa en Paddle. Adminístrala o cancélala desde el portal seguro.',
+      'profile_premium_section_body':
+          'Cuando canceles, el acceso continúa hasta el final del periodo pagado.',
+      'profile_premium_cancel_cta': 'Cancelar Premium',
+      'profile_paddle_portal_error':
+          'No se pudo abrir el portal de Paddle ahora.',
+      'profile_paddle_login_required':
+          'Inicia sesión para gestionar Premium.',
+      'premium_plan_monthly_title': 'Plan mensual - R\$ 29,90/mes',
+      'premium_plan_monthly_subtitle':
+          'Renovación automática. Cancela cuando quieras.',
+      'premium_plan_yearly_title': 'Plan anual - R\$ 299,90/año',
+      'premium_plan_yearly_subtitle':
+          'Pago anual con acceso premium durante todos los meses del período.',
       'premium_dialog_body':
           'Desbloquea misiones, informes inteligentes, calculadora de inversiones y alertas de pagos.\n\nContáctanos para activar Premium.',
       'premium_upsell_title': 'Más control, más claridad, más resultados',
@@ -1484,6 +1921,9 @@ class AppStrings {
       'premium_tour_insights_location': 'Dónde está: menú lateral > Insights.',
       'premium_tour_insights_tip': 'Sigue el foco principal y mejora tu mes.',
       'close': 'Cerrar',
+      'ok': 'OK',
+      'previous_month': 'Mes anterior',
+      'next_month': 'Próximo mes',
       'user_label': 'Usuario',
       'security': 'Seguridad',
       'settings': 'Configuraciones',
@@ -1508,6 +1948,80 @@ class AppStrings {
       'investment_total_contribution': 'Aporte total',
       'investment_profit': 'Rendimiento',
       'investment_final_total': 'Total final',
+      'investment_reserve_emergency_title': 'Reserva de emergencia (prioridad)',
+      'investment_reserve_emergency_subtitle':
+          'Simple y líquida hasta completar la reserva.',
+      'investment_fixed_liquid_label': 'Renta fija con liquidez (Selic/CDB)',
+      'investment_fixed_long_label': 'Renta fija a largo plazo',
+      'investment_variable_diversified_label': 'Variable diversificada',
+      'investment_reserve_emergency_months_label':
+          'Reserva de emergencia (meses)',
+      'investment_allocation_title': 'Asignación sugerida (clases de activos):',
+      'investment_high_risk_label': 'Mayor riesgo',
+      'investment_risk_aggressive': 'Agresivo',
+      'investment_risk_moderate': 'Moderado',
+      'investment_risk_conservative': 'Conservador',
+      'investment_allocate_now': 'Asignar ahora',
+      'investment_allocation_chosen': 'Asignación elegida',
+      'investment_allocation_not_defined':
+          'La asignación aún no está definida.',
+      'investment_allocation_unlock_hint':
+          'Complétalo para desbloquear tus sugerencias de asignación.',
+      'investment_allocation_define_value': 'Define un valor para asignar.',
+      'investment_profile_updated': 'Perfil actualizado.',
+      'investment_profile_local_applied':
+          'No fue posible calcular en l?nea; us? un c?lculo local simple.',
+      'investment_profile_local_saved': 'Perfil aplicado localmente.',
+      'investment_plan_title': 'Tu plan de inversiones',
+      'investment_plan_edit_button': 'Editar plan',
+      'investment_plan_quick_summary': 'Resumen r?pido de tu mes',
+      'investment_plan_target_label': 'Aporte objetivo',
+      'investment_plan_profile_label': 'Perfil',
+      'investment_plan_reserve_label': 'Reserva',
+      'investment_plan_goals_title': 'Metas',
+      'investment_plan_save_button': 'Guardar',
+      'investment_plan_saving_button': 'Guardando...',
+      'investment_plan_setup_help':
+          'Define metas simples (reserva y aporte). Puedes ajustarlas despu?s.',
+      'investment_plan_target_input_label': 'Aporte mensual objetivo (R\$)',
+      'investment_plan_suggestions_title': 'Sugerencias para este mes',
+      'investment_plan_simulate_label': 'Simular valor (opcional)',
+      'investment_plan_simulate_hint':
+          'Si est? vac?o, usamos el aporte mensual objetivo.',
+      'investment_plan_suggestions_empty':
+          'Define un valor (aporte) para ver sugerencias.',
+      'investment_plan_save_choice': 'Guardar esta elecci?n',
+      'investment_plan_choice_saved': 'Perfil guardado',
+      'investment_step_simple_title': 'Primer paso (simple)',
+      'investment_step_simple_subtitle':
+          'Equilibrio entre seguridad y crecimiento.',
+      'investment_step_simple_note':
+          'Si quieres dejarlo aún más simple: reduce "alto riesgo" a 0% y aumenta el ETF.',
+      'investment_step_aggressive_title': 'Agresivo (diversificado)',
+      'investment_step_aggressive_subtitle':
+          'Más volatilidad, siempre con una base segura.',
+      'investment_step_aggressive_note':
+          'Si la volatilidad te molesta, aumenta la parte de "liquidez" y reduce el ETF.',
+      'investment_step_moderate_title': 'Moderado (simple)',
+      'investment_step_moderate_subtitle': 'Para empezar sin estrés.',
+      'investment_step_moderate_note':
+          'Si la volatilidad te molesta, aumenta la parte de "liquidez" y reduce el ETF.',
+      'investment_step_moderate_ipca_title': 'Moderado con IPCA',
+      'investment_step_moderate_ipca_subtitle':
+          'Más protección de largo plazo, manteniendo la simplicidad.',
+      'investment_reserve_emergency_note_1':
+          'Objetivo: 3-6 meses de costos esenciales en liquidez diaria.',
+      'investment_reserve_emergency_note_2':
+          'Después de completar la reserva, vuelve aquí y elige una asignación de largo plazo.',
+      'investment_step_conservative_title': 'Inicio conservador',
+      'investment_step_conservative_subtitle': 'Para salir de cero sin estrés.',
+      'investment_step_conservative_note':
+          'Cuando la reserva esté lista, puedes agregar un poco de IPCA+ o ETF.',
+      'investment_step_conservative_long_title': 'Conservador + largo plazo',
+      'investment_step_conservative_long_subtitle':
+          'Un toque de largo plazo, manteniendo seguridad.',
+      'investment_step_conservative_long_note':
+          'Aumenta la parte de liquidez si prefieres más seguridad.',
       'example_500': 'Ej: 500',
       'example_12': 'Ej: 12',
       'years_label': '{years} años',
@@ -1605,7 +2119,7 @@ class AppStrings {
       'onboarding_profession_subtitle':
           'Queremos entender tu momento profesional para personalizar tu camino.',
       'onboarding_profession_required': 'Ingresa tu profesión.',
-      'onboarding_income_title': '¿Cuál es tu ingreso mensual?',
+      'onboarding_income_title': '¿Cuál es tu entrada mensual?',
       'onboarding_income_subtitle':
           'Con este dato, podemos crear metas realistas para ti.',
       'summary_fixed': 'Fijos',
@@ -1649,6 +2163,29 @@ class AppStrings {
       'alert_negative_balance': 'Tu saldo del mes es negativo.',
       'alert_ok': 'Todo bien por aquí. Sigue constante.',
       'tips_title': 'Consejos del mes',
+      'monthly_report_title': 'Reporte mensual',
+      'monthly_report_empty': 'No se encontraron datos para este mes.',
+      'monthly_report_month_spending': 'Gasto del mes',
+      'monthly_report_total_spent': 'Gasto total',
+      'monthly_report_total_invested': 'Total invertido',
+      'monthly_report_total_invested_info':
+          'Este valor suma solo lo invertido a lo largo de los meses. Los rendimientos no aparecen aquí.',
+      'monthly_report_balance': 'Saldo del mes',
+      'monthly_report_entries_filters': 'Lanzamientos (filtros)',
+      'monthly_report_adjust_balance': 'Ajustar saldo del mes',
+      'monthly_report_timeline': 'Línea de tiempo',
+      'monthly_report_card_credit': 'Tarjeta de crédito',
+      'monthly_report_no_card': 'Ninguna tarjeta registrada',
+      'monthly_report_card_due_day': 'Vencimiento de la tarjeta: día {day}',
+      'monthly_report_due_day_optional': 'Día de vencimiento (opcional)',
+      'monthly_report_loading': 'Cargando...',
+      'monthly_report_login_required': 'Inicia sesión para acceder a reportes.',
+      'monthly_report_premium_title': 'Los reportes inteligentes son Premium',
+      'monthly_report_premium_subtitle':
+          'Ve la línea de tiempo, la evolución mensual y los insights detallados.',
+      'monthly_report_premium_perk1': 'Línea de tiempo de tu dinero',
+      'monthly_report_premium_perk2': 'Puntaje de salud financiera',
+      'monthly_report_premium_perk3': 'Insights mensuales personalizados',
       'tip_housing_high':
           'Vivienda por encima de 35%. Considera opciones para reducir este costo.',
       'compare_title': 'Comparativo mensual',
@@ -1667,7 +2204,41 @@ class AppStrings {
       'habit_invest_subtitle': 'Reserva un valor semanal.',
       'month_entries': 'Lanzamientos del mes',
       'no_entries_yet': 'Aún no hay lanzamientos.',
-      'month_salary': 'Salario del mes',
+      'month_salary': 'Entradas del mes',
+      'view_all_entries': 'Ver todos los lanzamientos',
+      'income_modal_new_title': 'Nueva entrada',
+      'income_modal_edit_title': 'Editar entrada',
+      'income_modal_fixed': 'Fijo',
+      'income_modal_variable': 'Variable',
+      'income_modal_fixed_info_title': 'Entrada fija',
+      'income_modal_variable_info_title': 'Entrada variable',
+      'income_modal_fixed_info_body':
+          'Esta entrada se aplica solo al mes actual como una entrada previsible.',
+      'income_modal_variable_info_body':
+          'Esta entrada se aplica solo al mes actual y no se repite sola.',
+      'income_modal_title_hint': 'Ej: Salario, Freelance',
+      'income_modal_amount_label': 'Monto de la entrada',
+      'income_modal_amount_hint': '0,00',
+      'income_modal_primary_title': 'Entrada principal',
+      'income_modal_error_fill': 'Completa correctamente el nombre y el valor.',
+      'income_modal_error_save': 'Error al guardar la entrada.',
+      'income_category_salary': 'Salario',
+      'income_category_service': 'Prestación de servicio',
+      'income_category_yield': 'Rendimiento',
+      'income_category_bonus': 'Bono',
+      'income_category_other': 'Otra entrada',
+      'profile_delete_account_title': 'Eliminar cuenta',
+      'profile_delete_account_subtitle': 'Acción permanente e irreversible.',
+      'profile_delete_account_body':
+          'Esto elimina tus datos locales y remotos y cierra el acceso a la app.',
+      'profile_delete_account_password_label': 'Ingresa tu contraseña',
+      'profile_delete_account_confirm': 'Eliminar cuenta',
+      'profile_delete_account_requires_password':
+          'Esta cuenta no usa contraseña para iniciar sesión. Usa el método de acceso original.',
+      'profile_delete_account_invalid_password':
+          'Contraseña inválida. Inténtalo de nuevo.',
+      'profile_delete_account_failed':
+          'No fue posible eliminar la cuenta ahora.',
       'goals_title': 'Metas',
       'goals_add_new': 'Nueva meta',
       'goals_title_label': 'Título de la meta',
@@ -1745,8 +2316,8 @@ class AppStrings {
       'timeline_balanced_month': 'Mes equilibrado',
       'timeline_balanced_month_desc':
           'No se detectó ninguna variación relevante.',
-      'add_extra_income': 'Agregar ingreso extra',
-      'income_label_placeholder': 'Nombre de la fuente',
+      'add_extra_income': 'Agregar entrada',
+      'income_label_placeholder': 'Nombre de la entrada',
       'offline_message': 'Estás desconectado. Conéctate a una red.',
     }
   };

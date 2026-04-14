@@ -456,11 +456,11 @@ class _TransactionsPageState extends State<TransactionsPage> {
                         labelText: 'Cartão de crédito',
                       ),
                       items: cards.isEmpty
-                          ? const [
+                          ? [
                               DropdownMenuItem<String?>(
                                 value: null,
                                 child: Text(
-                                  'Sem cartão cadastrado',
+                                  AppStrings.t(context, 'credit_cards_empty'),
                                   overflow: TextOverflow.ellipsis,
                                 ),
                               ),
@@ -608,7 +608,7 @@ class _TransactionsPageState extends State<TransactionsPage> {
     final salary =
         dashboard?.salary ?? LocalStorageService.incomeTotalForMonth(_month);
     final overview = buildFinanceOverview(
-      salary: salary > 0 ? salary : (user?.monthlyIncome ?? 0),
+      salary: salary > 0 ? salary : 0,
       expenses: _items,
       cards: user?.creditCards ?? const <CreditCard>[],
       creditCardPayments: dashboard?.creditCardPayments ?? const {},
@@ -646,46 +646,44 @@ class _TransactionsPageState extends State<TransactionsPage> {
   }
 
   Widget _emptyState() {
-    return SingleChildScrollView(
-      child: Container(
-        padding: Responsive.pagePadding(context),
-        decoration: BoxDecoration(
-          color: Theme.of(context).colorScheme.surface,
-          borderRadius: BorderRadius.circular(20),
-          border: Border.all(
-            color: Theme.of(context).colorScheme.outline.withValues(alpha: 0.3),
-          ),
+    return Container(
+      padding: Responsive.pagePadding(context),
+      decoration: BoxDecoration(
+        color: Theme.of(context).colorScheme.surface,
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(
+          color: Theme.of(context).colorScheme.outline.withValues(alpha: 0.3),
         ),
-        child: Center(
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Container(
-                width: 56,
-                height: 56,
-                decoration: BoxDecoration(
-                  color: Colors.white.withValues(alpha: 0.06),
-                  borderRadius: BorderRadius.circular(16),
-                ),
-                child: const Icon(Icons.calendar_month_rounded, size: 28),
+      ),
+      child: Center(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Container(
+              width: 56,
+              height: 56,
+              decoration: BoxDecoration(
+                color: Colors.white.withValues(alpha: 0.06),
+                borderRadius: BorderRadius.circular(16),
               ),
-              const SizedBox(height: 14),
-              Text(
-                AppStrings.t(context, 'no_entries_found_title'),
-                style: TextStyle(
-                  color: AppTheme.textPrimary(context),
-                  fontWeight: FontWeight.w700,
-                ),
-                textAlign: TextAlign.center,
+              child: const Icon(Icons.calendar_month_rounded, size: 28),
+            ),
+            const SizedBox(height: 14),
+            Text(
+              AppStrings.t(context, 'no_entries_found_title'),
+              style: TextStyle(
+                color: AppTheme.textPrimary(context),
+                fontWeight: FontWeight.w700,
               ),
-              const SizedBox(height: 6),
-              Text(
-                AppStrings.t(context, 'no_entries_found'),
-                style: TextStyle(color: AppTheme.textSecondary(context)),
-                textAlign: TextAlign.center,
-              ),
-            ],
-          ),
+              textAlign: TextAlign.center,
+            ),
+            const SizedBox(height: 6),
+            Text(
+              AppStrings.t(context, 'no_entries_found'),
+              style: TextStyle(color: AppTheme.textSecondary(context)),
+              textAlign: TextAlign.center,
+            ),
+          ],
         ),
       ),
     );

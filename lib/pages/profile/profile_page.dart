@@ -1,9 +1,9 @@
 import 'dart:io';
-import 'package:flutter/foundation.dart' show kIsWeb;
-
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:image_picker/image_picker.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 import 'package:path_provider/path_provider.dart';
 import '../../core/catalogs/gender_catalog.dart';
@@ -15,8 +15,11 @@ import '../../core/utils/sensitive_display.dart';
 import '../../models/user_profile.dart';
 import '../../models/credit_card.dart';
 import '../../models/income_source.dart';
+import '../../routes/app_routes.dart';
+import '../../services/billing_service.dart';
 import '../../services/local_storage_service.dart';
 import '../../services/notification_service.dart';
+import '../../services/storage_service.dart';
 import '../../theme/app_colors.dart';
 import '../../utils/money_input.dart';
 import '../../utils/date_utils.dart';
@@ -48,6 +51,7 @@ class _ProfilePageState extends State<ProfilePage> {
   String? _pendingPhotoPath;
   Uint8List? _pendingPhotoBytes;
   bool _saving = false;
+  bool _billingBusy = false;
   String gender = GenderCatalog.notInformed;
   static const List<String> _genderOptions = GenderCatalog.codes;
   final ImagePicker _imagePicker = ImagePicker();
@@ -163,13 +167,12 @@ class _ProfilePageState extends State<ProfilePage> {
     final file = await _imagePicker.pickImage(source: ImageSource.gallery);
     if (file == null) return;
 
-    _pendingPhotoPath = file.path;
-    if (kIsWeb) {
-      _pendingPhotoBytes = await file.readAsBytes();
-    }
-
-    photoPathController.text = file.path;
-    setState(() {});
+    final bytes = await file.readAsBytes();
+    setState(() {
+      _pendingPhotoPath = file.path;
+      _pendingPhotoBytes = bytes;
+      photoPathController.text = file.path;
+    });
   }
 
   Future<void> _save() async {
@@ -208,29 +211,33 @@ class _ProfilePageState extends State<ProfilePage> {
       return;
     }
 
-    final path = photoPathController.text.trim();
-    String? finalPhotoPath = path.isEmpty ? null : path;
+    String? finalPhotoPath =
+        _user?.photoPath?.isNotEmpty == true ? _user!.photoPath : null;
 
     if (_pendingPhotoPath != null && _pendingPhotoPath!.isNotEmpty) {
+      final userId =
+          LocalStorageService.currentUserId ?? email.toLowerCase().trim();
+      String? uploadedUrl;
       try {
-        final dir = await getApplicationDocumentsDirectory();
-        final fileName = 'profile_${DateTime.now().millisecondsSinceEpoch}.jpg';
-        final localFile = File('${dir.path}/$fileName');
-
-        if (kIsWeb && _pendingPhotoBytes != null) {
-          await localFile.writeAsBytes(_pendingPhotoBytes!);
-        } else {
-          final originalFile = File(_pendingPhotoPath!);
-          if (await originalFile.exists()) {
-            await originalFile.copy(localFile.path);
-          }
-        }
-        finalPhotoPath = localFile.path;
+        uploadedUrl = await StorageService.uploadUserPhoto(
+          userId: userId,
+          filePath: _pendingPhotoPath!,
+          fileBytes: _pendingPhotoBytes,
+        ).timeout(const Duration(seconds: 45));
       } catch (e) {
-        debugPrint('ProfilePage: Error saving local photo: $e');
-        _snack('Erro ao salvar foto localmente');
-        setState(() => _saving = false);
-        return;
+        debugPrint('ProfilePage: uploadUserPhoto failed, falling back: $e');
+      }
+
+      if (uploadedUrl != null && uploadedUrl.isNotEmpty) {
+        finalPhotoPath = uploadedUrl;
+      } else {
+        finalPhotoPath = await _savePhotoLocallyFallback(
+            _pendingPhotoPath!, _pendingPhotoBytes);
+        if (finalPhotoPath == null || finalPhotoPath.isEmpty) {
+          _snack('Erro ao salvar foto');
+          setState(() => _saving = false);
+          return;
+        }
       }
     }
 
@@ -240,7 +247,7 @@ class _ProfilePageState extends State<ProfilePage> {
       lastName: lastName,
       email: email,
       password: password.isEmpty ? _user!.password : password,
-      birthDate: birthDate,
+      birthDate: birthDate ?? _user!.birthDate,
       profession: profession,
       monthlyIncome:
           _user!.monthlyIncome, // Handled by separate income collection
@@ -274,6 +281,17 @@ class _ProfilePageState extends State<ProfilePage> {
       return;
     }
 
+    if (finalPhotoPath != null && finalPhotoPath.isNotEmpty) {
+      try {
+        final authUser = FirebaseAuth.instance.currentUser;
+        if (authUser != null) {
+          await authUser.updatePhotoURL(finalPhotoPath);
+        }
+      } catch (e) {
+        debugPrint('ProfilePage: Error updating auth photoURL: $e');
+      }
+    }
+
     final nextCardsById = {for (final c in newUser.creditCards) c.id: c};
     final prevCardsById = {for (final c in previousCards) c.id: c};
 
@@ -300,6 +318,55 @@ class _ProfilePageState extends State<ProfilePage> {
 
   void _snack(String msg) {
     ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(msg)));
+  }
+
+  Future<void> _openPaddlePortal() async {
+    if (_billingBusy) return;
+
+    final currentUser = FirebaseAuth.instance.currentUser;
+    if (currentUser == null) {
+      _snack(
+        AppStrings.t(
+          context,
+          'profile_paddle_login_required',
+        ),
+      );
+      return;
+    }
+
+    setState(() => _billingBusy = true);
+
+    try {
+      final response = await BillingService.createPaddlePortalSession(
+        returnUrl: 'https://www.voolo.com.br/profile',
+      );
+      final portalUrl = response['url']?.toString().trim() ?? '';
+      final degradedMode = response['degradedMode'] == true;
+
+      if (degradedMode || portalUrl.isEmpty) {
+        throw BillingException('paddle-portal-unavailable');
+      }
+
+      final launched = await launchUrl(
+        Uri.parse(portalUrl),
+        mode: LaunchMode.externalApplication,
+      );
+      if (!launched) {
+        throw BillingException('paddle-portal-launch-failed');
+      }
+    } catch (_) {
+      if (!mounted) return;
+      _snack(
+        AppStrings.t(
+          context,
+          'profile_paddle_portal_error',
+        ),
+      );
+    } finally {
+      if (mounted) {
+        setState(() => _billingBusy = false);
+      }
+    }
   }
 
   Widget _sectionCard({
@@ -343,22 +410,107 @@ class _ProfilePageState extends State<ProfilePage> {
       context: context,
       builder: (_) => AlertDialog(
         backgroundColor: Theme.of(context).colorScheme.surface,
-        title: const Text('Apagar renda fixa'),
-        content: const Text(
-          'Deseja remover apenas este mês ou apagar para todos os meses seguintes?',
-        ),
+        title: Text(AppStrings.t(context, 'profile_income_delete_title')),
+        content: Text(AppStrings.t(context, 'profile_income_delete_body')),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context, 'month'),
-            child: const Text('Somente este mês'),
+            child: Text(
+                AppStrings.t(context, 'profile_income_delete_scope_month')),
           ),
           ElevatedButton(
             onPressed: () => Navigator.pop(context, 'all'),
-            child: const Text('Meses seguintes'),
+            child: Text(
+                AppStrings.t(context, 'profile_income_delete_scope_future')),
           ),
         ],
       ),
     );
+  }
+
+  Future<String?> _askDeleteAccountPassword() async {
+    final controller = TextEditingController();
+    final result = await showDialog<String>(
+      context: context,
+      barrierDismissible: !_saving,
+      builder: (_) => AlertDialog(
+        backgroundColor: Theme.of(context).colorScheme.surface,
+        title: Text(AppStrings.t(context, 'profile_delete_account_title')),
+        content: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(AppStrings.t(context, 'profile_delete_account_body')),
+              const SizedBox(height: 12),
+              TextField(
+                controller: controller,
+                obscureText: true,
+                decoration: InputDecoration(
+                  labelText: AppStrings.t(
+                    context,
+                    'profile_delete_account_password_label',
+                  ),
+                ),
+                onSubmitted: (_) {
+                  Navigator.pop(context, controller.text.trim());
+                },
+              ),
+            ],
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: Text(AppStrings.t(context, 'cancel')),
+          ),
+          ElevatedButton(
+            onPressed: () => Navigator.pop(context, controller.text.trim()),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Colors.redAccent,
+              foregroundColor: Colors.white,
+            ),
+            child:
+                Text(AppStrings.t(context, 'profile_delete_account_confirm')),
+          ),
+        ],
+      ),
+    );
+    controller.dispose();
+    return result;
+  }
+
+  Future<void> _deleteAccount() async {
+    if (_saving) return;
+    final authUser = FirebaseAuth.instance.currentUser;
+    if (authUser == null) return;
+
+    final isPasswordProvider = authUser.providerData.any(
+      (provider) => provider.providerId == 'password',
+    );
+    if (!isPasswordProvider) {
+      _snack(AppStrings.t(context, 'profile_delete_account_requires_password'));
+      return;
+    }
+
+    final password = await _askDeleteAccountPassword();
+    if (password == null || password.isEmpty) return;
+
+    setState(() => _saving = true);
+    final ok =
+        await LocalStorageService.deleteCurrentAccount(password: password);
+    if (!mounted) return;
+    setState(() => _saving = false);
+    if (!ok) {
+      final errorKey =
+          LocalStorageService.lastLoginError ?? 'profile_delete_account_failed';
+      _snack(AppStrings.t(context, errorKey));
+      return;
+    }
+
+    if (!mounted) return;
+    Navigator.pushNamedAndRemoveUntil(
+        context, AppRoutes.login, (route) => false);
   }
 
   String _monthKey(DateTime date) {
@@ -366,11 +518,7 @@ class _ProfilePageState extends State<ProfilePage> {
   }
 
   bool _shouldShowIncome(IncomeSource income, String monthKey) {
-    if (income.activeUntil != null &&
-        monthKey.compareTo(income.activeUntil!) > 0) {
-      return false;
-    }
-    return true;
+    return income.appliesToMonthKey(monthKey);
   }
 
   ImageProvider? _photoProvider(String? path) {
@@ -378,12 +526,40 @@ class _ProfilePageState extends State<ProfilePage> {
     if (path.startsWith('http://') || path.startsWith('https://')) {
       return NetworkImage(path);
     }
-    if (kIsWeb && _pendingPhotoBytes != null && path == _pendingPhotoPath) {
+    if (_pendingPhotoBytes != null && path == _pendingPhotoPath) {
       return MemoryImage(_pendingPhotoBytes!);
     }
     final file = File(path);
     if (!file.existsSync()) return null;
     return FileImage(file);
+  }
+
+  Future<String?> _savePhotoLocallyFallback(
+    String sourcePath,
+    Uint8List? bytes,
+  ) async {
+    try {
+      final dir = await getApplicationDocumentsDirectory();
+      final fileName = 'profile_${DateTime.now().millisecondsSinceEpoch}.jpg';
+      final localFile = File('${dir.path}/$fileName');
+
+      if (bytes != null) {
+        await localFile.writeAsBytes(bytes);
+      } else {
+        final originalFile = File(sourcePath);
+        if (!await originalFile.exists()) {
+          debugPrint(
+              'ProfilePage: Fallback photo file not found at $sourcePath');
+          return null;
+        }
+        await originalFile.copy(localFile.path);
+      }
+
+      return localFile.path;
+    } catch (e) {
+      debugPrint('ProfilePage: Error saving local photo fallback: $e');
+      return null;
+    }
   }
 
   Future<void> _addCard() async {
@@ -476,7 +652,9 @@ class _ProfilePageState extends State<ProfilePage> {
       );
     }
 
-    final photo = _photoProvider(_user!.photoPath);
+    final photo = _pendingPhotoBytes != null
+        ? MemoryImage(_pendingPhotoBytes!)
+        : _photoProvider(_user!.photoPath);
     return Scaffold(
       appBar: AppBar(
         title: Text(AppStrings.t(context, 'profile')),
@@ -552,10 +730,65 @@ class _ProfilePageState extends State<ProfilePage> {
               ),
             ),
             const SizedBox(height: 18),
+            if (_user?.isPremium == true) ...[
+              _sectionCard(
+                title: AppStrings.t(
+                  context,
+                  'profile_premium_section_title',
+                ),
+                subtitle: AppStrings.t(
+                  context,
+                  'profile_premium_section_subtitle',
+                ),
+                children: [
+                  Text(
+                    AppStrings.t(
+                      context,
+                      'profile_premium_section_body',
+                    ),
+                    style: TextStyle(
+                      color: AppTheme.textSecondary(context),
+                      height: 1.4,
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                  SizedBox(
+                    width: double.infinity,
+                    child: OutlinedButton.icon(
+                      onPressed: _billingBusy ? null : _openPaddlePortal,
+                      style: OutlinedButton.styleFrom(
+                        foregroundColor: AppTheme.textPrimary(context),
+                        side: BorderSide(color: AppTheme.textSecondary(context)),
+                        padding: const EdgeInsets.symmetric(vertical: 14),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(14),
+                        ),
+                      ),
+                      icon: _billingBusy
+                          ? const SizedBox(
+                              height: 16,
+                              width: 16,
+                              child: CircularProgressIndicator(strokeWidth: 2),
+                            )
+                          : const Icon(Icons.open_in_new_rounded),
+                      label: Text(
+                        AppStrings.t(
+                          context,
+                          'profile_premium_cancel_cta',
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 18),
+            ],
             _sectionCard(
-              title: 'Dados pessoais',
-              subtitle:
-                  'Mantenha seus dados principais atualizados para o app organizar melhor sua jornada.',
+              title: AppStrings.t(context, 'profile_personal_data_title'),
+              subtitle: AppStrings.t(
+                context,
+                'profile_personal_data_subtitle',
+              ),
               children: [
                 TextField(
                   controller: firstNameController,
@@ -579,12 +812,12 @@ class _ProfilePageState extends State<ProfilePage> {
                 ListTile(
                   contentPadding: EdgeInsets.zero,
                   title: Text(
-                    '${AppStrings.t(context, 'birth_date')} (Opcional)',
+                    AppStrings.t(context, 'birth_date'),
                     style: TextStyle(color: AppTheme.textSecondary(context)),
                   ),
                   subtitle: Text(
                     birthDate == null
-                        ? 'Nao informado'
+                        ? AppStrings.t(context, 'select')
                         : DateUtilsJetx.formatDate(
                             birthDate!,
                             locale:
@@ -592,22 +825,7 @@ class _ProfilePageState extends State<ProfilePage> {
                           ),
                     style: TextStyle(color: AppTheme.textPrimary(context)),
                   ),
-                  trailing: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      if (birthDate != null)
-                        IconButton(
-                          visualDensity: VisualDensity.compact,
-                          padding: EdgeInsets.zero,
-                          constraints: const BoxConstraints(),
-                          onPressed: () => setState(() => birthDate = null),
-                          icon: const Icon(Icons.close_rounded, size: 18),
-                          tooltip: 'Remover data',
-                        ),
-                      const SizedBox(width: 4),
-                      const Icon(Icons.calendar_month),
-                    ],
-                  ),
+                  trailing: const Icon(Icons.calendar_month),
                   onTap: _pickBirthDate,
                 ),
                 DropdownButtonFormField<String>(
@@ -637,9 +855,8 @@ class _ProfilePageState extends State<ProfilePage> {
             ),
             const SizedBox(height: 18),
             _sectionCard(
-              title: 'Renda',
-              subtitle:
-                  'Sua renda é a base para limites, previsões e recomendações do mês.',
+              title: AppStrings.t(context, 'profile_income_title'),
+              subtitle: AppStrings.t(context, 'profile_income_subtitle'),
               children: _buildIncomeSources(),
             ),
             const SizedBox(height: 18),
@@ -718,6 +935,40 @@ class _ProfilePageState extends State<ProfilePage> {
                 ),
               ],
             ),
+            const SizedBox(height: 18),
+            _sectionCard(
+              title: AppStrings.t(context, 'profile_delete_account_title'),
+              subtitle:
+                  AppStrings.t(context, 'profile_delete_account_subtitle'),
+              children: [
+                Text(
+                  AppStrings.t(context, 'profile_delete_account_body'),
+                  style: TextStyle(
+                    color: AppTheme.textSecondary(context),
+                    height: 1.4,
+                  ),
+                ),
+                const SizedBox(height: 12),
+                SizedBox(
+                  width: double.infinity,
+                  child: OutlinedButton.icon(
+                    onPressed: _saving ? null : _deleteAccount,
+                    style: OutlinedButton.styleFrom(
+                      foregroundColor: Colors.redAccent,
+                      side: const BorderSide(color: Colors.redAccent),
+                      padding: const EdgeInsets.symmetric(vertical: 14),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(14),
+                      ),
+                    ),
+                    icon: const Icon(Icons.delete_forever_outlined),
+                    label: Text(
+                      AppStrings.t(context, 'profile_delete_account_confirm'),
+                    ),
+                  ),
+                ),
+              ],
+            ),
             const SizedBox(height: 22),
             SizedBox(
               width: double.infinity,
@@ -731,30 +982,6 @@ class _ProfilePageState extends State<ProfilePage> {
                       )
                     : Text(AppStrings.t(context, 'save')),
               ),
-            ),
-            const SizedBox(height: 16),
-            TextButton(
-              onPressed: () async {
-                final confirm = await showDialog<bool>(
-                  context: context,
-                  builder: (ctx) => AlertDialog(
-                    title: const Text('Excluir minha conta'),
-                    content: const Text('Deseja excluir sua conta permanentemente?'),
-                    actions: [
-                      TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Cancelar')),
-                      ElevatedButton(
-                        style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
-                        onPressed: () => Navigator.pop(ctx, true), 
-                        child: const Text('Excluir', style: TextStyle(color: Colors.white)),
-                      ),
-                    ],
-                  ),
-                );
-                if (confirm == true) {
-                  await LocalStorageService.deleteCurrentAccount();
-                }
-              },
-              child: const Text('Excluir minha conta', style: TextStyle(color: Colors.red)),
             ),
           ],
         ),
@@ -773,16 +1000,8 @@ class _ProfilePageState extends State<ProfilePage> {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Text(
-              AppStrings.t(context, 'monthly_income'),
+              AppStrings.t(context, 'month_entries'),
               style: TextStyle(color: AppTheme.textSecondary(context)),
-            ),
-            Align(
-              alignment: Alignment.centerLeft,
-              child: TextButton.icon(
-                onPressed: () => IncomeModal.show(context),
-                icon: const Icon(Icons.add, size: 16),
-                label: Text(AppStrings.t(context, 'add_extra_income')),
-              ),
             ),
           ],
         )
@@ -790,14 +1009,8 @@ class _ProfilePageState extends State<ProfilePage> {
         Row(
           children: [
             Text(
-              AppStrings.t(context, 'monthly_income'),
+              AppStrings.t(context, 'month_entries'),
               style: TextStyle(color: AppTheme.textSecondary(context)),
-            ),
-            const Spacer(),
-            TextButton.icon(
-              onPressed: () => IncomeModal.show(context),
-              icon: const Icon(Icons.add, size: 16),
-              label: Text(AppStrings.t(context, 'add_extra_income')),
             ),
           ],
         ),
@@ -834,7 +1047,8 @@ class _ProfilePageState extends State<ProfilePage> {
                         ),
                         if (income.isPrimary)
                           Text(
-                            'Renda Principal',
+                            AppStrings.t(
+                                context, 'profile_primary_income_label'),
                             style: TextStyle(
                               color: Theme.of(context).colorScheme.primary,
                               fontSize: 10,

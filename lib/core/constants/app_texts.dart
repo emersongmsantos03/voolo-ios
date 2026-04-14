@@ -16,7 +16,7 @@ class AppTexts {
   static const String fullName = 'Nome completo';
   static const String birthDate = 'Data de nascimento';
   static const String profession = 'Profissão';
-  static const String monthlyIncome = 'Renda mensal';
+  static const String monthlyIncome = 'Entradas mensais';
   static const String acceptTerms = 'Aceito os termos de uso';
 
   // Dashboard

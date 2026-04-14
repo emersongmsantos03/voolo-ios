@@ -250,4 +250,32 @@ class LocalDatabaseService {
     }
     await _persist();
   }
+
+  static Future<void> deleteUserData(String email) async {
+    _ensureInit();
+    final normalized = email.trim().toLowerCase();
+
+    _data['users'] = (_data['users'] as List<dynamic>).where((entry) {
+      final map = entry as Map<String, dynamic>;
+      return (map['email'] as String?)?.toLowerCase() != normalized;
+    }).toList();
+
+    _data['dashboards'] = (_data['dashboards'] as List<dynamic>).where((entry) {
+      final map = entry as Map<String, dynamic>;
+      return (map['email'] as String?)?.toLowerCase() != normalized;
+    }).toList();
+
+    _data['goals'] = (_data['goals'] as List<dynamic>).where((entry) {
+      final map = entry as Map<String, dynamic>;
+      return (map['email'] as String?)?.toLowerCase() != normalized;
+    }).toList();
+
+    final settings = _data['settings'] as Map<String, dynamic>;
+    if ((settings['current_user_email'] as String?)?.toLowerCase() ==
+        normalized) {
+      settings.remove('current_user_email');
+    }
+
+    await _persist();
+  }
 }

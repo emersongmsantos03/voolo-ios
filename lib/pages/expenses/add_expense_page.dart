@@ -184,9 +184,8 @@ class _AddExpensePageState extends State<AddExpensePage> {
   Widget? _highExpenseTip() {
     final now = DateTime.now();
     final dashboard = LocalStorageService.getDashboard(now.month, now.year);
-    final income = dashboard?.salary ??
-        LocalStorageService.getUserProfile()?.monthlyIncome ??
-        0;
+    final income =
+        dashboard?.salary ?? LocalStorageService.incomeTotalForMonth(now);
     if (income <= 0) return null;
 
     final amount = parseMoneyInput(amountController.text);
@@ -444,7 +443,7 @@ class _AddExpensePageState extends State<AddExpensePage> {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  'Novo lancamento',
+                  AppStrings.t(context, 'new_entry'),
                   style: TextStyle(
                     color: AppTheme.textMuted(context),
                     fontSize: 12,
@@ -762,11 +761,11 @@ class _AddExpensePageState extends State<AddExpensePage> {
                               ),
                             )
                             .toList()
-                        : const [
+                        : [
                             DropdownMenuItem<String?>(
                               value: null,
                               child: Text(
-                                'Sem cartão cadastrado',
+                                AppStrings.t(context, 'credit_cards_empty'),
                                 overflow: TextOverflow.ellipsis,
                               ),
                             ),

@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../core/localization/app_strings.dart';
 import '../core/theme/app_theme.dart';
 import '../core/ui/responsive.dart';
+import '../widgets/web_layout_wrapper.dart';
 
 // Auth
 import '../pages/auth/login_page.dart';
@@ -91,79 +92,114 @@ class AppRoutes {
       }
     }
 
+    Widget page;
     switch (settings.name) {
       case login:
-        return MaterialPageRoute(builder: (_) => const LoginPage());
+        page = const LoginPage();
+        break;
 
       case securityLock:
-        return MaterialPageRoute(builder: (_) => const SecurityLockPage());
+        page = const SecurityLockPage();
+        break;
 
       case register:
-        return MaterialPageRoute(builder: (_) => const RegisterPage());
+        page = const RegisterPage();
+        break;
 
       case forgotPassword:
-        return MaterialPageRoute(builder: (_) => const ResetPasswordPage());
+        page = const ResetPasswordPage();
+        break;
 
       case resetPassword:
-        return MaterialPageRoute(builder: (_) => const ResetPasswordPage());
+        page = const ResetPasswordPage();
+        break;
 
       case onboarding:
-        return MaterialPageRoute(builder: (_) => const OnboardingPage());
+        page = const OnboardingPage();
+        break;
 
       case dashboard:
-        return MaterialPageRoute(builder: (_) => const DashboardPage());
+        page = const DashboardPage();
+        break;
 
       case addExpense:
-        return MaterialPageRoute(builder: (_) => const AddExpensePage());
+        page = const AddExpensePage();
+        break;
 
       case investmentCalculator:
-        return MaterialPageRoute(
-            builder: (_) => const InvestmentCalculatorPage());
+        page = const InvestmentCalculatorPage();
+        break;
 
       case investmentPlan:
-        return MaterialPageRoute(builder: (_) => const InvestmentPlanPage());
+        page = const InvestmentPlanPage();
+        break;
 
       case calculator:
-        return MaterialPageRoute(
-            builder: (_) => const InvestmentCalculatorPage());
+        page = const InvestmentCalculatorPage();
+        break;
 
       case goals:
-        return MaterialPageRoute(builder: (_) => const GoalsPage());
+        page = const GoalsPage();
+        break;
 
       case monthlyReport:
-        return MaterialPageRoute(builder: (_) => const MonthlyReportPage());
+        page = const MonthlyReportPage();
+        break;
 
       case missions:
-        return MaterialPageRoute(builder: (_) => const MissionsPage());
+        page = const MissionsPage();
+        break;
 
       case transactions:
-        return MaterialPageRoute(builder: (_) => const TransactionsPage());
+        page = const TransactionsPage();
+        break;
 
       case insights:
-        return MaterialPageRoute(builder: (_) => const InsightsPage());
+        page = const InsightsPage();
+        break;
 
       case profile:
-        return MaterialPageRoute(builder: (_) => const ProfilePage());
+        page = const ProfilePage();
+        break;
 
       case budgets:
-        return MaterialPageRoute(builder: (_) => const BudgetsPage());
+        page = const BudgetsPage();
+        break;
 
       case debts:
-        return MaterialPageRoute(builder: (_) => const DebtsPage());
+        page = const DebtsPage();
+        break;
 
       case premium:
         final args = settings.arguments;
         final initialPlan = args is Map<String, dynamic>
             ? args['plan']?.toString()
             : (args is Map ? args['plan']?.toString() : null);
-        return MaterialPageRoute(
-          builder: (_) => PremiumPage(initialPlan: initialPlan),
-        );
+        page = PremiumPage(initialPlan: initialPlan);
+        break;
 
       default:
-        return MaterialPageRoute(
-          builder: (_) => _UnknownRoutePage(routeName: settings.name),
-        );
+        page = _UnknownRoutePage(routeName: settings.name);
+        break;
+    }
+
+    // Determine if it's an auth/unauthenticated screen
+    final isAuthScreen = [
+      login,
+      register,
+      forgotPassword,
+      resetPassword,
+      onboarding,
+      securityLock
+    ].contains(settings.name);
+
+    if (isAuthScreen) {
+      return MaterialPageRoute(builder: (_) => page, settings: settings);
+    } else {
+      return MaterialPageRoute(
+        builder: (_) => WebLayoutWrapper(routeName: settings.name, child: page),
+        settings: settings,
+      );
     }
   }
 }

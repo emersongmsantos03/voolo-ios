@@ -13,16 +13,13 @@ import 'core/utils/date_utils.dart';
 import 'routes/app_routes.dart';
 import 'services/local_database_service.dart';
 import 'services/local_storage_service.dart';
+import 'services/security_lock_service.dart';
 import 'state/locale_state.dart';
 import 'state/privacy_state.dart';
 import 'state/theme_state.dart';
 import 'widgets/offline_banner.dart';
 
 final GlobalKey<NavigatorState> _navKey = GlobalKey<NavigatorState>();
-const bool _previewForceLogin = bool.fromEnvironment('PREVIEW_FORCE_LOGIN');
-const bool _screenshotMode = bool.fromEnvironment('SCREENSHOT_MODE');
-const bool _appStoreReviewMode = bool.fromEnvironment('APP_STORE_REVIEW_MODE');
-const bool _previewLocalMode = _previewForceLogin || _screenshotMode;
 
 Future<void> main() async {
   await runZonedGuarded(() async {
@@ -45,7 +42,7 @@ Future<void> main() async {
 
     final bootstrap = await _bootstrapApp();
 
-    if (bootstrap.cloudEnabled) {
+    if (bootstrap.firebaseReady) {
       FirebaseAuth.instance.authStateChanges().listen((authUser) {
         if (authUser != null) return;
         final navigator = _navKey.currentState;
@@ -54,25 +51,11 @@ Future<void> main() async {
       });
     }
 
-    runApp(
-      MultiProvider(
-        providers: [
-          ChangeNotifierProvider(create: (_) => ThemeState()),
-          ChangeNotifierProvider(create: (_) => LocaleState()),
-          ChangeNotifierProvider(create: (_) => PrivacyState()),
-        ],
-        child: JetxApp(initialRoute: bootstrap.initialRoute),
-      ),
-    );
+    _launchApp(bootstrap.initialRoute);
   }, (error, stack) {
     debugPrint('Bootstrap error: $error');
     debugPrintStack(stackTrace: stack);
-    runApp(
-      const _FatalApp(
-        title: 'Nao foi possivel abrir o app',
-        message: 'O Voolo encontrou um erro ao iniciar.',
-      ),
-    );
+    _launchApp(AppRoutes.login);
   });
 }
 
@@ -85,34 +68,56 @@ Future<_BootstrapResult> _bootstrapApp() async {
     debugPrint('Firebase bootstrap unavailable, starting in local mode: $e');
   }
 
-  LocalStorageService.configureCloud(
-    enabled: firebaseReady && !_previewLocalMode,
-  );
-  await DateUtilsJetx.init();
-  await LocalDatabaseService.init();
-  await LocalStorageService.forceLogoutOnStartup();
-  await LocalStorageService.init().timeout(
-    const Duration(seconds: 3),
-    onTimeout: () => null,
-  );
+  try {
+    LocalStorageService.configureCloud(enabled: firebaseReady);
+    await DateUtilsJetx.init();
+    await LocalDatabaseService.init();
+    await LocalStorageService.init().timeout(
+      const Duration(seconds: 3),
+      onTimeout: () => null,
+    );
 
-  if (_appStoreReviewMode) {
-    await _seedAppStoreReviewAccount();
+    if (LocalStorageService.currentUserId != null) {
+      await LocalStorageService.waitForSync(timeoutSeconds: 2);
+    }
+
+    final user = LocalStorageService.getUserProfile();
+    final needsSetup = user != null &&
+        (!user.setupCompleted ||
+            user.profession.trim().isEmpty ||
+            user.objectives.isEmpty);
+    final initialRoute = user == null
+        ? AppRoutes.login
+        : (await SecurityLockService.requiresUnlockForCurrentUser()
+            ? AppRoutes.securityLock
+            : (needsSetup ? AppRoutes.onboarding : AppRoutes.dashboard));
+
+    return _BootstrapResult(
+      firebaseReady: firebaseReady,
+      initialRoute: initialRoute,
+    );
+  } catch (e, stack) {
+    debugPrint('Bootstrap fallback to login after error: $e');
+    debugPrintStack(stackTrace: stack);
+    LocalStorageService.configureCloud(enabled: false);
+    return const _BootstrapResult(
+      firebaseReady: false,
+      initialRoute: AppRoutes.login,
+    );
   }
-
-  if (LocalStorageService.currentUserId != null) {
-    await LocalStorageService.waitForSync(timeoutSeconds: 2);
-  }
-
-  return _BootstrapResult(
-    firebaseReady: firebaseReady,
-    cloudEnabled: firebaseReady && !_previewLocalMode,
-    initialRoute: AppRoutes.login,
-  );
 }
 
-Future<void> _seedAppStoreReviewAccount() async {
-  await LocalStorageService.seedReviewAccount();
+void _launchApp(String initialRoute) {
+  runApp(
+    MultiProvider(
+      providers: [
+        ChangeNotifierProvider(create: (_) => ThemeState()),
+        ChangeNotifierProvider(create: (_) => LocaleState()),
+        ChangeNotifierProvider(create: (_) => PrivacyState()),
+      ],
+      child: JetxApp(initialRoute: initialRoute),
+    ),
+  );
 }
 
 class JetxApp extends StatelessWidget {
@@ -149,35 +154,12 @@ class JetxApp extends StatelessWidget {
 
 class _BootstrapResult {
   final bool firebaseReady;
-  final bool cloudEnabled;
   final String initialRoute;
 
   const _BootstrapResult({
     required this.firebaseReady,
-    required this.cloudEnabled,
     required this.initialRoute,
   });
-}
-
-class _FatalApp extends StatelessWidget {
-  final String title;
-  final String message;
-
-  const _FatalApp({
-    required this.title,
-    required this.message,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return MaterialApp(
-      title: 'Voolo',
-      debugShowCheckedModeBanner: false,
-      theme: AppTheme.lightTheme,
-      darkTheme: AppTheme.darkTheme,
-      home: _FatalErrorScaffold(title: title, message: message),
-    );
-  }
 }
 
 class _FatalErrorScaffold extends StatelessWidget {

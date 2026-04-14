@@ -231,12 +231,10 @@ class _BudgetsPageState extends State<BudgetsPage> {
       if (mounted) setState(() => _suggesting = false);
     }
     if (suggestions.isEmpty) {
-      final user = LocalStorageService.getUserProfile();
-      final incomes = LocalStorageService.getIncomes();
-      final totalIncome = incomes.fold<double>(
-          0, (sum, i) => sum + (i.isActive == false ? 0 : i.amount));
-      suggestions = _localSuggestions(
-          totalIncome > 0 ? totalIncome : (user?.monthlyIncome ?? 0));
+      final totalIncome = LocalStorageService.incomeTotalForMonth(
+        DateTime(_month.year, _month.month, 1),
+      );
+      suggestions = _localSuggestions(totalIncome > 0 ? totalIncome : 0);
     }
     if (!mounted) return;
     await showDialog<void>(

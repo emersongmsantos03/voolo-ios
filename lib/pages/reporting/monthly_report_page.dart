@@ -149,15 +149,14 @@ class _MonthlyReportPageState extends State<MonthlyReportPage> {
     showDialog<void>(
       context: context,
       builder: (context) => AlertDialog(
-        title: const Text('Total investido'),
-        content: const Text(
-          'Este valor soma apenas o que foi investido ao longo dos meses. '
-          'Os rendimentos nao aparecem aqui.',
+        title: Text(AppStrings.t(context, 'monthly_report_total_invested')),
+        content: Text(
+          AppStrings.t(context, 'monthly_report_total_invested_info'),
         ),
         actions: [
           TextButton(
             onPressed: () => Navigator.of(context).pop(),
-            child: const Text('Entendi'),
+            child: Text(AppStrings.t(context, 'ok')),
           ),
         ],
       ),
@@ -246,15 +245,11 @@ class _MonthlyReportPageState extends State<MonthlyReportPage> {
     final salaryFallback = LocalStorageService.incomeTotalForMonth(
       _currentMonth,
     );
-    final profileIncome =
-        LocalStorageService.getUserProfile()?.monthlyIncome ?? 0;
-    final resolvedFallback =
-        salaryFallback > 0 ? salaryFallback : profileIncome;
-    if (base == null && resolvedFallback <= 0 && _currentExpenses.isEmpty)
+    if (base == null && salaryFallback <= 0 && _currentExpenses.isEmpty)
       return null;
 
     final baseSalary = base?.salary ?? 0;
-    final salary = baseSalary > 0 ? baseSalary : resolvedFallback;
+    final salary = baseSalary > 0 ? baseSalary : salaryFallback;
     return MonthlyDashboard(
       month: _currentMonth.month,
       year: _currentMonth.year,
@@ -435,7 +430,7 @@ class _MonthlyReportPageState extends State<MonthlyReportPage> {
       context: context,
       builder: (_) => AlertDialog(
         backgroundColor: Theme.of(context).colorScheme.surface,
-        title: Text('Ajustar saldo do mês'),
+        title: Text(AppStrings.t(context, 'monthly_report_adjust_balance')),
         content: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
@@ -640,7 +635,8 @@ class _MonthlyReportPageState extends State<MonthlyReportPage> {
                   if (!isInvestment) ...[
                     SwitchListTile(
                       contentPadding: EdgeInsets.zero,
-                      title: const Text('Cartão de crédito'),
+                      title: Text(
+                          AppStrings.t(context, 'monthly_report_card_credit')),
                       value: isCard,
                       activeColor: Theme.of(context).colorScheme.primary,
                       activeTrackColor: Theme.of(
@@ -729,15 +725,17 @@ class _MonthlyReportPageState extends State<MonthlyReportPage> {
                     DropdownButtonFormField<String?>(
                       isExpanded: true,
                       value: cards.isEmpty ? null : creditCardId,
-                      decoration: const InputDecoration(
-                        labelText: 'Cartão de crédito',
+                      decoration: InputDecoration(
+                        labelText:
+                            AppStrings.t(context, 'monthly_report_card_credit'),
                       ),
                       items: cards.isEmpty
-                          ? const [
+                          ? [
                               DropdownMenuItem<String?>(
                                 value: null,
                                 child: Text(
-                                  'Sem cartão cadastrado',
+                                  AppStrings.t(
+                                      context, 'monthly_report_no_card'),
                                   overflow: TextOverflow.ellipsis,
                                 ),
                               ),
@@ -768,7 +766,9 @@ class _MonthlyReportPageState extends State<MonthlyReportPage> {
                     ),
                     const SizedBox(height: 6),
                     Text(
-                      'Vencimento do cartão: dia ${cardDueDay ?? '-'}',
+                      AppStrings.tr(context, 'monthly_report_card_due_day', {
+                        'day': '${cardDueDay ?? '-'}',
+                      }),
                       style: TextStyle(
                         color: AppTheme.textSecondary(context),
                         fontSize: 12,
@@ -780,13 +780,16 @@ class _MonthlyReportPageState extends State<MonthlyReportPage> {
                     DropdownButtonFormField<int?>(
                       isExpanded: true,
                       initialValue: billDueDay,
-                      decoration: const InputDecoration(
-                        labelText: 'Dia de vencimento (opcional)',
+                      decoration: InputDecoration(
+                        labelText: AppStrings.t(
+                          context,
+                          'monthly_report_due_day_optional',
+                        ),
                       ),
                       items: [
-                        const DropdownMenuItem<int?>(
+                        DropdownMenuItem<int?>(
                           value: null,
-                          child: Text('Sem vencimento'),
+                          child: Text(AppStrings.t(context, 'no_due_date')),
                         ),
                         ...List.generate(
                           31,
@@ -895,11 +898,13 @@ class _MonthlyReportPageState extends State<MonthlyReportPage> {
           actions: [
             TextButton(
               onPressed: () => Navigator.pop(context, 'month'),
-              child: const Text('Somente este mês'),
+              child: Text(
+                  AppStrings.t(context, 'profile_income_delete_scope_month')),
             ),
             ElevatedButton(
               onPressed: () => Navigator.pop(context, 'all'),
-              child: const Text('Meses seguintes'),
+              child: Text(
+                  AppStrings.t(context, 'profile_income_delete_scope_future')),
             ),
           ],
         ),
@@ -994,6 +999,7 @@ class _MonthlyReportPageState extends State<MonthlyReportPage> {
       _investmentExpenses.fold(0, (a, b) => a + b.amount);
   double get _total => _fixedTotal + _variableTotal + _investmentTotal;
   double get _remaining => (_currentView()?.salary ?? 0) - _total;
+  double get _accumulated => _currentView()?.totalBalance ?? _remaining;
 
   Widget _filtersCard() {
     String statusLabel(_PaidFilter f) {
@@ -1712,15 +1718,11 @@ class _MonthlyReportPageState extends State<MonthlyReportPage> {
     final prev = DateTime(_currentMonth.year, _currentMonth.month - 1, 1);
     final base = LocalStorageService.getDashboard(prev.month, prev.year);
     final salaryFallback = LocalStorageService.incomeTotalForMonth(prev);
-    final profileIncome =
-        LocalStorageService.getUserProfile()?.monthlyIncome ?? 0;
-    final resolvedFallback =
-        salaryFallback > 0 ? salaryFallback : profileIncome;
-    if (base == null && resolvedFallback <= 0 && _prevExpenses.isEmpty)
+    if (base == null && salaryFallback <= 0 && _prevExpenses.isEmpty)
       return null;
 
     final baseSalary = base?.salary ?? 0;
-    final salary = baseSalary > 0 ? baseSalary : resolvedFallback;
+    final salary = baseSalary > 0 ? baseSalary : salaryFallback;
     return MonthlyDashboard(
       month: prev.month,
       year: prev.year,
@@ -2058,7 +2060,7 @@ class _MonthlyReportPageState extends State<MonthlyReportPage> {
       return Scaffold(
         body: Center(
           child: Text(
-            'Faça login para acessar relatórios.',
+            AppStrings.t(context, 'monthly_report_login_required'),
             style: TextStyle(color: AppTheme.textSecondary(context)),
           ),
         ),
@@ -2067,15 +2069,15 @@ class _MonthlyReportPageState extends State<MonthlyReportPage> {
 
     if (!user.isPremium) {
       return Scaffold(
-        appBar: AppBar(title: Text('Relatório mensal')),
-        body: const PremiumGate(
-          title: 'Relatórios inteligentes são Premium',
-          subtitle:
-              'Veja linha do tempo, evolução mensal e insights detalhados.',
+        appBar:
+            AppBar(title: Text(AppStrings.t(context, 'monthly_report_title'))),
+        body: PremiumGate(
+          title: AppStrings.t(context, 'monthly_report_premium_title'),
+          subtitle: AppStrings.t(context, 'monthly_report_premium_subtitle'),
           perks: [
-            'Linha do tempo do seu dinheiro',
-            'Score da saúde financeira',
-            'Insights personalizados do mês',
+            AppStrings.t(context, 'monthly_report_premium_perk1'),
+            AppStrings.t(context, 'monthly_report_premium_perk2'),
+            AppStrings.t(context, 'monthly_report_premium_perk3'),
           ],
         ),
       );
@@ -2088,13 +2090,13 @@ class _MonthlyReportPageState extends State<MonthlyReportPage> {
 
     return Scaffold(
       appBar: AppBar(
-        title: Text('Relatório mensal'),
+        title: Text(AppStrings.t(context, 'monthly_report_title')),
         actions: [
           const MoneyVisibilityButton(),
           IconButton(
             onPressed: _openInsights,
             icon: const Icon(Icons.auto_awesome_outlined),
-            tooltip: 'Insights',
+            tooltip: AppStrings.t(context, 'insights_title'),
           ),
           IconButton(
             onPressed: _isWithinWindow(
@@ -2103,7 +2105,7 @@ class _MonthlyReportPageState extends State<MonthlyReportPage> {
                 ? () => _changeMonth(-1)
                 : null,
             icon: const Icon(Icons.chevron_left),
-            tooltip: 'Mês anterior',
+            tooltip: AppStrings.t(context, 'previous_month'),
           ),
           Center(
             child: Text(
@@ -2121,7 +2123,7 @@ class _MonthlyReportPageState extends State<MonthlyReportPage> {
                 ? () => _changeMonth(1)
                 : null,
             icon: const Icon(Icons.chevron_right),
-            tooltip: 'Próximo mês',
+            tooltip: AppStrings.t(context, 'next_month'),
           ),
         ],
       ),
@@ -2133,7 +2135,7 @@ class _MonthlyReportPageState extends State<MonthlyReportPage> {
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
                     Text(
-                      'Nenhum dado encontrado para este mês.',
+                      AppStrings.t(context, 'monthly_report_empty'),
                       style: TextStyle(color: AppTheme.textMuted(context)),
                       textAlign: TextAlign.center,
                     ),
@@ -2157,7 +2159,7 @@ class _MonthlyReportPageState extends State<MonthlyReportPage> {
                 child: ListView(
                   children: [
                     Text(
-                      'Gastos do mês',
+                      AppStrings.t(context, 'monthly_report_month_spending'),
                       style: const TextStyle(
                         color: Colors.amber,
                         fontSize: 18,
@@ -2171,7 +2173,8 @@ class _MonthlyReportPageState extends State<MonthlyReportPage> {
                         children: [
                           Expanded(
                             child: _summaryCard(
-                              title: 'Fixos',
+                              title:
+                                  AppStrings.t(context, 'expense_type_fixed'),
                               value: SensitiveDisplay.money(
                                 context,
                                 _fixedTotal,
@@ -2182,7 +2185,8 @@ class _MonthlyReportPageState extends State<MonthlyReportPage> {
                           const SizedBox(width: 10),
                           Expanded(
                             child: _summaryCard(
-                              title: 'Variáveis',
+                              title: AppStrings.t(
+                                  context, 'expense_type_variable'),
                               value: SensitiveDisplay.money(
                                 context,
                                 _variableTotal,
@@ -2195,21 +2199,23 @@ class _MonthlyReportPageState extends State<MonthlyReportPage> {
                     ),
                     const SizedBox(height: 10),
                     _summaryCard(
-                      title: 'Total de gastos',
+                      title:
+                          AppStrings.t(context, 'monthly_report_total_spent'),
                       value: SensitiveDisplay.money(context, _total),
                       color: Colors.white,
                     ),
                     const SizedBox(height: 10),
                     _summaryCard(
-                      title: 'Investimentos',
+                      title: AppStrings.t(context, 'expense_type_investment'),
                       value: SensitiveDisplay.money(context, _investmentTotal),
                       color: AppColors.investment,
                     ),
                     const SizedBox(height: 10),
                     _summaryCard(
-                      title: 'Total investido',
+                      title: AppStrings.t(
+                          context, 'monthly_report_total_invested'),
                       value: _lifetimeInvestedLoading
-                          ? 'Carregando...'
+                          ? AppStrings.t(context, 'monthly_report_loading')
                           : SensitiveDisplay.money(
                               context,
                               _lifetimeInvestedTotal,
@@ -2219,15 +2225,21 @@ class _MonthlyReportPageState extends State<MonthlyReportPage> {
                     ),
                     const SizedBox(height: 10),
                     _summaryCard(
-                      title: 'Saldo do mês',
+                      title: AppStrings.t(context, 'monthly_report_balance'),
                       value: SensitiveDisplay.money(context, _remaining),
+                      color: Colors.white,
+                    ),
+                    const SizedBox(height: 10),
+                    _summaryCard(
+                      title: 'Saldo acumulado',
+                      value: SensitiveDisplay.money(context, _accumulated),
                       color: Colors.white,
                     ),
                     const SizedBox(height: 12),
                     _filtersCard(),
                     const SizedBox(height: 10),
                     Text(
-                      'Lançamentos (filtros)',
+                      AppStrings.t(context, 'monthly_report_entries_filters'),
                       style: TextStyle(
                         color: AppTheme.textPrimary(context),
                         fontWeight: FontWeight.w600,
@@ -2235,19 +2247,19 @@ class _MonthlyReportPageState extends State<MonthlyReportPage> {
                     ),
                     const SizedBox(height: 10),
                     _section(
-                      title: 'Gastos fixos',
+                      title: AppStrings.t(context, 'expense_type_fixed'),
                       color: AppColors.fixedExpense,
                       items: _filteredFixedExpenses,
                     ),
                     const SizedBox(height: 14),
                     _section(
-                      title: 'Gastos variáveis',
+                      title: AppStrings.t(context, 'expense_type_variable'),
                       color: AppColors.variableExpense,
                       items: _filteredVariableExpenses,
                     ),
                     const SizedBox(height: 14),
                     _section(
-                      title: 'Investimentos',
+                      title: AppStrings.t(context, 'expense_type_investment'),
                       color: AppColors.investment,
                       items: _filteredInvestmentExpenses,
                     ),
@@ -2261,14 +2273,17 @@ class _MonthlyReportPageState extends State<MonthlyReportPage> {
                       child: OutlinedButton.icon(
                         onPressed: _adjustMonthlyIncome,
                         icon: const Icon(Icons.tune),
-                        label: Text('Ajustar saldo do mês'),
+                        label: Text(
+                          AppStrings.t(
+                              context, 'monthly_report_adjust_balance'),
+                        ),
                       ),
                     ),
                     const SizedBox(height: 18),
                     _barChart(),
                     const SizedBox(height: 18),
                     Text(
-                      'Linha do tempo',
+                      AppStrings.t(context, 'monthly_report_timeline'),
                       style: TextStyle(
                         color: AppTheme.textPrimary(context),
                         fontWeight: FontWeight.w600,

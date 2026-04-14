@@ -33,7 +33,7 @@ class BackendConfigService {
     if (_apiBaseFromEnv.trim().isNotEmpty) {
       return _apiBaseFromEnv.trim();
     }
-    // Dedicated billing function URL (isolated from generic /api routes).
-    return 'https://us-central1-voolo-ad416.cloudfunctions.net/billingApiUs';
+    // Paddle billing endpoints are served by the web backend.
+    return 'https://www.voolo.com.br/api';
   }
 }

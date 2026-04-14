@@ -24,6 +24,7 @@ class _RegisterPageState extends State<RegisterPage> {
   final passwordController = TextEditingController();
   final confirmPasswordController = TextEditingController();
 
+  DateTime? birthDate;
   String gender = GenderCatalog.notInformed;
   static const List<String> _genderOptions = GenderCatalog.codes;
 
@@ -41,6 +42,19 @@ class _RegisterPageState extends State<RegisterPage> {
     passwordController.dispose();
     confirmPasswordController.dispose();
     super.dispose();
+  }
+
+  Future<void> _pickBirthDate() async {
+    final date = await showDatePicker(
+      context: context,
+      initialDate: DateTime(2000, 1, 1),
+      firstDate: DateTime(1900, 1, 1),
+      lastDate: DateTime.now(),
+    );
+
+    if (date != null) {
+      setState(() => birthDate = date);
+    }
   }
 
   void _snack(String msg) {
@@ -68,6 +82,10 @@ class _RegisterPageState extends State<RegisterPage> {
     }
     if (!_isValidEmail(email)) {
       _snack('Digite um e-mail no formato nome@dominio.com');
+      return false;
+    }
+    if (birthDate == null) {
+      _snack('Escolha sua data de nascimento para continuar.');
       return false;
     }
     return true;
@@ -116,16 +134,12 @@ class _RegisterPageState extends State<RegisterPage> {
         children: [
           Icon(icon, size: 14, color: scheme.primary),
           const SizedBox(width: 8),
-          Flexible(
-            child: Text(
-              label,
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-              style: TextStyle(
-                color: AppTheme.textSecondary(context),
-                fontSize: 12,
-                fontWeight: FontWeight.w700,
-              ),
+          Text(
+            label,
+            style: TextStyle(
+              color: AppTheme.textSecondary(context),
+              fontSize: 12,
+              fontWeight: FontWeight.w700,
             ),
           ),
         ],
@@ -142,7 +156,7 @@ class _RegisterPageState extends State<RegisterPage> {
       lastName: lastNameController.text.trim(),
       email: emailController.text.trim(),
       password: passwordController.text,
-      birthDate: null,
+      birthDate: birthDate!,
       profession: '',
       monthlyIncome: 0,
       gender: gender,
@@ -196,6 +210,9 @@ class _RegisterPageState extends State<RegisterPage> {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final scheme = theme.colorScheme;
+    final birthText = birthDate == null
+        ? 'Selecionar'
+        : '${birthDate!.day.toString().padLeft(2, '0')}/${birthDate!.month.toString().padLeft(2, '0')}/${birthDate!.year}';
     final stepTitle = _step == 0
         ? 'Crie sua conta para organizar o mes com mais clareza.'
         : 'Proteja sua conta e finalize a entrada no Voolo.';
@@ -348,6 +365,52 @@ class _RegisterPageState extends State<RegisterPage> {
                                 textInputAction: TextInputAction.next,
                                 decoration: const InputDecoration(
                                   hintText: 'nome@dominio.com',
+                                ),
+                              ),
+                            ),
+                            const SizedBox(height: 14),
+                            _LabeledField(
+                              label: AppStrings.t(context, 'birth_date'),
+                              child: InkWell(
+                                borderRadius: BorderRadius.circular(24),
+                                onTap: _pickBirthDate,
+                                child: Container(
+                                  padding: const EdgeInsets.symmetric(
+                                    horizontal: 18,
+                                    vertical: 18,
+                                  ),
+                                  decoration: BoxDecoration(
+                                    color: scheme.surfaceContainerLow,
+                                    borderRadius: BorderRadius.circular(24),
+                                    border: Border.all(
+                                      color: scheme.outline.withValues(
+                                        alpha: 0.14,
+                                      ),
+                                    ),
+                                  ),
+                                  child: Row(
+                                    children: [
+                                      Icon(
+                                        Icons.calendar_month_outlined,
+                                        color: scheme.primary,
+                                      ),
+                                      const SizedBox(width: 12),
+                                      Expanded(
+                                        child: Text(
+                                          birthText,
+                                          style: TextStyle(
+                                            color:
+                                                AppTheme.textPrimary(context),
+                                            fontWeight: FontWeight.w600,
+                                          ),
+                                        ),
+                                      ),
+                                      Icon(
+                                        Icons.chevron_right_rounded,
+                                        color: scheme.onSurfaceVariant,
+                                      ),
+                                    ],
+                                  ),
                                 ),
                               ),
                             ),

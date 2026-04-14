@@ -43,7 +43,7 @@ class FinanceScoreUtils {
       return HealthScoreResult(
         score: 0,
         status: 'critical',
-        tip: 'Register your income to calculate your financial health.',
+        tip: 'Cadastre sua renda para calcular sua saude financeira.',
         needsIncome: true,
         tipKey: 'score_tip_add_income',
       );
@@ -74,7 +74,7 @@ class FinanceScoreUtils {
         score: score,
         status: 'critical',
         tip:
-            'Your spending exceeded your income (${pct(overspendRate)} over). Cut variable expenses first and renegotiate fixed costs.',
+            'Seus gastos passaram da renda (${pct(overspendRate)} acima). Corte primeiro as despesas variaveis e renegocie os custos fixos.',
         needsIncome: false,
         tipKey: 'score_tip_overspending',
         tipArgs: {'pct': pct(overspendRate)},
@@ -120,44 +120,45 @@ class FinanceScoreUtils {
     }
 
     // Tip priority: most actionable first
-    var tip = 'Good balance. Keep consistency and review your budget monthly.';
+    var tip =
+        'Bom equilibrio. Mantenha a consistencia e revise seu orcamento todo mes.';
     var tipKey = 'score_tip_balanced';
     var tipArgs = <String, String>{};
 
     if (leftoverRate < targets.bufferMin) {
       tip =
-          'Your budget is tight. Try to keep at least ${pct(targets.bufferMin)} as monthly buffer.';
+          'Seu orcamento esta apertado. Tente manter pelo menos ${pct(targets.bufferMin)} de folga mensal.';
       tipKey = 'score_tip_budget_tight';
       tipArgs = {'pct': pct(targets.bufferMin)};
     } else if (housingRatio > targets.housingMax) {
       tip =
-          'Housing is high. Try to keep it up to ${pct(targets.housingMax)} of your income (rent/mortgage/condo).';
+          'Moradia esta alta. Tente manter ate ${pct(targets.housingMax)} da renda (aluguel, financiamento, condominio).';
       tipKey = 'score_tip_housing_high';
       tipArgs = {'pct': pct(targets.housingMax)};
     } else if (variableRatio > targets.variableMax) {
       tip =
-          'Variable expenses are high. Set a cap up to ${pct(targets.variableMax)} of income this month.';
+          'Despesas variaveis estao altas. Defina um teto de ate ${pct(targets.variableMax)} da renda neste mes.';
       tipKey = 'score_tip_variable_high';
       tipArgs = {'pct': pct(targets.variableMax)};
     } else if (fixedRatio > targets.fixedMax) {
       tip =
-          'Fixed costs are high. Try reducing to up to ${pct(targets.fixedMax)} of income through cuts and renegotiation.';
+          'Custos fixos estao altos. Tente reduzir para ate ${pct(targets.fixedMax)} da renda com cortes e renegociacao.';
       tipKey = 'score_tip_fixed_high';
       tipArgs = {'pct': pct(targets.fixedMax)};
     } else if (investRatio == 0) {
       tip =
-          'You are balanced, but investing adds more resilience (target: ${pct(targets.investMin)} of income).';
+          'Voce esta equilibrado, mas investir aumenta a resiliencia (meta: ${pct(targets.investMin)} da renda).';
       tipKey = 'score_tip_invest_zero';
       tipArgs = {'pct': pct(targets.investMin)};
     } else if (investRatio < targets.investMin) {
       tip =
-          'Increase your investments to around ${pct(targets.investMin)} of income to strengthen your score.';
+          'Aumente os investimentos para cerca de ${pct(targets.investMin)} da renda para fortalecer seu score.';
       tipKey = 'score_tip_invest_low';
       tipArgs = {'pct': pct(targets.investMin)};
     }
 
     final finalTip = hasOpenDebts
-        ? '$tip\n\nOpen debts reduce your score by 20% until paid off.'
+        ? '$tip\n\nDívidas em aberto reduzem seu score em 20% até serem pagas.'
         : tip;
 
     return HealthScoreResult(

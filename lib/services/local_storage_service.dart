@@ -1,14 +1,10 @@
 import 'dart:async';
-import 'dart:convert';
-import 'dart:math';
 
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_core/firebase_core.dart';
-import 'package:crypto/crypto.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
 import 'package:google_sign_in/google_sign_in.dart';
-import 'package:sign_in_with_apple/sign_in_with_apple.dart';
 
 import '../models/goal.dart';
 import '../models/income_source.dart';
@@ -17,21 +13,22 @@ import '../models/user_profile.dart';
 import '../models/expense.dart';
 import '../models/fixed_series.dart';
 import '../models/v2/enums.dart';
+import '../utils/income_category_utils.dart';
 import '../core/plans/user_plan.dart';
 import 'habits_service.dart';
 import 'local_database_service.dart';
 import 'firestore_service.dart';
 import 'notification_service.dart';
+import 'storage_service.dart';
 
 class LocalStorageService {
   LocalStorageService._();
 
   static const String _kCurrentUserEmail = 'current_user_email';
-  static const String _reviewAccountEmail = 'teste5@voolo.com.br';
-  static const String _reviewAccountPassword = 'Jana5897@';
+  static const String _kSeedDemoEmail = 'emerson@jetx.com';
 
   /// Web client ID (OAuth 2.0) from Google Cloud / Firebase project.
-  /// Used to request an ID token when needed on mobile platforms.
+  /// Used on Android to request an ID token when needed.
   ///
   /// Provide via: `--dart-define=GOOGLE_WEB_CLIENT_ID=...`
   static const String _googleServerClientId =
@@ -78,26 +75,6 @@ class LocalStorageService {
     );
   }
 
-  static bool get _supportsAppleSignIn =>
-      !kIsWeb &&
-      (defaultTargetPlatform == TargetPlatform.iOS ||
-          defaultTargetPlatform == TargetPlatform.macOS);
-
-  static String _generateNonce([int length = 32]) {
-    const charset =
-        '0123456789ABCDEFGHIJKLMNOPQRSTUVXYZabcdefghijklmnopqrstuvwxyz-._';
-    final random = Random.secure();
-    return List.generate(
-      length,
-      (_) => charset[random.nextInt(charset.length)],
-    ).join();
-  }
-
-  static String _sha256ofString(String input) {
-    final bytes = utf8.encode(input);
-    return sha256.convert(bytes).toString();
-  }
-
   static Future<void> init() async {
     if (_initialized) return;
     syncNotifier.value = !_cloudEnabled;
@@ -109,9 +86,9 @@ class LocalStorageService {
       _currentUserId = authUser.uid;
       _loggedOut = false;
     } else {
+      _currentUserEmail = await _restoreLocalCurrentUserEmail();
       _currentUserId = null;
-      _currentUserEmail = null;
-      _loggedOut = true;
+      _loggedOut = _currentUserEmail == null;
     }
     userNotifier.value = getUserProfile();
 
@@ -231,32 +208,26 @@ class LocalStorageService {
     }
   }
 
+  static Future<String?> _restoreLocalCurrentUserEmail() async {
+    final saved = (await LocalDatabaseService.getSetting(_kCurrentUserEmail))
+        ?.trim()
+        .toLowerCase();
+    if (saved != null && saved.isNotEmpty && _findLocalUser(saved) != null) {
+      // Never auto-open the built-in demo account on a fresh install.
+      if (saved == _kSeedDemoEmail && _auth?.currentUser == null) {
+        await _persistCurrentUserEmail(null);
+        return null;
+      }
+      return saved;
+    }
+    return null;
+  }
+
   static Future<void> _persistCurrentUserEmail(String? email) async {
     await LocalDatabaseService.setSetting(
       _kCurrentUserEmail,
       email?.trim().toLowerCase(),
     );
-  }
-
-  static Future<void> forceLogoutOnStartup() async {
-    _currentUserEmail = null;
-    _currentUserId = null;
-    _loggedOut = true;
-    userNotifier.value = null;
-    dashboardNotifier.value++;
-    goalNotifier.value++;
-    incomeNotifier.value++;
-    _dashboards.clear();
-    _goals.clear();
-    _incomes.clear();
-    _stopUserListener();
-    try {
-      await _googleSignInClient().signOut();
-    } catch (_) {}
-    try {
-      await _auth?.signOut();
-    } catch (_) {}
-    await _persistCurrentUserEmail(null);
   }
 
   static Future<void> _loadLocalUserData() async {
@@ -277,34 +248,20 @@ class LocalStorageService {
     goalNotifier.value++;
   }
 
+  static String _essentialGuideKey() {
+    final userKey = _localUserKey() ?? 'anonymous';
+    return 'dashboard_essential_guide_seen_$userKey';
+  }
+
   static Future<bool> hasSeenDashboardEssentialGuide() async {
     await _ensureInit();
-    final user = getUserProfile();
-    if (user != null) {
-      return user.dashboardEssentialGuideSeen;
-    }
-    final userKey = _localUserKey();
-    if (userKey == null || userKey.isEmpty) return false;
-    final value = await LocalDatabaseService.getSetting(
-      'dashboard_essential_guide_seen_$userKey',
-    );
+    final value = await LocalDatabaseService.getSetting(_essentialGuideKey());
     return value == '1';
   }
 
   static Future<void> markDashboardEssentialGuideSeen() async {
     await _ensureInit();
-    final user = getUserProfile();
-    if (user != null) {
-      final updated = user.copyWith(dashboardEssentialGuideSeen: true);
-      await saveUserProfile(updated);
-    }
-    final userKey = _localUserKey();
-    if (userKey != null && userKey.isNotEmpty) {
-      await LocalDatabaseService.setSetting(
-        'dashboard_essential_guide_seen_$userKey',
-        '1',
-      );
-    }
+    await LocalDatabaseService.setSetting(_essentialGuideKey(), '1');
   }
 
   // ================= AUTH / ACCOUNTS =================
@@ -336,19 +293,8 @@ class LocalStorageService {
     final normalizedEmail = email.trim().toLowerCase();
     if (normalizedEmail.isEmpty) return null;
 
-    final localUser = _findLocalUser(normalizedEmail);
-
-    if (normalizedEmail == _reviewAccountEmail &&
-        password == _reviewAccountPassword) {
-      await seedReviewAccount();
-      final seeded = _findLocalUser(normalizedEmail);
-      if (seeded != null && seeded.password == password) {
-        await setCurrentUser(seeded.email);
-        return getUserProfile();
-      }
-    }
-
     if (!_cloudEnabled) {
+      final localUser = _findLocalUser(normalizedEmail);
       if (localUser == null || localUser.password != password) {
         _lastLoginError = 'login_invalid_credentials';
         return null;
@@ -372,11 +318,7 @@ class LocalStorageService {
         _lastLoginError = 'login_invalid_email';
       } else if (e.code == 'network-request-failed') {
         _lastLoginError = 'no_connection';
-      } else if (_canFallbackToLocalCredentialsError(e.code)) {
-        if (localUser != null && localUser.password == password) {
-          await setCurrentUser(localUser.email);
-          return getUserProfile();
-        }
+      } else if (e.code == 'user-not-found' || e.code == 'wrong-password') {
         _lastLoginError = 'login_invalid_credentials';
       } else {
         _lastLoginError = 'login_failed_try_again';
@@ -398,16 +340,6 @@ class LocalStorageService {
 
     await setCurrentUser(email);
     return user;
-  }
-
-  static bool _canFallbackToLocalCredentialsError(String code) {
-    const fallbackCodes = {
-      'user-not-found',
-      'wrong-password',
-      'invalid-credential',
-      'invalid-login-credentials',
-    };
-    return fallbackCodes.contains(code);
   }
 
   static Future<UserProfile?> loginWithGoogle() async {
@@ -484,7 +416,7 @@ class LocalStorageService {
           e.code == 'sign_in_cancelled') {
         _lastLoginError = 'login_cancelled';
       } else {
-        // Common provider setup issue: missing client ID or platform configuration.
+        // Common Android case: ApiException: 10 (misconfigured SHA-1 / client ID)
         _lastLoginError = 'login_google_not_ready';
       }
       return null;
@@ -512,7 +444,7 @@ class LocalStorageService {
         firstName: firstName,
         lastName: lastName,
         email: (_currentUserEmail ?? '').trim().toLowerCase(),
-        birthDate: null,
+        birthDate: DateTime(2000, 1, 1),
         profession: '',
         monthlyIncome: 0,
         gender: 'Nao informado',
@@ -528,126 +460,6 @@ class LocalStorageService {
 
     await setCurrentUser(_currentUserEmail ?? '');
     return getUserProfile();
-  }
-
-  static Future<UserProfile?> loginWithApple() async {
-    await _ensureInit();
-    _lastLoginError = null;
-    syncNotifier.value = false;
-    if (!_cloudEnabled || !_supportsAppleSignIn) {
-      _lastLoginError = 'login_apple_not_ready';
-      syncNotifier.value = true;
-      return null;
-    }
-
-    try {
-      final auth = _auth;
-      if (auth == null) {
-        _lastLoginError = 'login_apple_not_ready';
-        syncNotifier.value = true;
-        return null;
-      }
-
-      final rawNonce = _generateNonce();
-      final hashedNonce = _sha256ofString(rawNonce);
-      final appleCredential = await SignInWithApple.getAppleIDCredential(
-        scopes: const [
-          AppleIDAuthorizationScopes.email,
-          AppleIDAuthorizationScopes.fullName,
-        ],
-        nonce: hashedNonce,
-      );
-      final idToken = appleCredential.identityToken;
-      if (idToken == null || idToken.isEmpty) {
-        _lastLoginError = 'login_apple_not_ready';
-        syncNotifier.value = true;
-        return null;
-      }
-
-      final oauthCredential = OAuthProvider('apple.com').credential(
-        idToken: idToken,
-        rawNonce: rawNonce,
-        accessToken: appleCredential.authorizationCode,
-      );
-      await auth.signInWithCredential(oauthCredential);
-
-      final authUser = auth.currentUser;
-      if (authUser == null) return null;
-
-      _currentUserId = authUser.uid;
-      _currentUserEmail = authUser.email ?? appleCredential.email ?? '';
-      _loggedOut = false;
-
-      var user = await FirestoreService.getUserByUid(_currentUserId!);
-      if (user == null) {
-        final fullName =
-            '${appleCredential.givenName ?? ''} ${appleCredential.familyName ?? ''}'
-                .trim();
-        final displayName =
-            fullName.isNotEmpty ? fullName : authUser.displayName ?? '';
-        final parts =
-            displayName.trim().split(' ').where((p) => p.isNotEmpty).toList();
-        final firstName = parts.isNotEmpty ? parts.first : 'Usuario';
-        final lastName = parts.length > 1 ? parts.sublist(1).join(' ') : '';
-        user = UserProfile(
-          firstName: firstName,
-          lastName: lastName,
-          email: (_currentUserEmail ?? '').trim().toLowerCase(),
-          birthDate: null,
-          profession: '',
-          monthlyIncome: 0,
-          gender: 'Nao informado',
-          photoPath: authUser.photoURL,
-          objectives: const [],
-          setupCompleted: false,
-          isPremium: false,
-          isActive: true,
-          totalXp: 0,
-        );
-        await FirestoreService.upsertUser(user);
-      }
-
-      await setCurrentUser(_currentUserEmail ?? appleCredential.email ?? '');
-      return getUserProfile();
-    } on SignInWithAppleAuthorizationException catch (e) {
-      if (e.code == AuthorizationErrorCode.canceled) {
-        _lastLoginError = 'login_cancelled';
-      } else {
-        _lastLoginError = 'login_failed_try_again';
-      }
-      syncNotifier.value = true;
-      return null;
-    } on FirebaseAuthException catch (e) {
-      debugPrint(
-        'LocalStorageService: Apple login FirebaseAuthException: ${e.code} - ${e.message}',
-      );
-      if (e.code == 'network-request-failed') {
-        _lastLoginError = 'no_connection';
-      } else {
-        _lastLoginError = 'login_failed_try_again';
-      }
-      syncNotifier.value = true;
-      return null;
-    } on PlatformException catch (e) {
-      debugPrint(
-        'LocalStorageService: Apple login PlatformException: ${e.code} - ${e.message}',
-      );
-      if (e.code == 'network_error') {
-        _lastLoginError = 'no_connection';
-      } else if (e.code == 'sign_in_canceled' ||
-          e.code == 'sign_in_cancelled') {
-        _lastLoginError = 'login_cancelled';
-      } else {
-        _lastLoginError = 'login_apple_not_ready';
-      }
-      syncNotifier.value = true;
-      return null;
-    } catch (e) {
-      debugPrint('LocalStorageService: Unexpected Apple login error: $e');
-      _lastLoginError = 'login_failed_try_again';
-      syncNotifier.value = true;
-      return null;
-    }
   }
 
   static Future<void> setCurrentUser(String email) async {
@@ -756,47 +568,6 @@ class LocalStorageService {
     // Optimized: instead of setCurrentUser (which reloads EVERYTHING), just update the notifier
     userNotifier.value = finalUser;
     return true;
-  }
-
-  static Future<void> seedLocalAccount(UserProfile profile) async {
-    await _ensureInit();
-    final normalizedEmail = profile.email.trim().toLowerCase();
-    final seeded = profile.copyWith(email: normalizedEmail);
-    final idx = _accounts.indexWhere(
-      (u) => u.email.toLowerCase() == normalizedEmail,
-    );
-    if (idx >= 0) {
-      _accounts[idx] = seeded;
-    } else {
-      _accounts.add(seeded);
-    }
-    await _persistAccounts();
-  }
-
-  static UserProfile buildReviewAccountProfile() {
-    return UserProfile(
-      firstName: 'Voolo',
-      lastName: 'Review',
-      email: _reviewAccountEmail,
-      password: _reviewAccountPassword,
-      profession: 'Analista financeiro',
-      monthlyIncome: 7200,
-      gender: 'Nao informado',
-      objectives: const [
-        'objective_save',
-        'objective_invest',
-        'objective_security',
-      ],
-      setupCompleted: true,
-      isPremium: false,
-      isActive: true,
-      propertyValue: 320000,
-      investBalance: 28000,
-    );
-  }
-
-  static Future<void> seedReviewAccount() async {
-    await seedLocalAccount(buildReviewAccountProfile());
   }
 
   static Future<bool> updateUserProfile({
@@ -909,55 +680,75 @@ class LocalStorageService {
     await _auth?.signOut();
   }
 
-  static Future<void> deleteCurrentAccount() async {
-    final uid = _resolvedUid();
-    if (uid != null && uid.isNotEmpty) {
-      await FirestoreService.deleteUserAccount(uid);
+  static Future<bool> deleteCurrentAccount({
+    required String password,
+  }) async {
+    await _ensureInit();
+    _lastLoginError = null;
+
+    final authUser = _auth?.currentUser;
+    if (authUser == null) return false;
+
+    final email = (authUser.email ?? _currentUserEmail ?? '').trim();
+    if (email.isEmpty) return false;
+
+    final isPasswordProvider = authUser.providerData.any(
+      (provider) => provider.providerId == 'password',
+    );
+    if (!isPasswordProvider) {
+      _lastLoginError = 'delete_account_requires_password';
+      return false;
     }
-    await logout();
+
+    if (password.trim().isEmpty) {
+      _lastLoginError = 'delete_account_invalid_password';
+      return false;
+    }
+
+    try {
+      final credential = EmailAuthProvider.credential(
+        email: email,
+        password: password,
+      );
+      await authUser.reauthenticateWithCredential(credential);
+    } on FirebaseAuthException catch (e) {
+      debugPrint('LocalStorageService: delete reauth failed: $e');
+      _lastLoginError = 'delete_account_invalid_password';
+      return false;
+    }
+
+    try {
+      if (_cloudEnabled) {
+        await FirestoreService.deleteUserData(
+          uid: authUser.uid,
+          legacyEmail: email,
+        );
+      }
+      await LocalDatabaseService.deleteUserData(email);
+      await StorageService.deleteUserPhoto(
+        getUserProfile()?.photoPath ?? authUser.photoURL,
+      );
+      await authUser.delete();
+      await logout();
+      return true;
+    } on FirebaseAuthException catch (e) {
+      debugPrint('LocalStorageService: delete account failed: $e');
+      _lastLoginError = 'delete_account_failed';
+      return false;
+    } catch (e) {
+      debugPrint('LocalStorageService: delete account error: $e');
+      _lastLoginError = 'delete_account_failed';
+      return false;
+    }
   }
 
   static Future<bool> updateMonthlyIncome(double income) async {
     final user = getUserProfile();
     if (user == null || _currentUserId == null) return false;
 
-    // Web parity: treat this as updating the primary fixed income baseline.
     user.monthlyIncome = income;
     userNotifier.value = user.copyWith(); // Notify listeners
-    final now = DateTime.now();
-    final monthYear = '${now.year}-${now.month.toString().padLeft(2, '0')}';
-
-    final primary = _incomes.where((i) => i.isPrimary).toList();
-    final IncomeSource nextPrimary = primary.isNotEmpty
-        ? primary.first.copyWith(
-            amount: income,
-            type: 'fixed',
-            isActive: true,
-            activeFrom: null,
-          )
-        : IncomeSource(
-            id: 'main_income',
-            title: 'Renda Principal',
-            amount: income,
-            type: 'fixed',
-            isPrimary: true,
-            createdAt: DateTime.now(),
-          );
-
-    final nextIncomes = <IncomeSource>[
-      for (final i in _incomes)
-        if (i.id == nextPrimary.id) nextPrimary else i,
-      if (_incomes.every((i) => i.id != nextPrimary.id)) nextPrimary,
-    ];
-
-    await FirestoreService.saveIncome(_currentUserId!, nextPrimary);
-
-    final ok = await FirestoreService.updateUserIncomeSync(
-      uid: _currentUserId!,
-      monthYear: monthYear,
-      incomes: nextIncomes,
-    );
-
+    final ok = await saveUserProfile(user);
     _setSyncError(ok);
     return ok;
   }
@@ -980,17 +771,11 @@ class LocalStorageService {
       '${date.year}-${date.month.toString().padLeft(2, '0')}';
 
   static bool _isIncomeActiveForMonth(IncomeSource income, String monthKey) {
-    if (!income.isActive) return false;
-    if (income.excludedMonths.contains(monthKey)) return false;
-    if (income.activeFrom != null &&
-        monthKey.compareTo(income.activeFrom!) < 0) {
-      return false;
-    }
-    if (income.activeUntil != null &&
-        monthKey.compareTo(income.activeUntil!) > 0) {
-      return false;
-    }
-    return true;
+    return income.appliesToMonthKey(monthKey);
+  }
+
+  static double _roundMoney(double value) {
+    return double.parse(value.toStringAsFixed(2));
   }
 
   static double incomeTotalForMonth(DateTime month) {
@@ -1002,43 +787,70 @@ class LocalStorageService {
     );
   }
 
-  static double fixedIncomeBaseline() {
-    return _incomes.fold(0.0, (sum, item) {
-      final type = item.type.isEmpty ? 'fixed' : item.type;
-      if (!item.isActive) return sum;
-      if (type != 'fixed') return sum;
-      return sum + item.amount;
+  static List<MonthlyDashboard> _sortedDashboards() {
+    final dashboards = List<MonthlyDashboard>.from(_dashboards);
+    dashboards.sort((a, b) {
+      final aKey = a.year * 12 + a.month;
+      final bKey = b.year * 12 + b.month;
+      return aKey.compareTo(bKey);
     });
+    return dashboards;
   }
 
-  static void _updateDashboardsIncome() {
-    if (_currentUserId == null || _currentUserId!.isEmpty) return;
-    final now = DateTime.now();
-    final nowKey = now.year * 12 + now.month;
+  static Future<bool> _refreshDashboardBalances() async {
+    final dashboards = _sortedDashboards();
+    if (dashboards.isEmpty) return false;
 
+    final uid = _currentUserId;
+    final canFetchRemote = uid != null && uid.isNotEmpty;
+
+    var previousTotal = 0.0;
     var changed = false;
-    for (var i = 0; i < _dashboards.length; i++) {
-      final d = _dashboards[i];
-      final key = d.year * 12 + d.month;
-      if (key < nowKey) continue;
-      final incomeForMonth = incomeTotalForMonth(DateTime(d.year, d.month, 1));
-      if (d.salary == incomeForMonth) continue;
+    final updated = <MonthlyDashboard>[];
 
-      _dashboards[i] = MonthlyDashboard(
-        month: d.month,
-        year: d.year,
-        salary: incomeForMonth,
-        expenses: List.of(d.expenses),
-        creditCardPayments: d.creditCardPayments,
-        fixedExclusions: d.fixedExclusions,
+    for (final dashboard in dashboards) {
+      final monthYear =
+          '${dashboard.year.toString().padLeft(4, '0')}-${dashboard.month.toString().padLeft(2, '0')}';
+      final expenses = canFetchRemote
+          ? await FirestoreService.getTransactionsForMonth(uid!, monthYear)
+          : dashboard.expenses;
+      final salary =
+          incomeTotalForMonth(DateTime(dashboard.year, dashboard.month, 1));
+      final monthBalance =
+          _roundMoney(salary - expenses.fold(0.0, (sum, e) => sum + e.amount));
+      final totalBalance = _roundMoney(previousTotal + monthBalance);
+
+      final next = dashboard.copyWith(
+        salary: salary,
+        expenses: expenses,
+        balanceBeforeMonth: _roundMoney(previousTotal),
+        monthBalance: monthBalance,
+        totalBalance: totalBalance,
       );
-      changed = true;
+      if (next.salary != dashboard.salary ||
+          next.balanceBeforeMonth != dashboard.balanceBeforeMonth ||
+          next.monthBalance != dashboard.monthBalance ||
+          next.totalBalance != dashboard.totalBalance ||
+          next.expenses.length != dashboard.expenses.length) {
+        changed = true;
+      }
+
+      updated.add(next);
+      previousTotal = totalBalance;
     }
 
     if (changed) {
+      _dashboards
+        ..clear()
+        ..addAll(updated);
       dashboardNotifier.value++;
-      _persistDashboards(); // fire-and-forget
+      await _persistDashboards();
     }
+    return changed;
+  }
+
+  static void _updateDashboardsIncome() {
+    unawaited(_refreshDashboardBalances());
   }
 
   static Future<bool> addXp(int amount) async {
@@ -1059,26 +871,11 @@ class LocalStorageService {
     await _ensureInit();
     final uid = _resolvedUid();
 
-    if (income.isPrimary) {
-      final demotedIncomes = _incomes
-          .where((item) => item.id != income.id && item.isPrimary)
-          .map((item) => item.copyWith(isPrimary: false))
-          .toList();
-      for (final demoted in demotedIncomes) {
-        _upsertLocalIncome(demoted);
-      }
-      if (uid != null && uid.isNotEmpty) {
-        for (final demoted in demotedIncomes) {
-          await FirestoreService.saveIncome(uid, demoted);
-        }
-      }
-    }
-
     _upsertLocalIncome(income);
     if (uid == null || uid.isEmpty) {
       final currentProfile = getUserProfile();
       if (currentProfile != null) {
-        final baseline = fixedIncomeBaseline();
+        final baseline = incomeTotalForMonth(DateTime.now());
         final idx = _accounts.indexWhere(
           (u) => u.email.toLowerCase() == currentProfile.email.toLowerCase(),
         );
@@ -1089,7 +886,7 @@ class LocalStorageService {
         userNotifier.value = updatedProfile;
       }
       _ensureDashboardWindow();
-      _updateDashboardsIncome();
+      await _refreshDashboardBalances();
       _setSyncError(false);
       return true;
     }
@@ -1104,7 +901,7 @@ class LocalStorageService {
     _setSyncError(ok);
     final currentProfile = getUserProfile();
     if (currentProfile != null) {
-      final baseline = fixedIncomeBaseline();
+      final baseline = incomeTotalForMonth(DateTime.now());
       final idx = _accounts.indexWhere(
         (u) => u.email.toLowerCase() == currentProfile.email.toLowerCase(),
       );
@@ -1115,23 +912,50 @@ class LocalStorageService {
       userNotifier.value = updatedProfile;
     }
     _ensureDashboardWindow();
-    _updateDashboardsIncome();
+    await _refreshDashboardBalances();
     return true;
   }
 
   static Future<bool> deleteIncome(String incomeId) async {
     await _ensureInit();
-    if (_currentUserId == null) return false;
+    final idx = _incomes.indexWhere((income) => income.id == incomeId);
+    if (idx < 0) return false;
 
-    // Protection: Primary income cannot be deleted
-    try {
-      final income = _incomes.firstWhere((i) => i.id == incomeId);
-      if (income.isPrimary) return false;
-    } catch (_) {
-      // If not found in local list, backend rules will still protect it
+    _incomes.removeAt(idx);
+    incomeNotifier.value++;
+
+    final now = DateTime.now();
+    final monthYear = _monthKey(now);
+    final monthTotal = incomeTotalForMonth(now);
+    final currentProfile = getUserProfile();
+    if (currentProfile != null) {
+      final updatedProfile = currentProfile.copyWith(monthlyIncome: monthTotal);
+      final profileIdx = _accounts.indexWhere(
+        (u) => u.email.toLowerCase() == currentProfile.email.toLowerCase(),
+      );
+      if (profileIdx >= 0) {
+        _accounts[profileIdx] = updatedProfile;
+      }
+      userNotifier.value = updatedProfile;
     }
 
-    await FirestoreService.deleteIncome(_currentUserId!, incomeId);
+    _ensureDashboardWindow();
+    await _refreshDashboardBalances();
+
+    final uid = _resolvedUid();
+    if (uid == null || uid.isEmpty) {
+      _setSyncError(false);
+      return true;
+    }
+
+    await FirestoreService.deleteIncome(uid, incomeId);
+
+    final ok = await FirestoreService.updateUserIncomeSync(
+      uid: uid,
+      monthYear: monthYear,
+      incomes: List.of(_incomes),
+    );
+    _setSyncError(ok);
     return true;
   }
 
@@ -1149,12 +973,6 @@ class LocalStorageService {
       String incomeId, String monthKey) async {
     await _ensureInit();
     if (_currentUserId == null) return false;
-    try {
-      final income = _incomes.firstWhere((i) => i.id == incomeId);
-      if (income.isPrimary) return false;
-    } catch (_) {
-      // If not found locally, let backend rules handle it
-    }
     await FirestoreService.setIncomeActiveUntil(
         _currentUserId!, incomeId, monthKey);
     return true;
@@ -1192,6 +1010,9 @@ class LocalStorageService {
       expenses: const [], // Sempre vazio no documento de sumário
       creditCardPayments: dashboard.creditCardPayments,
       fixedExclusions: dashboard.fixedExclusions,
+      balanceBeforeMonth: dashboard.balanceBeforeMonth,
+      monthBalance: dashboard.monthBalance,
+      totalBalance: dashboard.totalBalance,
     );
 
     _dashboards.removeWhere(
@@ -1202,7 +1023,7 @@ class LocalStorageService {
     final plan = UserPlan.fromProfile(getUserProfile());
     final uid = _currentUserId;
     var ok = true;
-    if (_cloudEnabled && plan.hasCloudBackup) {
+    if (plan.hasCloudBackup) {
       if (uid != null && uid.isNotEmpty) {
         final saved =
             await FirestoreService.upsertDashboard(uid, dashboardToSave);
@@ -1230,6 +1051,7 @@ class LocalStorageService {
       final persisted = await _persistDashboards();
       if (!persisted) ok = false;
     }
+    await _refreshDashboardBalances();
     _setSyncError(ok);
     return ok;
   }
@@ -1339,6 +1161,7 @@ class LocalStorageService {
       if (expense.isFixed && !expense.isCreditCard && expense.dueDay != null) {
         NotificationService.scheduleExpenseReminder(expense).catchError((_) {});
       }
+      await _refreshDashboardBalances();
       return true;
     } catch (e) {
       debugPrint('LocalStorageService: Error saving expense: $e');
@@ -1351,6 +1174,7 @@ class LocalStorageService {
     try {
       await FirestoreService.deleteTransaction(_currentUserId!, expenseId);
       NotificationService.cancelExpenseReminder(expenseId).catchError((_) {});
+      await _refreshDashboardBalances();
       return true;
     } catch (e) {
       debugPrint('LocalStorageService: Error deleting expense: $e');
@@ -1771,7 +1595,7 @@ class LocalStorageService {
       firstName: 'Usuario',
       lastName: '',
       email: normalizedEmail,
-      birthDate: null,
+      birthDate: DateTime(2000, 1, 1),
       profession: '',
       monthlyIncome: 0,
       gender: 'Nao informado',
@@ -1851,46 +1675,11 @@ class LocalStorageService {
         _incomes.addAll(incomes);
         incomeNotifier.value++;
 
-        // --- Migration & Protection Logic ---
-        final hasPrimary = incomes.any((i) => i.isPrimary);
         final user = userNotifier.value;
-
-        if (!hasPrimary) {
-          if (incomes.isEmpty && user != null && user.monthlyIncome > 0) {
-            debugPrint(
-                'LocalStorageService: Migrating legacy monthlyIncome to incomes collection (Primary)');
-            await saveIncome(IncomeSource(
-              id: 'main_income',
-              title: 'Renda Principal',
-              amount: user.monthlyIncome,
-              type: 'fixed',
-              isPrimary: true,
-              createdAt: DateTime.now(),
-            ));
-            return;
-          } else if (incomes.isNotEmpty) {
-            debugPrint('LocalStorageService: Fixing missing primary income');
-            await saveIncome(incomes.first.copyWith(isPrimary: true));
-            return;
-          } else if (incomes.isEmpty &&
-              (user == null || user.monthlyIncome == 0)) {
-            debugPrint('LocalStorageService: Creating default primary income');
-            await saveIncome(IncomeSource(
-              id: 'main_income',
-              title: 'Renda Principal',
-              amount: 0.0,
-              type: 'fixed',
-              isPrimary: true,
-              createdAt: DateTime.now(),
-            ));
-            return;
-          }
-        }
-        // --------------------------------------
 
         final now = DateTime.now();
         final monthYear = _monthKey(now);
-        final baseline = fixedIncomeBaseline();
+        final baseline = incomeTotalForMonth(now);
         final monthTotal = incomeTotalForMonth(now);
 
         final currentProfile = userNotifier.value;
@@ -1901,13 +1690,12 @@ class LocalStorageService {
                 currentDash == null ||
                 currentDash.salary != monthTotal);
 
-        // Sync baseline back to profile for other parts of the app (web uses monthlyIncome as fixed baseline)
         if (currentProfile != null &&
             currentProfile.monthlyIncome != baseline) {
           userNotifier.value = currentProfile.copyWith(monthlyIncome: baseline);
         }
 
-        _updateDashboardsIncome();
+        await _refreshDashboardBalances();
 
         if (needsSync) {
           final ok = await FirestoreService.updateUserIncomeSync(
@@ -2109,6 +1897,7 @@ class LocalStorageService {
     }
 
     _ensureDashboardWindow();
+    await _refreshDashboardBalances();
 
     // Persist the merged state locally
     if (localKey != null) {
@@ -2119,19 +1908,7 @@ class LocalStorageService {
     debugPrint(
         'LocalStorageService: _loadUserData completed. Total dashboards: ${_dashboards.length}');
 
-    // 6. Migration: Move monthlyIncome to incomes collection if empty
-    final user = getUserProfile();
-    if (user != null && user.monthlyIncome > 0 && _incomes.isEmpty) {
-      debugPrint(
-          'LocalStorageService: Migrating legacy monthlyIncome to incomes collection');
-      await saveIncome(IncomeSource(
-        id: 'main_income',
-        title: 'Renda Principal',
-        amount: user.monthlyIncome,
-        type: 'fixed',
-        createdAt: DateTime.now(),
-      ));
-    }
+    // 6. Keep legacy monthlyIncome as profile data only.
   }
 
   static Future<bool> _persistDashboards() async {
@@ -2141,7 +1918,7 @@ class LocalStorageService {
     }
 
     final plan = UserPlan.fromProfile(getUserProfile());
-    if (!_cloudEnabled || !plan.hasCloudBackup) return true;
+    if (!plan.hasCloudBackup) return true;
 
     if (_currentUserId == null || _currentUserId!.isEmpty) return false;
     final ok =
@@ -2152,7 +1929,7 @@ class LocalStorageService {
 
   static Future<bool> _persistGoals() async {
     final plan = UserPlan.fromProfile(getUserProfile());
-    if (!_cloudEnabled || !plan.hasCloudBackup) return true;
+    if (!plan.hasCloudBackup) return true;
 
     if (_currentUserId == null || _currentUserId!.isEmpty) return false;
     final ok = await FirestoreService.replaceGoals(_currentUserId!, _goals);

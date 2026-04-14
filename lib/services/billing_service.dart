@@ -18,29 +18,42 @@ class BillingException implements Exception {
 class BillingService {
   BillingService._();
 
-  static const String googlePlayUnifiedSubscriptionId = 'voolo_monthly';
-  static const String googlePlayMonthlySubscriptionId =
-      'voolo-premium-monthly';
-  static const String googlePlayYearlySubscriptionId =
-      'voolo-premium-yearly';
-  static const Set<String> supportedGooglePlaySubscriptionIds = {
-    googlePlayUnifiedSubscriptionId,
-    googlePlayMonthlySubscriptionId,
-    googlePlayYearlySubscriptionId,
-  };
+  static const String paddleMonthlyPriceId = 'pri_01knqmg977ezes0x1nn555g280';
+  static const String paddleYearlyPriceId = 'pri_01knqmn1q7gbpjcvm0aws4p1ej';
+  static const String paddleCheckoutHostUrl = 'https://www.voolo.com.br';
+  static const String paddlePremiumSuccessUrl =
+      'https://www.voolo.com.br/profile?premium=success';
 
-  static const String iosMonthlySubscriptionId = String.fromEnvironment(
-    'VOOLO_IOS_MONTHLY_SUBSCRIPTION_ID',
-    defaultValue: 'voolo',
-  );
-  static const String iosYearlySubscriptionId = String.fromEnvironment(
-    'VOOLO_IOS_YEARLY_SUBSCRIPTION_ID',
-    defaultValue: 'voolo_y',
-  );
-  static const Set<String> supportedAppleSubscriptionIds = {
-    iosMonthlySubscriptionId,
-    iosYearlySubscriptionId,
-  };
+  static Uri buildPaddleCheckoutUri({
+    required String uid,
+    required String plan,
+    String? email,
+    String? successUrl,
+  }) {
+    final normalizedPlan = plan.trim().toLowerCase();
+    final resolvedPlan = normalizedPlan == 'yearly' ? 'yearly' : 'monthly';
+    final base = Uri.parse(paddleCheckoutHostUrl);
+    final params = <String, String>{
+      'plan': resolvedPlan,
+      'uid': uid.trim(),
+      'successUrl': (successUrl?.trim().isNotEmpty ?? false)
+          ? successUrl!.trim()
+          : paddlePremiumSuccessUrl,
+    };
+
+    final normalizedEmail = email?.trim();
+    if (normalizedEmail != null && normalizedEmail.isNotEmpty) {
+      params['email'] = normalizedEmail;
+    }
+
+    return Uri(
+      scheme: base.scheme,
+      host: base.host,
+      port: base.hasPort ? base.port : null,
+      path: '/premium-checkout',
+      queryParameters: params,
+    );
+  }
 
   static Future<Map<String, dynamic>> _post(
     String path,
@@ -93,30 +106,24 @@ class BillingService {
     return null;
   }
 
-  static Future<Map<String, dynamic>> syncGooglePlaySubscription({
-    required String purchaseToken,
-    required String subscriptionId,
+  static Future<Map<String, dynamic>> createPaddlePortalSession({
+    String? returnUrl,
   }) {
-    return _post('/billing/googleplay/sync-subscription', {
-      'purchaseToken': purchaseToken,
-      'subscriptionId': subscriptionId,
+    return _post('/billing/paddle/create-portal-session', {
+      if (returnUrl != null && returnUrl.trim().isNotEmpty)
+        'returnUrl': returnUrl.trim(),
     });
   }
 
-  static Future<Map<String, dynamic>> syncAppStoreSubscription({
-    required String receiptData,
-    required String subscriptionId,
-    String? transactionId,
-    String? originalTransactionId,
+  static Future<Map<String, dynamic>> syncPaddleTransaction({
+    required String transactionId,
   }) {
-    return _post('/billing/appstore/sync-subscription', {
-      'receiptData': receiptData,
-      'subscriptionId': subscriptionId,
-      if (transactionId != null && transactionId.trim().isNotEmpty)
-        'transactionId': transactionId.trim(),
-      if (originalTransactionId != null &&
-          originalTransactionId.trim().isNotEmpty)
-        'originalTransactionId': originalTransactionId.trim(),
+    return _post('/billing/paddle/sync-transaction', {
+      'transactionId': transactionId,
     });
+  }
+
+  static Future<Map<String, dynamic>> cancelPaddleSubscription() {
+    return _post('/billing/paddle/cancel-subscription', const {});
   }
 }

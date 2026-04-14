@@ -137,6 +137,34 @@ class NotificationService {
   static int _cardPreId(String cardId) =>
       _stableId(_creditCardSeed(cardId), 1202);
 
+  static bool _isBusinessDay(tz.TZDateTime day) {
+    return day.weekday >= DateTime.monday && day.weekday <= DateTime.friday;
+  }
+
+  static tz.TZDateTime _fifthBusinessDayAt(
+    int hour,
+    int minute, {
+    tz.TZDateTime? anchor,
+  }) {
+    final now = anchor ?? tz.TZDateTime.now(tz.local);
+
+    tz.TZDateTime computeForMonth(int year, int month) {
+      var current = tz.TZDateTime(tz.local, year, month, 1, hour, minute);
+      var businessDays = 0;
+      while (true) {
+        if (_isBusinessDay(current)) {
+          businessDays++;
+          if (businessDays == 5) return current;
+        }
+        current = current.add(const Duration(days: 1));
+      }
+    }
+
+    final thisMonth = computeForMonth(now.year, now.month);
+    if (thisMonth.isAfter(now)) return thisMonth;
+    return computeForMonth(now.year, now.month + 1);
+  }
+
   static tz.TZDateTime _nextInstanceAt(
     int day,
     int hour,
@@ -327,11 +355,11 @@ class NotificationService {
   static Future<void> scheduleEngagementReminders() async {
     const dailyId = 9001;
     const weeklyId = 9002;
-    const monthlyInvestId = 9003;
+    const monthlyEntriesId = 9003;
 
     await _plugin.cancel(dailyId);
     await _plugin.cancel(weeklyId);
-    await _plugin.cancel(monthlyInvestId);
+    await _plugin.cancel(monthlyEntriesId);
 
     final now = tz.TZDateTime.now(tz.local);
     var nextSunday = tz.TZDateTime(
@@ -363,11 +391,11 @@ class NotificationService {
       matchDateTimeComponents: DateTimeComponents.dayOfWeekAndTime,
     );
 
-    final monthly = _nextInstanceAt(10, 19, 0);
+    final monthly = _fifthBusinessDayAt(9, 0);
     await _plugin.zonedSchedule(
-      monthlyInvestId,
-      _t('notif_monthly_invest_title'),
-      _t('notif_monthly_invest_body'),
+      monthlyEntriesId,
+      _t('notif_monthly_entries_title'),
+      _t('notif_monthly_entries_body'),
       monthly,
       _details(
         channelId: _channelEngagement,

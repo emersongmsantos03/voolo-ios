@@ -1,6 +1,4 @@
-import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
-import 'package:sign_in_with_apple/sign_in_with_apple.dart';
 
 import 'package:jetx/core/localization/app_strings.dart';
 import 'package:jetx/models/user_profile.dart';
@@ -122,43 +120,11 @@ class _LoginPageState extends State<LoginPage> {
     );
   }
 
-  Future<void> _loginWithApple() async {
-    setState(() => _loading = true);
-    UserProfile? user;
-    try {
-      user = await LocalStorageService.loginWithApple();
-    } catch (_) {
-      if (!mounted) return;
-      _snack(AppStrings.t(context, 'login_failed_try_again'));
-      setState(() => _loading = false);
-      return;
-    }
-    if (!mounted) return;
-    if (user == null) {
-      final loginError = LocalStorageService.lastLoginError;
-      if (loginError != null) {
-        _snack(AppStrings.t(context, loginError));
-      } else {
-        _snack(AppStrings.t(context, 'login_failed_try_again'));
-      }
-      setState(() => _loading = false);
-      return;
-    }
-
-    setState(() => _loading = false);
-    Navigator.pushReplacement(
-      context,
-      MaterialPageRoute(builder: (_) => const LoginSuccessSplash()),
-    );
-  }
-
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final scheme = theme.colorScheme;
     final isDark = theme.brightness == Brightness.dark;
-    final isApplePlatform = defaultTargetPlatform == TargetPlatform.iOS ||
-        defaultTargetPlatform == TargetPlatform.macOS;
 
     return Scaffold(
       body: Container(
@@ -279,68 +245,52 @@ class _LoginPageState extends State<LoginPage> {
                               ),
                             ),
                             const SizedBox(height: 14),
-                            if (isApplePlatform) ...[
-                              SizedBox(
-                                width: double.infinity,
-                                height: 52,
-                                child: SignInWithAppleButton(
-                                  onPressed: () {
-                                    if (_loading) return;
-                                    _loginWithApple();
-                                  },
-                                  style: isDark
-                                      ? SignInWithAppleButtonStyle.white
-                                      : SignInWithAppleButtonStyle.black,
+                            Row(
+                              children: [
+                                Expanded(
+                                  child: Divider(
+                                    color:
+                                        scheme.outline.withValues(alpha: 0.35),
+                                  ),
                                 ),
-                              ),
-                            ] else ...[
-                              Row(
-                                children: [
-                                  Expanded(
-                                    child: Divider(
-                                      color:
-                                          scheme.outline.withValues(alpha: 0.35),
-                                    ),
-                                  ),
-                                  Padding(
-                                    padding: const EdgeInsets.symmetric(
-                                        horizontal: 12),
-                                    child: Text(
-                                      AppStrings.t(context, 'or'),
-                                      style: theme.textTheme.bodySmall?.copyWith(
-                                        color: scheme.onSurfaceVariant,
-                                      ),
-                                    ),
-                                  ),
-                                  Expanded(
-                                    child: Divider(
-                                      color:
-                                          scheme.outline.withValues(alpha: 0.35),
-                                    ),
-                                  ),
-                                ],
-                              ),
-                              const SizedBox(height: 14),
-                              SizedBox(
-                                width: double.infinity,
-                                height: 52,
-                                child: OutlinedButton.icon(
-                                  onPressed: _loading ? null : _loginWithGoogle,
-                                  icon: Image.network(
-                                    'https://upload.wikimedia.org/wikipedia/commons/c/c1/Google_%22G%22_logo.svg',
-                                    height: 18,
-                                    errorBuilder: (_, __, ___) => Icon(
-                                      Icons.g_mobiledata,
-                                      size: 26,
+                                Padding(
+                                  padding: const EdgeInsets.symmetric(
+                                      horizontal: 12),
+                                  child: Text(
+                                    AppStrings.t(context, 'or'),
+                                    style: theme.textTheme.bodySmall?.copyWith(
                                       color: scheme.onSurfaceVariant,
                                     ),
                                   ),
-                                  label:
-                                      Text(AppStrings.t(context, 'login_google')),
                                 ),
+                                Expanded(
+                                  child: Divider(
+                                    color:
+                                        scheme.outline.withValues(alpha: 0.35),
+                                  ),
+                                ),
+                              ],
+                            ),
+                            const SizedBox(height: 14),
+                            SizedBox(
+                              width: double.infinity,
+                              height: 52,
+                              child: OutlinedButton.icon(
+                                onPressed: _loading ? null : _loginWithGoogle,
+                                icon: Image.network(
+                                  'https://upload.wikimedia.org/wikipedia/commons/c/c1/Google_%22G%22_logo.svg',
+                                  height: 18,
+                                  errorBuilder: (_, __, ___) => Icon(
+                                    Icons.g_mobiledata,
+                                    size: 26,
+                                    color: scheme.onSurfaceVariant,
+                                  ),
+                                ),
+                                label:
+                                    Text(AppStrings.t(context, 'login_google')),
                               ),
-                              const SizedBox(height: 8),
-                            ],
+                            ),
+                            const SizedBox(height: 8),
                             TextButton(
                               onPressed: () {
                                 Navigator.pushNamed(
@@ -406,7 +356,6 @@ class _LoginSuccessSplashState extends State<LoginSuccessSplash> {
     if (user == null) return false;
     if (!user.setupCompleted) return true;
     if (user.profession.trim().isEmpty) return true;
-    if (user.monthlyIncome <= 0) return true;
     if (user.objectives.isEmpty) return true;
     return false;
   }

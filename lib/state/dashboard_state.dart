@@ -26,7 +26,8 @@ class DashboardState extends ChangeNotifier {
       final salary =
           LocalStorageService.incomeTotalForMonth(DateTime(_year, _month, 1));
       if (_dashboard == null) return;
-      _dashboard = _dashboard?.copyWith(salary: salary);
+      final stored = LocalStorageService.getDashboard(_month, _year);
+      _dashboard = (stored ?? _dashboard)?.copyWith(salary: salary);
       notifyListeners();
     };
     LocalStorageService.incomeNotifier.addListener(_incomeListener);
@@ -194,6 +195,9 @@ class DashboardState extends ChangeNotifier {
             year: _year,
             salary: salary,
             expenses: [],
+            balanceBeforeMonth: 0.0,
+            monthBalance: salary,
+            totalBalance: salary,
           );
 
     // Subscribe to transactions for real-time updates
@@ -201,7 +205,8 @@ class DashboardState extends ChangeNotifier {
     final runId = ++_fixedEnsureRunId;
     _transactionsSubscription =
         LocalStorageService.watchTransactions(_month, _year).listen((txs) {
-      _dashboard = _dashboard?.copyWith(expenses: txs);
+      final stored = LocalStorageService.getDashboard(_month, _year);
+      _dashboard = (stored ?? _dashboard)?.copyWith(expenses: txs);
       notifyListeners();
 
       final monthYear =

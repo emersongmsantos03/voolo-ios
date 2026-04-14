@@ -4,8 +4,6 @@ import 'package:jetx/models/goal.dart';
 import 'package:jetx/models/monthly_dashboard.dart';
 import 'package:jetx/services/weekly_plan_service.dart';
 
-String _tr(String key, [Map<String, String>? vars]) => key;
-
 void main() {
   group('WeeklyPlanService', () {
     test('returns add_income when dashboard is missing', () {
@@ -88,3 +86,5 @@ Expense _expense({required double amount, required ExpenseType type}) {
     date: DateTime(2026, 2, 10),
   );
 }
+
+String _tr(String key, [Map<String, String>? vars]) => key;

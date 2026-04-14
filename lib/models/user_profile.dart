@@ -14,7 +14,7 @@ class UserProfile {
   String lastName;
   String email;
   String password;
-  DateTime? birthDate;
+  DateTime birthDate;
   String profession;
   double monthlyIncome;
   String gender;
@@ -23,7 +23,6 @@ class UserProfile {
   bool setupCompleted;
   bool isPremium;
   DateTime? premiumUntil;
-  bool dashboardEssentialGuideSeen;
   bool isActive;
   int totalXp;
   List<String> completedMissions;
@@ -42,7 +41,7 @@ class UserProfile {
     required this.lastName,
     required this.email,
     this.password = '',
-    this.birthDate,
+    required this.birthDate,
     required this.profession,
     required this.monthlyIncome,
     required this.gender,
@@ -51,7 +50,6 @@ class UserProfile {
     this.setupCompleted = false,
     this.isPremium = false,
     this.premiumUntil,
-    this.dashboardEssentialGuideSeen = false,
     this.isActive = true,
     this.totalXp = 0,
     List<String> completedMissions = const [],
@@ -80,7 +78,7 @@ class UserProfile {
         'lastName': lastName,
         'email': email,
         'password': password,
-        'birthDate': birthDate?.toIso8601String(),
+        'birthDate': birthDate.toIso8601String(),
         'profession': profession,
         'monthlyIncome': monthlyIncome,
         'gender': gender,
@@ -89,7 +87,6 @@ class UserProfile {
         'setupCompleted': setupCompleted,
         'isPremium': isPremium,
         'isActive': isActive,
-        'dashboardEssentialGuideSeen': dashboardEssentialGuideSeen,
         'plan': plan,
         'status': status,
         'totalXp': totalXp,
@@ -165,19 +162,14 @@ class UserProfile {
       isPremium = premiumUntil.isAfter(now);
     }
 
-    final dashboardEssentialGuideSeen =
-        (json['dashboardEssentialGuideSeen'] as bool?) ??
-            (json['essentialGuideSeen'] as bool?) ??
-            false;
-
     return UserProfile(
       firstName: (json['firstName'] as String?) ?? 'Usuario',
       lastName: (json['lastName'] as String?) ?? '',
       email: (json['email'] as String?) ?? '',
       password: (json['password'] as String?) ?? '',
       birthDate: json['birthDate'] != null
-          ? DateTime.tryParse(json['birthDate'] as String)
-          : null,
+          ? DateTime.tryParse(json['birthDate'] as String) ?? DateTime(2000, 1, 1)
+          : DateTime(2000, 1, 1),
       profession: (json['profession'] as String?) ?? '',
       monthlyIncome: (json['monthlyIncome'] as num?)?.toDouble() ?? 0.0,
       gender: GenderCatalog.normalize((json['gender'] as String?) ?? '') ??
@@ -192,7 +184,6 @@ class UserProfile {
       setupCompleted: (json['setupCompleted'] as bool?) ?? false,
       isPremium: isPremium,
       premiumUntil: premiumUntil,
-      dashboardEssentialGuideSeen: dashboardEssentialGuideSeen,
       isActive: isActive,
       totalXp: (json['totalXp'] as num?)?.toInt() ?? 0,
       completedMissions: (json['completedMissions'] as List<dynamic>?)
@@ -240,7 +231,6 @@ class UserProfile {
     bool? setupCompleted,
     bool? isPremium,
     DateTime? premiumUntil,
-    bool? dashboardEssentialGuideSeen,
     bool? isActive,
     int? totalXp,
     List<String>? completedMissions,
@@ -268,8 +258,6 @@ class UserProfile {
       setupCompleted: setupCompleted ?? this.setupCompleted,
       isPremium: isPremium ?? this.isPremium,
       premiumUntil: premiumUntil ?? this.premiumUntil,
-      dashboardEssentialGuideSeen:
-          dashboardEssentialGuideSeen ?? this.dashboardEssentialGuideSeen,
       isActive: isActive ?? this.isActive,
       totalXp: totalXp ?? this.totalXp,
       completedMissions: completedMissions ?? this.completedMissions,

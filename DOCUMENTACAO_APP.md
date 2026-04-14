@@ -6,7 +6,7 @@ O Voolo e um app Flutter para controle financeiro pessoal com foco em:
 - planejamento (metas, orcamentos, dividas)
 - analises e relatorios
 - trilha gamificada (missoes e progresso)
-- recursos Premium com assinatura no Google Play (Android)
+- recursos Premium com assinatura via Paddle
 
 Nome tecnico atual do pacote Flutter: `jetx` (`pubspec.yaml`).
 
@@ -19,7 +19,7 @@ Nome tecnico atual do pacote Flutter: `jetx` (`pubspec.yaml`).
 - Banco: `cloud_firestore`
 - Arquivos: `firebase_storage`
 - Notificacoes locais: `flutter_local_notifications`
-- Compra in-app: `in_app_purchase`
+- Pagamentos externos: `url_launcher` + checkout hospedado do Paddle
 - API HTTP para billing: `http`
 
 ## 3. Arquitetura (alto nivel)
@@ -120,15 +120,13 @@ Tela:
 - `lib/pages/premium/premium_page.dart`
 
 Fluxo atual:
-1. app consulta disponibilidade da loja (`InAppPurchase.instance`)
-2. consulta dois produtos (`voolo` e `voolo_y`)
-3. inicia compra e escuta `purchaseStream`
-4. ao comprar/restaurar, envia token para backend em:
-   - `POST /billing/googleplay/sync-subscription`
-5. backend valida assinatura e atualiza status premium
+1. app monta a URL hospedada do Paddle com `plan`, `uid`, `email` e `successUrl`
+2. abre o checkout no navegador externo
+3. o backend/webhook do Paddle atualiza o status premium
+4. o perfil abre o portal do Paddle para cancelamento quando a assinatura estiver ativa
 
 Observacao:
-- fluxo implementado para Android (Google Play)
+- fluxo implementado para Paddle, sem compra dentro do app
 
 ## 10. Backend Firebase (Functions + Firestore)
 Arquivos:
