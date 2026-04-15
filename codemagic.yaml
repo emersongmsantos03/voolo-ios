@@ -117,7 +117,8 @@ workflows:
             --build-number="$CM_FLUTTER_BUILD_NUMBER" \
             --dart-define=APP_STORE_REVIEW_MODE=true \
             --dart-define=VOOLO_IOS_MONTHLY_SUBSCRIPTION_ID="$VOOLO_IOS_MONTHLY_SUBSCRIPTION_ID" \
-            --dart-define=VOOLO_IOS_YEARLY_SUBSCRIPTION_ID="$VOOLO_IOS_YEARLY_SUBSCRIPTION_ID"
+            --dart-define=VOOLO_IOS_YEARLY_SUBSCRIPTION_ID="$VOOLO_IOS_YEARLY_SUBSCRIPTION_ID" \
+            --export-options-plist=/Users/builder/export_options.plist
 
       - name: Validate and collect IPA
         script: |
