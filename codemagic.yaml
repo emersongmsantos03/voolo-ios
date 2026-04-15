@@ -91,12 +91,9 @@ workflows:
           /usr/libexec/PlistBuddy -c "Add :CFBundleURLTypes:0:CFBundleURLSchemes array" ios/Runner/Info.plist
           /usr/libexec/PlistBuddy -c "Add :CFBundleURLTypes:0:CFBundleURLSchemes:0 string $REVERSED_CLIENT_ID" ios/Runner/Info.plist
 
-      - name: Fetch and set up iOS code signing
+      - name: Set up iOS code signing
         script: |
           set -e
-          keychain initialize
-          app-store-connect fetch-signing-files "$BUNDLE_ID" --type IOS_APP_STORE --create
-          keychain add-certificates
           xcode-project use-profiles --project ios/Runner.xcodeproj
 
       - name: Verify signing settings
@@ -120,8 +117,7 @@ workflows:
             --build-number="$CM_FLUTTER_BUILD_NUMBER" \
             --dart-define=APP_STORE_REVIEW_MODE=true \
             --dart-define=VOOLO_IOS_MONTHLY_SUBSCRIPTION_ID="$VOOLO_IOS_MONTHLY_SUBSCRIPTION_ID" \
-            --dart-define=VOOLO_IOS_YEARLY_SUBSCRIPTION_ID="$VOOLO_IOS_YEARLY_SUBSCRIPTION_ID" \
-            --export-options-plist=/Users/builder/export_options.plist
+            --dart-define=VOOLO_IOS_YEARLY_SUBSCRIPTION_ID="$VOOLO_IOS_YEARLY_SUBSCRIPTION_ID"
 
       - name: Validate and collect IPA
         script: |
