@@ -12,7 +12,6 @@ workflows:
         distribution_type: app_store
         bundle_identifier: com.voolo.jetx
       groups:
-        - appstore_credentials
         - firebase
       vars:
         BUNDLE_ID: com.voolo.jetx
