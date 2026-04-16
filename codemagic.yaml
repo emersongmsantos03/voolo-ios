@@ -16,8 +16,6 @@ workflows:
       vars:
         BUNDLE_ID: com.voolo.jetx
         FIREBASE_IOS_PLIST_PATH: ios/Runner/GoogleService-Info.plist
-        VOOLO_IOS_MONTHLY_SUBSCRIPTION_ID: voolo
-        VOOLO_IOS_YEARLY_SUBSCRIPTION_ID: voolo_y
 
     integrations:
       app_store_connect: app-store-connect
@@ -115,9 +113,6 @@ workflows:
           set -e
           flutter build ipa --release \
             --build-number="$CM_FLUTTER_BUILD_NUMBER" \
-            --dart-define=APP_STORE_REVIEW_MODE=true \
-            --dart-define=VOOLO_IOS_MONTHLY_SUBSCRIPTION_ID="$VOOLO_IOS_MONTHLY_SUBSCRIPTION_ID" \
-            --dart-define=VOOLO_IOS_YEARLY_SUBSCRIPTION_ID="$VOOLO_IOS_YEARLY_SUBSCRIPTION_ID" \
             --export-options-plist=/Users/builder/export_options.plist
 
       - name: Validate and collect IPA
@@ -233,8 +228,8 @@ workflows:
         script: |
           set -e
           xcrun simctl shutdown all || true
-          xcrun simctl boot "$CM_SIMULATOR_DEVICE" || true
-          xcrun simctl bootstatus "$CM_SIMULATOR_DEVICE" -b
+          xcrun simctl boot "$CM_SIMULATOR_UDID" || true
+          xcrun simctl bootstatus "$CM_SIMULATOR_UDID" -b
 
       - name: Generate screenshots
         script: |
@@ -243,8 +238,7 @@ workflows:
           flutter drive \
             --driver=test_driver/integration_test.dart \
             --target=integration_test/app_store_screenshots_test.dart \
-            -d "$CM_SIMULATOR_UDID" \
-            --dart-define=SCREENSHOT_MODE=true
+            -d "$CM_SIMULATOR_UDID"
 
       - name: List generated screenshots
         script: |
@@ -349,8 +343,7 @@ workflows:
           flutter drive \
             --driver=test_driver/integration_test.dart \
             --target=integration_test/app_store_screenshots_test.dart \
-            -d "$CM_SIMULATOR_DEVICE" \
-            --dart-define=SCREENSHOT_MODE=true
+            -d "$CM_SIMULATOR_UDID"
 
       - name: List generated screenshots
         script: |
@@ -457,6 +450,7 @@ workflows:
         script: |
           set -e
           /usr/libexec/PlistBuddy -c "Delete :PREVIEW_STABLE_MODE" ios/Runner/Info.plist || true
+          /usr/libexec/PlistBuddy -c "Add :PREVIEW_STABLE_MODE bool true" ios/Runner/Info.plist
           cd ios
           pod install
           cd ..
@@ -464,9 +458,7 @@ workflows:
       - name: Build iOS simulator .app for App Preview
         script: |
           set -e
-          flutter build ios --simulator --debug \
-            --dart-define=PREVIEW_FORCE_LOGIN=true \
-            --dart-define=APP_PREVIEW_MODE=true
+          flutter build ios --simulator --debug
           find build/ios/iphonesimulator -type d -name "*.app" | sed 's|^| - |'
 
       - name: Inspect preview app signing metadata

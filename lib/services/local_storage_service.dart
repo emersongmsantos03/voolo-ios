@@ -1087,8 +1087,11 @@ class LocalStorageService {
   }
 
   static Stream<List<Expense>> watchTransactions(int month, int year) {
-    if (_currentUserId == null || _currentUserId!.isEmpty)
-      return Stream.value([]);
+    if (_currentUserId == null || _currentUserId!.isEmpty) {
+      final dashboard = getDashboard(month, year);
+      final localTransactions = dashboard?.expenses ?? const <Expense>[];
+      return Stream.value(List<Expense>.from(localTransactions));
+    }
     final monthYear = '$year-${month.toString().padLeft(2, '0')}';
 
     final key = '${_currentUserId!}|$monthYear';

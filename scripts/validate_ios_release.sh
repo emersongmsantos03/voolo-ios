@@ -25,6 +25,8 @@ require_file "ios/Runner/GoogleService-Info.plist"
 require_file "ios/Runner/PrivacyInfo.xcprivacy"
 require_file "ios/Runner.xcodeproj/project.pbxproj"
 require_file "codemagic.yaml"
+require_file "integration_test/app_store_screenshots_test.dart"
+require_file "test_driver/integration_test.dart"
 
 require_match "<key>NSPhotoLibraryUsageDescription</key>" "ios/Runner/Info.plist"
 require_match "<key>NSFaceIDUsageDescription</key>" "ios/Runner/Info.plist"
@@ -39,8 +41,10 @@ require_match "PrivacyInfo.xcprivacy" "ios/Runner.xcodeproj/project.pbxproj"
 require_match "https://voolo-ad416.web.app/auth/reset" "lib/core/constants/auth_links.dart"
 require_match "deleteCurrentAccount" "lib/services/local_storage_service.dart"
 require_match "deleteUserAccount" "lib/services/firestore_service.dart"
+require_match "integration_test:" "pubspec.yaml"
 require_match "FIREBASE_IOS_PLIST_BASE64" "codemagic.yaml"
-require_match "--dart-define=PREVIEW_FORCE_LOGIN=true" "codemagic.yaml"
+require_match "integration_test/app_store_screenshots_test.dart" "codemagic.yaml"
+require_match "test_driver/integration_test.dart" "codemagic.yaml"
 
 if grep -F "<key>NSCameraUsageDescription</key>" ios/Runner/Info.plist >/dev/null 2>&1; then
   if ! grep -R "ImageSource.camera" lib >/dev/null 2>&1; then
