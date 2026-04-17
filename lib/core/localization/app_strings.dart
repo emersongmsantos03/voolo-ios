@@ -308,41 +308,45 @@ class AppStrings {
       'premium_dialog_title': 'Seja Premium',
       'premium_cancel_anytime': 'Cancele quando quiser.',
       'premium_dialog_choose_plan': 'Escolha seu plano premium:',
-      'premium_checkout_secure_title': 'Pagamento seguro via Paddle',
+      'premium_checkout_secure_title': 'Pagamento seguro',
       'premium_checkout_secure_body':
           'A assinatura abre no navegador e fica vinculada à sua conta. Não há compra dentro do app.',
       'premium_checkout_monthly_title': 'Plano mensal',
       'premium_checkout_monthly_subtitle':
-          '7 dias de teste. Cancele quando quiser no portal do Paddle.',
+          '7 dias de teste. Cancele quando quiser.',
       'premium_checkout_yearly_title': 'Plano anual',
       'premium_checkout_yearly_subtitle':
           '7 dias de teste. Melhor custo-benefício para manter o Premium.',
       'premium_checkout_includes_title': 'O que você libera',
       'premium_checkout_feature_1':
           'Relatórios inteligentes e detalhes premium.',
-      'premium_checkout_feature_2':
-          'Metas, missões e insights avançados.',
+      'premium_checkout_feature_2': 'Metas, missões e insights avançados.',
       'premium_checkout_feature_3':
           'Acesso contínuo enquanto a assinatura estiver ativa.',
-      'premium_checkout_cta': 'Abrir no Paddle',
+      'premium_checkout_cta': 'Continuar',
       'premium_checkout_footer':
           'Depois de concluir a assinatura, volte ao app. O status premium será atualizado pelo servidor.',
-      'premium_checkout_login_required':
-          'Entre na conta para liberar o checkout do Paddle.',
+      'premium_checkout_login_required': 'Entre na conta para continuar.',
       'premium_checkout_open_error':
-          'Não foi possível abrir o checkout do Paddle agora.',
+          'Não foi possível abrir a assinatura agora.',
       'premium_checkout_opened_snack':
-          'Checkout aberto no Paddle. Conclua a assinatura no navegador.',
+          'Checkout aberto. Conclua a assinatura no navegador.',
       'profile_premium_section_title': 'Assinatura Premium',
       'profile_premium_section_subtitle':
-          'Sua assinatura está ativa no Paddle. Gerencie ou cancele pelo portal seguro.',
+          'Sua assinatura está ativa. Gerencie ou cancele pelo portal seguro.',
       'profile_premium_section_body':
           'Quando você cancelar, o acesso continua até o fim do período pago.',
-      'profile_premium_cancel_cta': 'Cancelar Premium',
+      'profile_premium_cancel_cta': 'Cancelar assinatura',
       'profile_paddle_portal_error':
-          'Não foi possível abrir o portal do Paddle agora.',
+          'Não foi possível abrir o portal de assinaturas agora.',
       'profile_paddle_login_required':
-          'Entre na conta para gerenciar o Premium.',
+          'Entre na conta para gerenciar a assinatura.',
+      'profile_subscription_login_required':
+          'Entre na conta para cancelar a assinatura.',
+      'profile_subscription_cancelled':
+          'Assinatura cancelada. O acesso continua até o fim do periodo pago.',
+      'profile_subscription_action_error':
+          'Não foi possível concluir a solicitação agora.',
       'premium_plan_monthly_title': 'Plano mensal - R\$ 29,90/mês',
       'premium_plan_monthly_subtitle':
           'Renovação automática. Cancele quando quiser.',
@@ -1062,41 +1066,42 @@ class AppStrings {
       'premium_dialog_title': 'Go Premium',
       'premium_cancel_anytime': 'Cancel anytime.',
       'premium_dialog_choose_plan': 'Choose your premium plan:',
-      'premium_checkout_secure_title': 'Secure payment via Paddle',
+      'premium_checkout_secure_title': 'Secure payment',
       'premium_checkout_secure_body':
           'The subscription opens in the browser and stays linked to your account. There is no in-app purchase.',
       'premium_checkout_monthly_title': 'Monthly plan',
-      'premium_checkout_monthly_subtitle':
-          '7-day trial. Cancel anytime in the Paddle portal.',
+      'premium_checkout_monthly_subtitle': '7-day trial. Cancel anytime.',
       'premium_checkout_yearly_title': 'Yearly plan',
       'premium_checkout_yearly_subtitle':
           '7-day trial. Best value for keeping Premium.',
       'premium_checkout_includes_title': 'What you unlock',
-      'premium_checkout_feature_1':
-          'Smart reports and premium details.',
-      'premium_checkout_feature_2':
-          'Goals, missions, and advanced insights.',
+      'premium_checkout_feature_1': 'Smart reports and premium details.',
+      'premium_checkout_feature_2': 'Goals, missions, and advanced insights.',
       'premium_checkout_feature_3':
           'Continuous access while the subscription is active.',
-      'premium_checkout_cta': 'Open in Paddle',
+      'premium_checkout_cta': 'Continue',
       'premium_checkout_footer':
           'After finishing the subscription, come back to the app. Premium status will be refreshed by the server.',
-      'premium_checkout_login_required':
-          'Sign in to unlock the Paddle checkout.',
+      'premium_checkout_login_required': 'Sign in to continue.',
       'premium_checkout_open_error':
-          'Could not open the Paddle checkout right now.',
+          'Could not open the subscription right now.',
       'premium_checkout_opened_snack':
-          'Checkout opened in Paddle. Complete the subscription in the browser.',
+          'Checkout opened. Complete the subscription in the browser.',
       'profile_premium_section_title': 'Premium subscription',
       'profile_premium_section_subtitle':
-          'Your subscription is active in Paddle. Manage or cancel it through the secure portal.',
+          'Your subscription is active. Manage or cancel it through the secure portal.',
       'profile_premium_section_body':
           'When you cancel, access continues until the end of the paid period.',
-      'profile_premium_cancel_cta': 'Cancel Premium',
+      'profile_premium_cancel_cta': 'Cancel subscription',
       'profile_paddle_portal_error':
-          'Could not open the Paddle portal right now.',
-      'profile_paddle_login_required':
-          'Sign in to manage Premium.',
+          'Could not open the subscriptions portal right now.',
+      'profile_paddle_login_required': 'Sign in to manage the subscription.',
+      'profile_subscription_login_required':
+          'Sign in to cancel the subscription.',
+      'profile_subscription_cancelled':
+          'Subscription cancelled. Access continues until the end of the paid period.',
+      'profile_subscription_action_error':
+          'Could not complete the request right now.',
       'premium_plan_monthly_title': 'Monthly plan - R\$ 29.90/month',
       'premium_plan_monthly_subtitle': 'Automatic renewal. Cancel anytime.',
       'premium_plan_yearly_title': 'Yearly plan - R\$ 299.90/year',
@@ -1808,41 +1813,43 @@ class AppStrings {
       'premium_dialog_title': 'Hazte Premium',
       'premium_cancel_anytime': 'Cancela cuando quieras.',
       'premium_dialog_choose_plan': 'Elige tu plan premium:',
-      'premium_checkout_secure_title': 'Pago seguro vía Paddle',
+      'premium_checkout_secure_title': 'Pago seguro',
       'premium_checkout_secure_body':
           'La suscripción se abre en el navegador y queda vinculada a tu cuenta. No hay compra dentro de la app.',
       'premium_checkout_monthly_title': 'Plan mensual',
       'premium_checkout_monthly_subtitle':
-          '7 días de prueba. Cancela cuando quieras en el portal de Paddle.',
+          '7 días de prueba. Cancela cuando quieras.',
       'premium_checkout_yearly_title': 'Plan anual',
       'premium_checkout_yearly_subtitle':
           '7 días de prueba. Mejor costo-beneficio para mantener Premium.',
       'premium_checkout_includes_title': 'Qué desbloqueas',
-      'premium_checkout_feature_1':
-          'Informes inteligentes y detalles premium.',
-      'premium_checkout_feature_2':
-          'Metas, misiones e insights avanzados.',
+      'premium_checkout_feature_1': 'Informes inteligentes y detalles premium.',
+      'premium_checkout_feature_2': 'Metas, misiones e insights avanzados.',
       'premium_checkout_feature_3':
           'Acceso continuo mientras la suscripción esté activa.',
-      'premium_checkout_cta': 'Abrir en Paddle',
+      'premium_checkout_cta': 'Continuar',
       'premium_checkout_footer':
           'Después de completar la suscripción, vuelve a la app. El estado premium se actualizará desde el servidor.',
-      'premium_checkout_login_required':
-          'Inicia sesión para abrir el checkout de Paddle.',
-      'premium_checkout_open_error':
-          'No se pudo abrir el checkout de Paddle ahora.',
+      'premium_checkout_login_required': 'Inicia sesión para continuar.',
+      'premium_checkout_open_error': 'No se pudo abrir la suscripción ahora.',
       'premium_checkout_opened_snack':
-          'Checkout abierto en Paddle. Completa la suscripción en el navegador.',
+          'Checkout abierto. Completa la suscripción en el navegador.',
       'profile_premium_section_title': 'Suscripción Premium',
       'profile_premium_section_subtitle':
-          'Tu suscripción está activa en Paddle. Adminístrala o cancélala desde el portal seguro.',
+          'Tu suscripción está activa. Adminístrala o cancélala desde el portal seguro.',
       'profile_premium_section_body':
           'Cuando canceles, el acceso continúa hasta el final del periodo pagado.',
-      'profile_premium_cancel_cta': 'Cancelar Premium',
+      'profile_premium_cancel_cta': 'Cancelar suscripción',
       'profile_paddle_portal_error':
-          'No se pudo abrir el portal de Paddle ahora.',
+          'No se pudo abrir el portal de suscripciones ahora.',
       'profile_paddle_login_required':
-          'Inicia sesión para gestionar Premium.',
+          'Inicia sesión para gestionar la suscripción.',
+      'profile_subscription_login_required':
+          'Inicia sesión para cancelar la suscripción.',
+      'profile_subscription_cancelled':
+          'Suscripción cancelada. El acceso continúa hasta el final del periodo pagado.',
+      'profile_subscription_action_error':
+          'No se pudo completar la solicitud ahora.',
       'premium_plan_monthly_title': 'Plan mensual - R\$ 29,90/mes',
       'premium_plan_monthly_subtitle':
           'Renovación automática. Cancela cuando quieras.',

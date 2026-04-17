@@ -3,7 +3,6 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:image_picker/image_picker.dart';
-import 'package:url_launcher/url_launcher.dart';
 
 import 'package:path_provider/path_provider.dart';
 import '../../core/catalogs/gender_catalog.dart';
@@ -320,7 +319,7 @@ class _ProfilePageState extends State<ProfilePage> {
     ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(msg)));
   }
 
-  Future<void> _openPaddlePortal() async {
+  Future<void> _cancelSubscription() async {
     if (_billingBusy) return;
 
     final currentUser = FirebaseAuth.instance.currentUser;
@@ -328,7 +327,7 @@ class _ProfilePageState extends State<ProfilePage> {
       _snack(
         AppStrings.t(
           context,
-          'profile_paddle_login_required',
+          'profile_subscription_login_required',
         ),
       );
       return;
@@ -337,29 +336,29 @@ class _ProfilePageState extends State<ProfilePage> {
     setState(() => _billingBusy = true);
 
     try {
-      final response = await BillingService.createPaddlePortalSession(
-        returnUrl: 'https://www.voolo.com.br/profile',
-      );
-      final portalUrl = response['url']?.toString().trim() ?? '';
-      final degradedMode = response['degradedMode'] == true;
+      await BillingService.cancelPaddleSubscription();
 
-      if (degradedMode || portalUrl.isEmpty) {
-        throw BillingException('paddle-portal-unavailable');
+      await LocalStorageService.waitForSync(timeoutSeconds: 8);
+      if (!mounted) return;
+      final refreshedUser = LocalStorageService.getUserProfile();
+      if (refreshedUser != null) {
+        setState(() {
+          _user = refreshedUser;
+        });
       }
 
-      final launched = await launchUrl(
-        Uri.parse(portalUrl),
-        mode: LaunchMode.externalApplication,
+      _snack(
+        AppStrings.t(
+          context,
+          'profile_subscription_cancelled',
+        ),
       );
-      if (!launched) {
-        throw BillingException('paddle-portal-launch-failed');
-      }
     } catch (_) {
       if (!mounted) return;
       _snack(
         AppStrings.t(
           context,
-          'profile_paddle_portal_error',
+          'profile_subscription_action_error',
         ),
       );
     } finally {
@@ -755,10 +754,11 @@ class _ProfilePageState extends State<ProfilePage> {
                   SizedBox(
                     width: double.infinity,
                     child: OutlinedButton.icon(
-                      onPressed: _billingBusy ? null : _openPaddlePortal,
+                      onPressed: _billingBusy ? null : _cancelSubscription,
                       style: OutlinedButton.styleFrom(
                         foregroundColor: AppTheme.textPrimary(context),
-                        side: BorderSide(color: AppTheme.textSecondary(context)),
+                        side:
+                            BorderSide(color: AppTheme.textSecondary(context)),
                         padding: const EdgeInsets.symmetric(vertical: 14),
                         shape: RoundedRectangleBorder(
                           borderRadius: BorderRadius.circular(14),
@@ -770,7 +770,7 @@ class _ProfilePageState extends State<ProfilePage> {
                               width: 16,
                               child: CircularProgressIndicator(strokeWidth: 2),
                             )
-                          : const Icon(Icons.open_in_new_rounded),
+                          : const Icon(Icons.cancel_outlined),
                       label: Text(
                         AppStrings.t(
                           context,

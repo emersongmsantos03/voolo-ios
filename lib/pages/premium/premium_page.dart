@@ -43,7 +43,7 @@ class _PremiumPageState extends State<PremiumPage> {
       setState(() {
         _error = _t(
           'premium_checkout_login_required',
-          'Entre na conta para liberar o checkout do Paddle.',
+          'Entre na conta para continuar.',
         );
       });
       return;
@@ -77,7 +77,7 @@ class _PremiumPageState extends State<PremiumPage> {
           content: Text(
             _t(
               'premium_checkout_opened_snack',
-              'Checkout aberto no Paddle. Conclua a assinatura no navegador.',
+              'Checkout aberto. Conclua a assinatura no navegador.',
             ),
           ),
         ),
@@ -87,7 +87,7 @@ class _PremiumPageState extends State<PremiumPage> {
       setState(() {
         _error = _t(
           'premium_checkout_open_error',
-          'Nao foi possivel abrir o checkout do Paddle agora.',
+          'Nao foi possivel abrir a assinatura agora.',
         );
       });
     } finally {
@@ -226,7 +226,7 @@ class _PremiumPageState extends State<PremiumPage> {
                   Text(
                     _t(
                       'premium_checkout_secure_title',
-                      'Pagamento seguro via Paddle',
+                      'Pagamento seguro',
                     ),
                     style: TextStyle(
                       color: scheme.onSurface,
@@ -257,7 +257,7 @@ class _PremiumPageState extends State<PremiumPage> {
               price: 'R\$ 29,99 / mes',
               subtitle: _t(
                 'premium_checkout_monthly_subtitle',
-                '7 dias de teste. Cancele quando quiser no portal do Paddle.',
+                '7 dias de teste. Cancele quando quiser.',
               ),
             ),
             const SizedBox(height: 10),
@@ -270,7 +270,7 @@ class _PremiumPageState extends State<PremiumPage> {
               price: 'R\$ 299,99 / ano',
               subtitle: _t(
                 'premium_checkout_yearly_subtitle',
-                '7 dias de teste. Melhor custo-benefício para manter o Premium.',
+                '7 dias de teste. Melhor custo-beneficio para manter o Premium.',
               ),
             ),
             const SizedBox(height: 18),
@@ -337,7 +337,7 @@ class _PremiumPageState extends State<PremiumPage> {
                     : Text(
                         _t(
                           'premium_checkout_cta',
-                          'Abrir no Paddle',
+                          'Continuar',
                         ),
                       ),
               ),
@@ -346,7 +346,7 @@ class _PremiumPageState extends State<PremiumPage> {
             Text(
               _t(
                 'premium_checkout_footer',
-                'Depois de concluir a assinatura, volte ao app. O status premium será atualizado pelo servidor.',
+                'Depois de concluir a assinatura, volte ao app. O status premium sera atualizado pelo servidor.',
               ),
               style: TextStyle(color: scheme.onSurfaceVariant, fontSize: 12),
             ),
