@@ -1,7 +1,7 @@
 # App Store Review Fix (2.1.0, 2.3.3, 2.3.8)
 
 ## 1) 2.1.0 App Completeness
-- Confirmar que `ios/Runner/GoogleService-Info.plist` existe no target `Runner` antes de gerar o `.ipa`.
+- Confirmar que `Util/GoogleService-Info.plist` existe e está incluído no target `Runner` antes de gerar o `.ipa`.
 - Garantir backend ativo no ambiente de review.
 - Em `App Review Information`, preencher:
   - `Sign-in required`: Yes

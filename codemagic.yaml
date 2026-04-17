@@ -10,12 +10,12 @@ workflows:
       cocoapods: default
       ios_signing:
         distribution_type: app_store
-        bundle_identifier: com.voolo.jetx
+        bundle_identifier: com.voolo.app
       groups:
         - firebase
       vars:
-        BUNDLE_ID: com.voolo.jetx
-        FIREBASE_IOS_PLIST_PATH: ios/Runner/GoogleService-Info.plist
+        BUNDLE_ID: com.voolo.app
+        FIREBASE_IOS_PLIST_PATH: Util/GoogleService-Info.plist
 
     integrations:
       app_store_connect: app-store-connect
@@ -174,10 +174,10 @@ workflows:
         script: |
           set -e
           if [ -n "$FIREBASE_IOS_PLIST_BASE64" ]; then
-            echo "$FIREBASE_IOS_PLIST_BASE64" | base64 --decode > ios/Runner/GoogleService-Info.plist
+            echo "$FIREBASE_IOS_PLIST_BASE64" | base64 --decode > Util/GoogleService-Info.plist
             echo "Using real Firebase iOS plist from secret."
           else
-            cat > ios/Runner/GoogleService-Info.plist <<'EOF'
+            cat > Util/GoogleService-Info.plist <<'EOF'
           <?xml version="1.0" encoding="UTF-8"?>
           <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
           <plist version="1.0">
@@ -185,7 +185,7 @@ workflows:
             <key>API_KEY</key>
             <string>stub-api-key</string>
             <key>BUNDLE_ID</key>
-            <string>com.voolo.jetx</string>
+            <string>com.voolo.app</string>
             <key>GCM_SENDER_ID</key>
             <string>1234567890</string>
             <key>GOOGLE_APP_ID</key>
@@ -276,10 +276,10 @@ workflows:
         script: |
           set -e
           if [ -n "$FIREBASE_IOS_PLIST_BASE64" ]; then
-            echo "$FIREBASE_IOS_PLIST_BASE64" | base64 --decode > ios/Runner/GoogleService-Info.plist
+            echo "$FIREBASE_IOS_PLIST_BASE64" | base64 --decode > Util/GoogleService-Info.plist
             echo "Using real Firebase iOS plist from secret."
           else
-            cat > ios/Runner/GoogleService-Info.plist <<'EOF'
+            cat > Util/GoogleService-Info.plist <<'EOF'
           <?xml version="1.0" encoding="UTF-8"?>
           <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
           <plist version="1.0">
@@ -287,7 +287,7 @@ workflows:
             <key>API_KEY</key>
             <string>stub-api-key</string>
             <key>BUNDLE_ID</key>
-            <string>com.voolo.jetx</string>
+            <string>com.voolo.app</string>
             <key>GCM_SENDER_ID</key>
             <string>1234567890</string>
             <key>GOOGLE_APP_ID</key>
@@ -365,8 +365,8 @@ workflows:
       groups:
         - firebase
       vars:
-        BUNDLE_ID: com.voolo.jetx
-        FIREBASE_IOS_PLIST_PATH: ios/Runner/GoogleService-Info.plist
+        BUNDLE_ID: com.voolo.app
+        FIREBASE_IOS_PLIST_PATH: Util/GoogleService-Info.plist
         SIMULATOR_DEVICE: "iPhone 14 Pro"
         SIMULATOR_RUNTIME: "iOS 16.2"
 
@@ -530,17 +530,17 @@ workflows:
           xcrun simctl boot "$TARGET" || true
           xcrun simctl bootstatus "$TARGET" -b
 
-          xcrun simctl uninstall "$TARGET" com.voolo.jetx || true
+          xcrun simctl uninstall "$TARGET" com.voolo.app || true
           xcrun simctl install "$TARGET" "$APP_PATH"
 
           (xcrun simctl spawn "$TARGET" log stream --style compact --level debug --predicate 'process == "Runner"' > build/preview_runtime.log 2>&1) &
           LOG_PID=$!
           sleep 2
 
-          xcrun simctl launch "$TARGET" com.voolo.jetx > build/preview_launch.log 2>&1
+          xcrun simctl launch "$TARGET" com.voolo.app > build/preview_launch.log 2>&1
           sleep 20
 
-          if ! xcrun simctl spawn "$TARGET" launchctl list | grep -F "com.voolo.jetx" >/dev/null; then
+          if ! xcrun simctl spawn "$TARGET" launchctl list | grep -F "com.voolo.app" >/dev/null; then
             echo "ERROR: Preview app exited right after launch."
             echo "=== preview_launch.log ==="
             cat build/preview_launch.log || true

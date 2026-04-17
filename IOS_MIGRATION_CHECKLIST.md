@@ -3,8 +3,8 @@
 Este projeto foi adaptado para iOS no Flutter, mas antes de subir na App Store voce precisa validar estes pontos no macOS (Xcode):
 
 1. Firebase (obrigatorio)
-- Adicione o app iOS no Firebase com o mesmo Bundle ID do Xcode (`com.voolo.jetx`).
-- Baixe `GoogleService-Info.plist` e coloque em `ios/Runner/GoogleService-Info.plist`.
+- Adicione o app iOS no Firebase com o mesmo Bundle ID do Xcode (`com.voolo.app`).
+- Baixe `GoogleService-Info.plist` e coloque em `Util/GoogleService-Info.plist`.
 - No Xcode, confirme que o arquivo foi incluído no target `Runner`.
 
 2. Google Sign-In (se usar login Google no iOS)
@@ -37,11 +37,11 @@ Este projeto foi adaptado para iOS no Flutter, mas antes de subir na App Store v
 - O arquivo `.p8` da chave vai no backend, nao no app iOS. Use os nomes equivalentes:
   - `APPLE_KEY_ID=BDWV8JZ952`
   - `APPLE_ISSUER_ID=83971460-f0c1-42bb-8c02-8fbd6c17c5ba`
-  - `APPLE_BUNDLE_ID=com.voolo.jetx`
+  - `APPLE_BUNDLE_ID=com.voolo.app`
   - `APPLE_PRIVATE_KEY_B64=<base64-do-arquivo-p8>`
   - `APPLE_ENVIRONMENT=SANDBOX`
 - Exemplo de configuracao via Firebase CLI:
-  - `firebase functions:config:set apple.key_id="..." apple.issuer_id="..." apple.bundle_id="com.voolo.jetx" apple.private_key_b64="..." apple.environment="SANDBOX"`
+  - `firebase functions:config:set apple.key_id="..." apple.issuer_id="..." apple.bundle_id="com.voolo.app" apple.private_key_b64="..." apple.environment="SANDBOX"`
 - Depois publique apenas o backend:
   - `firebase deploy --only functions:billingApiUs`
 

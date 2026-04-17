@@ -168,7 +168,7 @@ const getAppleConfig = () => {
   const bundleId =
     String(process.env.APPLE_BUNDLE_ID || '').trim() ||
     String(config.bundle_id || '').trim() ||
-    'com.voolo.jetx';
+    'com.voolo.app';
   const environmentRaw =
     String(process.env.APPLE_ENVIRONMENT || '').trim() ||
     String(config.environment || '').trim() ||

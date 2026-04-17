@@ -21,7 +21,7 @@ require_match() {
 }
 
 require_file "ios/Runner/Info.plist"
-require_file "ios/Runner/GoogleService-Info.plist"
+require_file "Util/GoogleService-Info.plist"
 require_file "ios/Runner/PrivacyInfo.xcprivacy"
 require_file "ios/Runner.xcodeproj/project.pbxproj"
 require_file "codemagic.yaml"
@@ -32,9 +32,9 @@ require_match "<key>NSPhotoLibraryUsageDescription</key>" "ios/Runner/Info.plist
 require_match "<key>NSFaceIDUsageDescription</key>" "ios/Runner/Info.plist"
 require_match "<key>ITSAppUsesNonExemptEncryption</key>" "ios/Runner/Info.plist"
 require_match "<string>com.googleusercontent.apps.100666481363-r1nvlcji3h8nc72i3abnfjhkmin2s5ed</string>" "ios/Runner/Info.plist"
-require_match "<key>BUNDLE_ID</key>" "ios/Runner/GoogleService-Info.plist"
-require_match "<string>com.voolo.jetx</string>" "ios/Runner/GoogleService-Info.plist"
-require_match "PRODUCT_BUNDLE_IDENTIFIER = com.voolo.jetx;" "ios/Runner.xcodeproj/project.pbxproj"
+require_match "<key>BUNDLE_ID</key>" "Util/GoogleService-Info.plist"
+require_match "<string>com.voolo.app</string>" "Util/GoogleService-Info.plist"
+require_match "PRODUCT_BUNDLE_IDENTIFIER = com.voolo.app;" "ios/Runner.xcodeproj/project.pbxproj"
 require_match 'MARKETING_VERSION = "$(FLUTTER_BUILD_NAME)";' "ios/Runner.xcodeproj/project.pbxproj"
 require_match 'CURRENT_PROJECT_VERSION = "$(FLUTTER_BUILD_NUMBER)";' "ios/Runner.xcodeproj/project.pbxproj"
 require_match "PrivacyInfo.xcprivacy" "ios/Runner.xcodeproj/project.pbxproj"
