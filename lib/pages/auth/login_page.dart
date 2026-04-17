@@ -67,8 +67,13 @@ class _LoginPageState extends State<LoginPage> {
     if (!mounted) return;
     if (user == null) {
       final loginError = LocalStorageService.lastLoginError;
+      final loginErrorCode = LocalStorageService.lastLoginErrorCode;
       if (loginError != null) {
-        _snack(AppStrings.t(context, loginError));
+        final baseMessage = AppStrings.t(context, loginError);
+        final message = loginErrorCode == null || loginErrorCode.isEmpty
+            ? baseMessage
+            : '$baseMessage (code: $loginErrorCode)';
+        _snack(message);
       } else {
         _snack(AppStrings.t(context, 'login_invalid_credentials'));
       }
@@ -104,8 +109,13 @@ class _LoginPageState extends State<LoginPage> {
     if (!mounted) return;
     if (user == null) {
       final loginError = LocalStorageService.lastLoginError;
+      final loginErrorCode = LocalStorageService.lastLoginErrorCode;
       if (loginError != null) {
-        _snack(AppStrings.t(context, loginError));
+        final baseMessage = AppStrings.t(context, loginError);
+        final message = loginErrorCode == null || loginErrorCode.isEmpty
+            ? baseMessage
+            : '$baseMessage (code: $loginErrorCode)';
+        _snack(message);
       } else {
         _snack(AppStrings.t(context, 'login_failed_try_again'));
       }

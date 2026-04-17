@@ -27,12 +27,12 @@
 			<string>Editor</string>
 			<key>CFBundleURLSchemes</key>
 			<array>
-				<string>com.googleusercontent.apps.100666481363-r1nvlcji3h8nc72i3abnfjhkmin2s5ed</string>
+				<string>com.googleusercontent.apps.100666481363-kl7pgrqsmghout884f0fp7otehqvl2mf</string>
 			</array>
 		</dict>
 	</array>
 	<key>GIDClientID</key>
-	<string>100666481363-r1nvlcji3h8nc72i3abnfjhkmin2s5ed.apps.googleusercontent.com</string>
+	<string>100666481363-kl7pgrqsmghout884f0fp7otehqvl2mf.apps.googleusercontent.com</string>
 	<key>GIDServerClientID</key>
 	<string>100666481363-oudvh15h83umb4gf4plfm1eilgihepab.apps.googleusercontent.com</string>
 	<key>CFBundleVersion</key>

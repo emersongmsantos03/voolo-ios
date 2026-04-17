@@ -54,6 +54,7 @@ class LocalStorageService {
   static StreamSubscription<List<MonthlyDashboard>>? _dashboardsSubscription;
   static String? _lastSyncError;
   static String? _lastLoginError;
+  static String? _lastLoginErrorCode;
   static final List<MonthlyDashboard> _dashboards = [];
   static final List<Goal> _goals = [];
   static final List<IncomeSource> _incomes = [];
@@ -270,6 +271,7 @@ class LocalStorageService {
   static String? get currentUserId => _currentUserId;
   static String? get lastSyncError => _lastSyncError;
   static String? get lastLoginError => _lastLoginError;
+  static String? get lastLoginErrorCode => _lastLoginErrorCode;
   static UserProfile? getUserProfile() {
     if (_loggedOut) return null;
     if (_currentUserEmail == null || _currentUserEmail!.isEmpty) {
@@ -290,6 +292,7 @@ class LocalStorageService {
   }) async {
     await _ensureInit();
     _lastLoginError = null;
+    _lastLoginErrorCode = null;
     final normalizedEmail = email.trim().toLowerCase();
     if (normalizedEmail.isEmpty) return null;
 
@@ -312,6 +315,7 @@ class LocalStorageService {
       debugPrint('LocalStorageService: Login successful for $normalizedEmail');
     } on FirebaseAuthException catch (e) {
       debugPrint('LocalStorageService: Login error: ${e.code} - ${e.message}');
+      _lastLoginErrorCode = e.code;
       if (e.code == 'user-disabled') {
         _lastLoginError = 'login_blocked';
       } else if (e.code == 'invalid-email') {
@@ -326,6 +330,7 @@ class LocalStorageService {
       return null;
     } catch (e) {
       debugPrint('LocalStorageService: Unexpected login error: $e');
+      _lastLoginErrorCode = null;
       _lastLoginError = 'login_failed_try_again';
       return null;
     }
@@ -345,6 +350,7 @@ class LocalStorageService {
   static Future<UserProfile?> loginWithGoogle() async {
     await _ensureInit();
     _lastLoginError = null;
+    _lastLoginErrorCode = null;
     syncNotifier.value = false;
     if (!_cloudEnabled) {
       _lastLoginError = 'login_google_not_ready';
@@ -397,6 +403,7 @@ class LocalStorageService {
       debugPrint(
         'LocalStorageService: Google login FirebaseAuthException: ${e.code} - ${e.message}',
       );
+      _lastLoginErrorCode = e.code;
       if (e.code == 'network-request-failed') {
         _lastLoginError = 'no_connection';
       } else if (e.code == 'popup-closed-by-user' ||
@@ -410,6 +417,7 @@ class LocalStorageService {
       debugPrint(
         'LocalStorageService: Google login PlatformException: ${e.code} - ${e.message}',
       );
+      _lastLoginErrorCode = e.code;
       if (e.code == 'network_error') {
         _lastLoginError = 'no_connection';
       } else if (e.code == 'sign_in_canceled' ||
@@ -422,6 +430,7 @@ class LocalStorageService {
       return null;
     } catch (e) {
       debugPrint('LocalStorageService: Unexpected Google login error: $e');
+      _lastLoginErrorCode = null;
       _lastLoginError = 'login_failed_try_again';
       return null;
     }
