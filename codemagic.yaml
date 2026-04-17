@@ -449,8 +449,6 @@ workflows:
       - name: Prepare Flutter iOS config and Pods
         script: |
           set -e
-          /usr/libexec/PlistBuddy -c "Delete :PREVIEW_STABLE_MODE" ios/Runner/Info.plist || true
-          /usr/libexec/PlistBuddy -c "Add :PREVIEW_STABLE_MODE bool true" ios/Runner/Info.plist
           cd ios
           pod install
           cd ..

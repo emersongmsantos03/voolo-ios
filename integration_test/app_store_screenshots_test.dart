@@ -26,7 +26,6 @@ void main() {
     await binding.takeScreenshot('02_dashboard');
 
     await _captureRoute(tester, AppRoutes.addExpense);
-    await tester.pumpAndSettle();
     await binding.takeScreenshot('03_add_expense');
 
     await _captureRoute(tester, AppRoutes.profile);
@@ -121,5 +120,6 @@ Future<void> _captureRoute(WidgetTester tester, String routeName) async {
       child: app.JetxApp(initialRoute: routeName),
     ),
   );
-  await tester.pumpAndSettle();
+  await tester.pump();
+  await tester.pump(const Duration(seconds: 1));
 }

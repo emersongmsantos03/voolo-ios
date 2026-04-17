@@ -13,7 +13,6 @@ import '../models/user_profile.dart';
 import '../models/expense.dart';
 import '../models/fixed_series.dart';
 import '../models/v2/enums.dart';
-import '../utils/income_category_utils.dart';
 import '../core/plans/user_plan.dart';
 import 'habits_service.dart';
 import 'local_database_service.dart';

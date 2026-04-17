@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 
 import 'package:jetx/core/localization/app_strings.dart';
@@ -70,9 +71,10 @@ class _LoginPageState extends State<LoginPage> {
       final loginErrorCode = LocalStorageService.lastLoginErrorCode;
       if (loginError != null) {
         final baseMessage = AppStrings.t(context, loginError);
-        final message = loginErrorCode == null || loginErrorCode.isEmpty
-            ? baseMessage
-            : '$baseMessage (code: $loginErrorCode)';
+        final message =
+            !kDebugMode || loginErrorCode == null || loginErrorCode.isEmpty
+                ? baseMessage
+                : '$baseMessage (code: $loginErrorCode)';
         _snack(message);
       } else {
         _snack(AppStrings.t(context, 'login_invalid_credentials'));
@@ -112,9 +114,10 @@ class _LoginPageState extends State<LoginPage> {
       final loginErrorCode = LocalStorageService.lastLoginErrorCode;
       if (loginError != null) {
         final baseMessage = AppStrings.t(context, loginError);
-        final message = loginErrorCode == null || loginErrorCode.isEmpty
-            ? baseMessage
-            : '$baseMessage (code: $loginErrorCode)';
+        final message =
+            !kDebugMode || loginErrorCode == null || loginErrorCode.isEmpty
+                ? baseMessage
+                : '$baseMessage (code: $loginErrorCode)';
         _snack(message);
       } else {
         _snack(AppStrings.t(context, 'login_failed_try_again'));

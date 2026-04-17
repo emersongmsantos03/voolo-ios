@@ -3,11 +3,6 @@ import UIKit
 
 @main
 @objc class AppDelegate: FlutterAppDelegate {
-  private var isPreviewStableMode: Bool {
-    let value = Bundle.main.object(forInfoDictionaryKey: "PREVIEW_STABLE_MODE")
-    return (value as? NSNumber)?.boolValue == true || (value as? Bool) == true
-  }
-
   private func configureBootstrapChannel() {
     guard let controller = window?.rootViewController as? FlutterViewController else {
       return
@@ -24,8 +19,6 @@ import UIKit
       }
 
       switch call.method {
-      case "isPreviewStableMode":
-        result(self.isPreviewStableMode)
       default:
         result(FlutterMethodNotImplemented)
       }
@@ -36,16 +29,6 @@ import UIKit
     _ application: UIApplication,
     didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey: Any]?
   ) -> Bool {
-    if isPreviewStableMode {
-      NSLog("Voolo preview stable mode active: skipping plugin registration")
-      let didFinishLaunching = super.application(
-        application,
-        didFinishLaunchingWithOptions: launchOptions
-      )
-      configureBootstrapChannel()
-      return didFinishLaunching
-    }
-
     NSLog("Voolo standard startup: registering plugins")
     GeneratedPluginRegistrant.register(with: self)
     let didFinishLaunching = super.application(
