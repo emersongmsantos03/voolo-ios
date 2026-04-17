@@ -999,6 +999,9 @@ class FirestoreService {
       return UserProfile.fromJson(data);
     } on FirebaseException {
       return null;
+    } catch (e) {
+      debugPrint('FirestoreService: getUserByUid parse error: $e');
+      return null;
     }
   }
 
@@ -1007,7 +1010,12 @@ class FirestoreService {
       if (!doc.exists) return null;
       final data = doc.data();
       if (data == null) return null;
-      return UserProfile.fromJson(data);
+      try {
+        return UserProfile.fromJson(data);
+      } catch (e) {
+        debugPrint('FirestoreService: watchUserByUid parse error: $e');
+        return null;
+      }
     }).handleError((_) {
       // ignore stream errors to avoid tearing down listeners
     });
@@ -1018,7 +1026,14 @@ class FirestoreService {
       if (!doc.exists) return null;
       final data = doc.data();
       if (data == null) return null;
-      return UserProfile.fromJson(data);
+      try {
+        return UserProfile.fromJson(data);
+      } catch (e) {
+        debugPrint(
+          'FirestoreService: watchUserByLegacyEmailDoc parse error: $e',
+        );
+        return null;
+      }
     }).handleError((_) {
       // ignore stream errors to avoid tearing down listeners
     });
@@ -1032,6 +1047,11 @@ class FirestoreService {
       if (data == null) return null;
       return UserProfile.fromJson(data);
     } on FirebaseException {
+      return null;
+    } catch (e) {
+      debugPrint(
+        'FirestoreService: getUserByLegacyEmailDoc parse error: $e',
+      );
       return null;
     }
   }
@@ -1485,8 +1505,10 @@ class FirestoreService {
         normalizedLegacy.isNotEmpty &&
         normalizedLegacy != uid.toLowerCase()) {
       tasks.addAll([
-        _deleteSubcollection(_legacyUserDoc(normalizedLegacy).collection('dashboards')),
-        _deleteSubcollection(_legacyUserDoc(normalizedLegacy).collection('goals')),
+        _deleteSubcollection(
+            _legacyUserDoc(normalizedLegacy).collection('dashboards')),
+        _deleteSubcollection(
+            _legacyUserDoc(normalizedLegacy).collection('goals')),
         _deleteDocument(_legacyUserDoc(normalizedLegacy)),
       ]);
     }

@@ -103,12 +103,31 @@ class UserProfile {
       };
 
   factory UserProfile.fromJson(Map<String, dynamic> json) {
+    DateTime parseDate(dynamic value, {required DateTime fallback}) {
+      if (value == null) return fallback;
+      if (value is DateTime) return value;
+      if (value is Timestamp) return value.toDate();
+      if (value is String) {
+        return DateTime.tryParse(value) ?? fallback;
+      }
+      return fallback;
+    }
+
+    DateTime? parseNullableDate(dynamic value) {
+      if (value == null) return null;
+      if (value is DateTime) return value;
+      if (value is Timestamp) return value.toDate();
+      if (value is String) {
+        return DateTime.tryParse(value);
+      }
+      return null;
+    }
+
     final statusRaw = (json['status'] as String?)?.trim().toLowerCase();
     final planRaw = (json['plan'] as String?)?.trim().toLowerCase();
 
-    var isActive = (json['isActive'] as bool?) ??
-        (json['active'] as bool?) ??
-        true;
+    var isActive =
+        (json['isActive'] as bool?) ?? (json['active'] as bool?) ?? true;
     final blockedFlag = (json['blocked'] as bool?) ?? false;
     final suspensoFlag =
         (json['suspenso'] as bool?) ?? (json['suspended'] as bool?) ?? false;
@@ -138,26 +157,8 @@ class UserProfile {
       isPremium = false;
     }
 
-    DateTime parseCreatedAt(dynamic value) {
-      if (value == null) return DateTime.now();
-      if (value is DateTime) return value;
-      if (value is Timestamp) return value.toDate();
-      if (value is String) {
-        return DateTime.tryParse(value) ?? DateTime.now();
-      }
-      return DateTime.now();
-    }
-
-    DateTime? parsePremiumUntil(dynamic value) {
-      if (value == null) return null;
-      if (value is DateTime) return value;
-      if (value is Timestamp) return value.toDate();
-      if (value is String) return DateTime.tryParse(value);
-      return null;
-    }
-
     final now = DateTime.now();
-    final premiumUntil = parsePremiumUntil(json['premiumUntil']);
+    final premiumUntil = parseNullableDate(json['premiumUntil']);
     if (premiumUntil != null) {
       isPremium = premiumUntil.isAfter(now);
     }
@@ -167,9 +168,10 @@ class UserProfile {
       lastName: (json['lastName'] as String?) ?? '',
       email: (json['email'] as String?) ?? '',
       password: (json['password'] as String?) ?? '',
-      birthDate: json['birthDate'] != null
-          ? DateTime.tryParse(json['birthDate'] as String) ?? DateTime(2000, 1, 1)
-          : DateTime(2000, 1, 1),
+      birthDate: parseDate(
+        json['birthDate'],
+        fallback: DateTime(2000, 1, 1),
+      ),
       profession: (json['profession'] as String?) ?? '',
       monthlyIncome: (json['monthlyIncome'] as num?)?.toDouble() ?? 0.0,
       gender: GenderCatalog.normalize((json['gender'] as String?) ?? '') ??
@@ -197,14 +199,13 @@ class UserProfile {
           (json['missionCompletionType'] as Map<String, dynamic>?)
                   ?.map((k, v) => MapEntry(k.toString(), v.toString())) ??
               const {},
-      lastReportViewedAt: (json['lastReportViewedAt'] as String?) == null
-          ? null
-          : DateTime.tryParse(json['lastReportViewedAt'] as String),
-      lastCalculatorOpenedAt: (json['lastCalculatorOpenedAt'] as String?) == null
-          ? null
-          : DateTime.tryParse(json['lastCalculatorOpenedAt'] as String),
+      lastReportViewedAt: parseNullableDate(json['lastReportViewedAt']),
+      lastCalculatorOpenedAt: parseNullableDate(
+        json['lastCalculatorOpenedAt'],
+      ),
       creditCards: (json['creditCards'] as List<dynamic>?)
-              ?.map((e) => CreditCard.fromJson(e as Map<String, dynamic>))
+              ?.map((e) =>
+                  CreditCard.fromJson(Map<String, dynamic>.from(e as Map)))
               .toList() ??
           const [],
       incomeSources: (json['incomeSources'] as List<dynamic>?)
@@ -213,7 +214,7 @@ class UserProfile {
           const [],
       propertyValue: (json['propertyValue'] as num?)?.toDouble() ?? 0.0,
       investBalance: (json['investBalance'] as num?)?.toDouble() ?? 0.0,
-      createdAt: parseCreatedAt(json['createdAt']),
+      createdAt: parseDate(json['createdAt'], fallback: DateTime.now()),
     );
   }
 
@@ -262,9 +263,11 @@ class UserProfile {
       totalXp: totalXp ?? this.totalXp,
       completedMissions: completedMissions ?? this.completedMissions,
       missionNotes: missionNotes ?? this.missionNotes,
-      missionCompletionType: missionCompletionType ?? this.missionCompletionType,
+      missionCompletionType:
+          missionCompletionType ?? this.missionCompletionType,
       lastReportViewedAt: lastReportViewedAt ?? this.lastReportViewedAt,
-      lastCalculatorOpenedAt: lastCalculatorOpenedAt ?? this.lastCalculatorOpenedAt,
+      lastCalculatorOpenedAt:
+          lastCalculatorOpenedAt ?? this.lastCalculatorOpenedAt,
       creditCards: creditCards ?? this.creditCards,
       incomeSources: incomeSources ?? this.incomeSources,
       propertyValue: propertyValue ?? this.propertyValue,
