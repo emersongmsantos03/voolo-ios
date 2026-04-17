@@ -1,5 +1,6 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:integration_test/integration_test.dart';
+import 'package:provider/provider.dart';
 
 import 'package:jetx/main.dart' as app;
 import 'package:jetx/models/expense.dart';
@@ -8,6 +9,9 @@ import 'package:jetx/models/user_profile.dart';
 import 'package:jetx/routes/app_routes.dart';
 import 'package:jetx/services/local_database_service.dart';
 import 'package:jetx/services/local_storage_service.dart';
+import 'package:jetx/state/locale_state.dart';
+import 'package:jetx/state/privacy_state.dart';
+import 'package:jetx/state/theme_state.dart';
 
 void main() {
   final binding = IntegrationTestWidgetsFlutterBinding.ensureInitialized();
@@ -107,6 +111,15 @@ Future<void> _prepareDemoData() async {
 }
 
 Future<void> _captureRoute(WidgetTester tester, String routeName) async {
-  await tester.pumpWidget(app.JetxApp(initialRoute: routeName));
+  await tester.pumpWidget(
+    MultiProvider(
+      providers: [
+        ChangeNotifierProvider(create: (_) => ThemeState()),
+        ChangeNotifierProvider(create: (_) => LocaleState()),
+        ChangeNotifierProvider(create: (_) => PrivacyState()),
+      ],
+      child: app.JetxApp(initialRoute: routeName),
+    ),
+  );
   await tester.pumpAndSettle();
 }
