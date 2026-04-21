@@ -16,6 +16,8 @@ workflows:
       vars:
         BUNDLE_ID: com.voolo.app
         FIREBASE_IOS_PLIST_PATH: Util/GoogleService-Info.plist
+        XCODE_WORKSPACE: Runner.xcworkspace
+        XCODE_SCHEME: Runner
 
     integrations:
       app_store_connect: app-store-connect
@@ -111,9 +113,11 @@ workflows:
       - name: Build signed IPA
         script: |
           set -e
-          if ! flutter build ipa --release \
-            --build-number="$CM_FLUTTER_BUILD_NUMBER" \
-            --export-options-plist=/Users/builder/export_options.plist; then
+          cd ios
+          if ! xcode-project build-ipa \
+            --workspace "$CM_BUILD_DIR/ios/$XCODE_WORKSPACE" \
+            --scheme "$XCODE_SCHEME" \
+            --archive-xcargs "CURRENT_PROJECT_VERSION=$CM_FLUTTER_BUILD_NUMBER"; then
             echo "=== iOS build log tail ==="
             if [ -d /tmp/xcodebuild_logs ]; then
               find /tmp/xcodebuild_logs -type f -name "*.log" | while read -r log; do
