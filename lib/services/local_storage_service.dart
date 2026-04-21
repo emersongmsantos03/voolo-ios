@@ -1,10 +1,14 @@
+import 'dart:convert';
 import 'dart:async';
+import 'dart:math';
 
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_core/firebase_core.dart';
+import 'package:crypto/crypto.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
 import 'package:google_sign_in/google_sign_in.dart';
+import 'package:sign_in_with_apple/sign_in_with_apple.dart';
 
 import '../models/goal.dart';
 import '../models/income_source.dart';
@@ -73,6 +77,21 @@ class LocalStorageService {
       serverClientId:
           _googleServerClientId.isEmpty ? null : _googleServerClientId,
     );
+  }
+
+  static String _generateNonce([int length = 32]) {
+    const charset =
+        '0123456789ABCDEFGHIJKLMNOPQRSTUVXYZabcdefghijklmnopqrstuvwxyz-._';
+    final random = Random.secure();
+    return List.generate(
+      length,
+      (_) => charset[random.nextInt(charset.length)],
+    ).join();
+  }
+
+  static String _sha256ofString(String input) {
+    final bytes = utf8.encode(input);
+    return sha256.convert(bytes).toString();
   }
 
   static Future<void> init() async {
@@ -468,6 +487,126 @@ class LocalStorageService {
 
     await setCurrentUser(_currentUserEmail ?? '');
     return getUserProfile();
+  }
+
+  static Future<UserProfile?> loginWithApple() async {
+    await _ensureInit();
+    _lastLoginError = null;
+    _lastLoginErrorCode = null;
+    syncNotifier.value = false;
+    if (!_cloudEnabled) {
+      _lastLoginError = 'login_apple_not_ready';
+      syncNotifier.value = true;
+      return null;
+    }
+
+    try {
+      final auth = _auth;
+      if (auth == null) {
+        _lastLoginError = 'login_apple_not_ready';
+        return null;
+      }
+
+      final rawNonce = _generateNonce();
+      final appleCredential = await SignInWithApple.getAppleIDCredential(
+        scopes: const [
+          AppleIDAuthorizationScopes.email,
+          AppleIDAuthorizationScopes.fullName,
+        ],
+        nonce: _sha256ofString(rawNonce),
+      );
+
+      final identityToken = appleCredential.identityToken;
+      if (identityToken == null || identityToken.isEmpty) {
+        _lastLoginError = 'login_apple_not_ready';
+        return null;
+      }
+
+      final oauthCredential = OAuthProvider('apple.com').credential(
+        idToken: identityToken,
+        rawNonce: rawNonce,
+      );
+      await auth.signInWithCredential(oauthCredential);
+
+      final authUser = _auth?.currentUser;
+      if (authUser == null) return null;
+
+      _currentUserId = authUser.uid;
+      _currentUserEmail =
+          (authUser.email ?? appleCredential.email ?? '').trim().toLowerCase();
+      _loggedOut = false;
+
+      var user = await FirestoreService.getUserByUid(_currentUserId!);
+      if (user == null) {
+        final nameParts = <String>[];
+        final givenName = appleCredential.givenName?.trim();
+        final familyName = appleCredential.familyName?.trim();
+        if (givenName != null && givenName.isNotEmpty) {
+          nameParts.add(givenName);
+        }
+        if (familyName != null && familyName.isNotEmpty) {
+          nameParts.add(familyName);
+        }
+        final firstName = nameParts.isNotEmpty ? nameParts.first : 'Usuario';
+        final lastName =
+            nameParts.length > 1 ? nameParts.sublist(1).join(' ') : '';
+        user = UserProfile(
+          firstName: firstName,
+          lastName: lastName,
+          email: _currentUserEmail ?? '',
+          birthDate: DateTime(2000, 1, 1),
+          profession: '',
+          monthlyIncome: 0,
+          gender: 'Nao informado',
+          photoPath: authUser.photoURL,
+          objectives: const [],
+          setupCompleted: false,
+          isPremium: false,
+          isActive: true,
+          totalXp: 0,
+        );
+        await FirestoreService.upsertUser(user);
+      }
+
+      await setCurrentUser(_currentUserEmail ?? '');
+      return getUserProfile();
+    } on SignInWithAppleAuthorizationException catch (e) {
+      debugPrint(
+        'LocalStorageService: Apple login authorization error: ${e.code} - ${e.message}',
+      );
+      _lastLoginErrorCode = e.code.name;
+      if (e.code == AuthorizationErrorCode.canceled) {
+        _lastLoginError = 'login_cancelled';
+      } else {
+        _lastLoginError = 'login_failed_try_again';
+      }
+      return null;
+    } on FirebaseAuthException catch (e) {
+      debugPrint(
+        'LocalStorageService: Apple login FirebaseAuthException: ${e.code} - ${e.message}',
+      );
+      _lastLoginErrorCode = e.code;
+      if (e.code == 'network-request-failed') {
+        _lastLoginError = 'no_connection';
+      } else {
+        _lastLoginError = 'login_failed_try_again';
+      }
+      return null;
+    } on PlatformException catch (e) {
+      debugPrint(
+        'LocalStorageService: Apple login PlatformException: ${e.code} - ${e.message}',
+      );
+      _lastLoginErrorCode = e.code;
+      _lastLoginError = 'login_apple_not_ready';
+      return null;
+    } catch (e) {
+      debugPrint('LocalStorageService: Unexpected Apple login error: $e');
+      _lastLoginErrorCode = null;
+      _lastLoginError = 'login_failed_try_again';
+      return null;
+    } finally {
+      syncNotifier.value = true;
+    }
   }
 
   static Future<void> setCurrentUser(String email) async {

@@ -84,10 +84,6 @@ class _RegisterPageState extends State<RegisterPage> {
       _snack('Digite um e-mail no formato nome@dominio.com');
       return false;
     }
-    if (birthDate == null) {
-      _snack('Escolha sua data de nascimento para continuar.');
-      return false;
-    }
     return true;
   }
 
@@ -156,7 +152,7 @@ class _RegisterPageState extends State<RegisterPage> {
       lastName: lastNameController.text.trim(),
       email: emailController.text.trim(),
       password: passwordController.text,
-      birthDate: birthDate!,
+      birthDate: birthDate ?? DateTime(2000, 1, 1),
       profession: '',
       monthlyIncome: 0,
       gender: gender,
@@ -211,7 +207,7 @@ class _RegisterPageState extends State<RegisterPage> {
     final theme = Theme.of(context);
     final scheme = theme.colorScheme;
     final birthText = birthDate == null
-        ? 'Selecionar'
+        ? 'Opcional - pode deixar em branco'
         : '${birthDate!.day.toString().padLeft(2, '0')}/${birthDate!.month.toString().padLeft(2, '0')}/${birthDate!.year}';
     final stepTitle = _step == 0
         ? 'Crie sua conta para organizar o mes com mais clareza.'
@@ -370,7 +366,8 @@ class _RegisterPageState extends State<RegisterPage> {
                             ),
                             const SizedBox(height: 14),
                             _LabeledField(
-                              label: AppStrings.t(context, 'birth_date'),
+                              label:
+                                  '${AppStrings.t(context, 'birth_date')} (opcional)',
                               child: InkWell(
                                 borderRadius: BorderRadius.circular(24),
                                 onTap: _pickBirthDate,

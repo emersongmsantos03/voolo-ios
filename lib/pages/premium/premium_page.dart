@@ -1,9 +1,14 @@
+import 'dart:async';
+
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:in_app_purchase/in_app_purchase.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 import '../../core/localization/app_strings.dart';
 import '../../services/billing_service.dart';
+import '../../services/local_storage_service.dart';
 
 class PremiumPage extends StatefulWidget {
   const PremiumPage({
@@ -19,8 +24,16 @@ class PremiumPage extends StatefulWidget {
 
 class _PremiumPageState extends State<PremiumPage> {
   bool _openingCheckout = false;
+  bool _openingPortal = false;
   String? _error;
   late String _selectedPlan; // monthly | yearly
+  bool _iapAvailable = false;
+  bool _loadingProducts = false;
+  List<ProductDetails> _productDetails = const [];
+  StreamSubscription<List<PurchaseDetails>>? _purchaseSub;
+
+  bool get _usesAppleIap =>
+      !kIsWeb && defaultTargetPlatform == TargetPlatform.iOS;
 
   String _t(String key, String fallback) {
     final value = AppStrings.t(context, key);
@@ -31,10 +44,253 @@ class _PremiumPageState extends State<PremiumPage> {
   void initState() {
     super.initState();
     _selectedPlan = widget.initialPlan == 'yearly' ? 'yearly' : 'monthly';
+    _setupBillingFlow();
+  }
+
+  @override
+  void dispose() {
+    _purchaseSub?.cancel();
+    super.dispose();
+  }
+
+  Future<void> _setupBillingFlow() async {
+    if (!_usesAppleIap) return;
+
+    _purchaseSub ??= InAppPurchase.instance.purchaseStream.listen(
+      _handlePurchaseUpdates,
+      onError: (Object error) {
+        if (!mounted) return;
+        setState(() {
+          _error = _t(
+            'premium_checkout_open_error',
+            'Nao foi possivel abrir a assinatura agora.',
+          );
+          _openingCheckout = false;
+        });
+      },
+    );
+
+    final available = await InAppPurchase.instance.isAvailable();
+    if (!mounted) return;
+    setState(() {
+      _iapAvailable = available;
+    });
+
+    if (available) {
+      await _loadAppleProducts();
+    }
+  }
+
+  Future<void> _loadAppleProducts() async {
+    if (!_usesAppleIap) return;
+    setState(() {
+      _loadingProducts = true;
+      _error = null;
+    });
+
+    final response = await InAppPurchase.instance.queryProductDetails({
+      BillingService.appleMonthlySubscriptionId,
+      BillingService.appleYearlySubscriptionId,
+    });
+
+    if (!mounted) return;
+    setState(() {
+      _productDetails = response.productDetails;
+      _loadingProducts = false;
+    });
+
+    if (response.notFoundIDs.isNotEmpty && _productDetails.isEmpty) {
+      setState(() {
+        _error = _t(
+          'premium_checkout_open_error',
+          'Nao foi possivel carregar os planos da App Store agora.',
+        );
+      });
+    }
+  }
+
+  ProductDetails? _appleProductForPlan(String plan) {
+    final productId = plan == 'yearly'
+        ? BillingService.appleYearlySubscriptionId
+        : BillingService.appleMonthlySubscriptionId;
+    try {
+      return _productDetails.firstWhere((product) => product.id == productId);
+    } catch (_) {
+      return null;
+    }
+  }
+
+  String _planPriceLabel(String plan, String fallback) {
+    final product = _appleProductForPlan(plan);
+    if (product != null) return product.price;
+    return fallback;
+  }
+
+  Future<void> _handlePurchaseUpdates(
+    List<PurchaseDetails> purchaseDetailsList,
+  ) async {
+    for (final purchaseDetails in purchaseDetailsList) {
+      switch (purchaseDetails.status) {
+        case PurchaseStatus.pending:
+          if (!mounted) break;
+          setState(() {
+            _openingCheckout = true;
+            _error = null;
+          });
+          break;
+        case PurchaseStatus.purchased:
+        case PurchaseStatus.restored:
+          await _syncApplePurchase(purchaseDetails);
+          break;
+        case PurchaseStatus.error:
+          if (!mounted) break;
+          setState(() {
+            _error = purchaseDetails.error?.message ??
+                _t(
+                  'premium_checkout_open_error',
+                  'Nao foi possivel abrir a assinatura agora.',
+                );
+            _openingCheckout = false;
+          });
+          break;
+        case PurchaseStatus.canceled:
+          if (!mounted) break;
+          setState(() {
+            _openingCheckout = false;
+          });
+          break;
+      }
+
+      if (purchaseDetails.pendingCompletePurchase) {
+        await InAppPurchase.instance.completePurchase(purchaseDetails);
+      }
+    }
+  }
+
+  Future<void> _syncApplePurchase(PurchaseDetails purchaseDetails) async {
+    final receiptData = purchaseDetails.verificationData.serverVerificationData;
+    if (receiptData.trim().isEmpty) {
+      if (!mounted) return;
+      setState(() {
+        _error = _t(
+          'premium_checkout_open_error',
+          'Nao foi possivel validar a compra agora.',
+        );
+        _openingCheckout = false;
+      });
+      return;
+    }
+
+    try {
+      final response = await BillingService.syncAppStoreSubscription(
+        subscriptionId: purchaseDetails.productID,
+        receiptData: receiptData,
+      );
+      final premiumGranted = response['premiumGranted'] == true;
+      if (premiumGranted) {
+        await LocalStorageService.waitForSync(timeoutSeconds: 8);
+      }
+      if (!mounted) return;
+      setState(() {
+        _openingCheckout = false;
+        _error = null;
+      });
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            _t(
+              'premium_checkout_opened_snack',
+              'Compra concluida. O status premium sera atualizado em breve.',
+            ),
+          ),
+        ),
+      );
+    } catch (_) {
+      if (!mounted) return;
+      setState(() {
+        _openingCheckout = false;
+        _error = _t(
+          'premium_checkout_open_error',
+          'Nao foi possivel sincronizar a compra agora.',
+        );
+      });
+    }
+  }
+
+  Future<void> _purchaseApplePlan() async {
+    if (_openingCheckout) return;
+
+    final user = FirebaseAuth.instance.currentUser;
+    final uid = user?.uid.trim() ?? '';
+    if (uid.isEmpty) {
+      if (!mounted) return;
+      setState(() {
+        _error = _t(
+          'premium_checkout_login_required',
+          'Entre na conta para continuar.',
+        );
+      });
+      return;
+    }
+
+    if (!_iapAvailable) {
+      if (!mounted) return;
+      setState(() {
+        _error = _t(
+          'premium_checkout_open_error',
+          'Nao foi possivel abrir a assinatura agora.',
+        );
+      });
+      return;
+    }
+
+    if (_productDetails.isEmpty) {
+      await _loadAppleProducts();
+    }
+
+    final product = _appleProductForPlan(_selectedPlan);
+    if (product == null) {
+      if (!mounted) return;
+      setState(() {
+        _error = _t(
+          'premium_checkout_open_error',
+          'Nao foi possivel carregar os planos da App Store agora.',
+        );
+      });
+      return;
+    }
+
+    setState(() {
+      _openingCheckout = true;
+      _error = null;
+    });
+
+    try {
+      final started = await InAppPurchase.instance.buyNonConsumable(
+        purchaseParam: PurchaseParam(productDetails: product),
+      );
+      if (!started) {
+        throw Exception('purchase-not-started');
+      }
+    } catch (_) {
+      if (!mounted) return;
+      setState(() {
+        _openingCheckout = false;
+        _error = _t(
+          'premium_checkout_open_error',
+          'Nao foi possivel abrir a assinatura agora.',
+        );
+      });
+    }
   }
 
   Future<void> _openCheckout() async {
     if (_openingCheckout) return;
+
+    if (_usesAppleIap) {
+      await _purchaseApplePlan();
+      return;
+    }
 
     final user = FirebaseAuth.instance.currentUser;
     final uid = user?.uid.trim() ?? '';
@@ -94,6 +350,95 @@ class _PremiumPageState extends State<PremiumPage> {
       if (mounted) {
         setState(() {
           _openingCheckout = false;
+        });
+      }
+    }
+  }
+
+  Future<void> _openCancellationPortal() async {
+    if (_openingPortal) return;
+
+    final user = FirebaseAuth.instance.currentUser;
+    final uid = user?.uid.trim() ?? '';
+    if (uid.isEmpty) {
+      if (!mounted) return;
+      setState(() {
+        _error = _t(
+          'premium_checkout_login_required',
+          'Entre na conta para continuar.',
+        );
+      });
+      return;
+    }
+
+    setState(() {
+      _openingPortal = true;
+      _error = null;
+    });
+
+    try {
+      if (_usesAppleIap) {
+        final launched = await launchUrl(
+          Uri.parse('https://apps.apple.com/account/subscriptions'),
+          mode: LaunchMode.externalApplication,
+        );
+        if (!launched) {
+          throw Exception('launch-failed');
+        }
+
+        if (!mounted) return;
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              _t(
+                'profile_subscription_cancelled',
+                'Abra a pagina de assinaturas da App Store para gerenciar o plano.',
+              ),
+            ),
+          ),
+        );
+        return;
+      }
+
+      final response = await BillingService.createPaddlePortalSession(
+        returnUrl: BillingService.paddlePremiumSuccessUrl,
+      );
+      final portalUrl = (response['url'] ?? '').toString().trim();
+      if (portalUrl.isEmpty) {
+        throw Exception('portal-url-missing');
+      }
+
+      final launched = await launchUrl(
+        Uri.parse(portalUrl),
+        mode: LaunchMode.externalApplication,
+      );
+      if (!launched) {
+        throw Exception('launch-failed');
+      }
+
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            _t(
+              'premium_portal_opened_snack',
+              'Portal de assinatura aberto. Cancele por la se desejar.',
+            ),
+          ),
+        ),
+      );
+    } catch (_) {
+      if (!mounted) return;
+      setState(() {
+        _error = _t(
+          'premium_portal_open_error',
+          'Nao foi possivel abrir o portal de assinaturas agora.',
+        );
+      });
+    } finally {
+      if (mounted) {
+        setState(() {
+          _openingPortal = false;
         });
       }
     }
@@ -187,6 +532,9 @@ class _PremiumPageState extends State<PremiumPage> {
   @override
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
+    final secureBody = _usesAppleIap
+        ? 'A assinatura usa a compra da App Store e fica vinculada à sua conta.'
+        : 'A assinatura abre no navegador e fica vinculada à sua conta. Nao ha compra dentro do app.';
 
     return Scaffold(
       appBar: AppBar(
@@ -234,16 +582,25 @@ class _PremiumPageState extends State<PremiumPage> {
                     ),
                   ),
                   const SizedBox(height: 8),
-                  Text(
-                    _t(
-                      'premium_checkout_secure_body',
-                      'A assinatura abre no navegador e fica vinculada à sua conta. Não há compra dentro do app.',
+                  if (_usesAppleIap)
+                    Text(
+                      secureBody,
+                      style: TextStyle(
+                        color: scheme.onSurfaceVariant,
+                        height: 1.35,
+                      ),
                     ),
-                    style: TextStyle(
-                      color: scheme.onSurfaceVariant,
-                      height: 1.35,
+                  if (!_usesAppleIap)
+                    Text(
+                      _t(
+                        'premium_checkout_secure_body',
+                        'A assinatura abre no navegador e fica vinculada à sua conta. Não há compra dentro do app.',
+                      ),
+                      style: TextStyle(
+                        color: scheme.onSurfaceVariant,
+                        height: 1.35,
+                      ),
                     ),
-                  ),
                 ],
               ),
             ),
@@ -254,7 +611,7 @@ class _PremiumPageState extends State<PremiumPage> {
                 'premium_checkout_monthly_title',
                 'Plano mensal',
               ),
-              price: 'R\$ 29,99 / mes',
+              price: _planPriceLabel('monthly', 'R\$ 29,99 / mes'),
               subtitle: _t(
                 'premium_checkout_monthly_subtitle',
                 '7 dias de teste. Cancele quando quiser.',
@@ -267,7 +624,7 @@ class _PremiumPageState extends State<PremiumPage> {
                 'premium_checkout_yearly_title',
                 'Plano anual',
               ),
-              price: 'R\$ 299,99 / ano',
+              price: _planPriceLabel('yearly', 'R\$ 299,99 / ano'),
               subtitle: _t(
                 'premium_checkout_yearly_subtitle',
                 '7 dias de teste. Melhor custo-beneficio para manter o Premium.',
@@ -327,8 +684,11 @@ class _PremiumPageState extends State<PremiumPage> {
             SizedBox(
               height: 50,
               child: ElevatedButton(
-                onPressed: _openingCheckout ? null : _openCheckout,
-                child: _openingCheckout
+                onPressed:
+                    (_openingCheckout || (_usesAppleIap && _loadingProducts))
+                        ? null
+                        : _openCheckout,
+                child: (_openingCheckout || (_usesAppleIap && _loadingProducts))
                     ? const SizedBox(
                         height: 18,
                         width: 18,
@@ -340,6 +700,28 @@ class _PremiumPageState extends State<PremiumPage> {
                           'Continuar',
                         ),
                       ),
+              ),
+            ),
+            const SizedBox(height: 10),
+            SizedBox(
+              height: 46,
+              child: OutlinedButton.icon(
+                onPressed: _openingPortal ? null : _openCancellationPortal,
+                icon: _openingPortal
+                    ? const SizedBox(
+                        height: 16,
+                        width: 16,
+                        child: CircularProgressIndicator(strokeWidth: 2),
+                      )
+                    : const Icon(Icons.cancel_outlined),
+                label: Text(
+                  _usesAppleIap
+                      ? 'Gerenciar assinatura'
+                      : _t(
+                          'premium_cancel_subscription_cta',
+                          'Cancelar assinatura',
+                        ),
+                ),
               ),
             ),
             const SizedBox(height: 10),

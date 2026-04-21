@@ -14,11 +14,11 @@ Este projeto foi adaptado para iOS no Flutter, mas antes de subir na App Store v
 
 3. In-App Purchase (App Store)
 - Crie os produtos no App Store Connect com os IDs usados no app:
-  - `voolo`
-  - `voolo_y`
+  - `voolo_month`
+  - `voolo_year`
 - No Codemagic, passe os mesmos IDs no build iOS com:
-  - `--dart-define=VOOLO_IOS_MONTHLY_SUBSCRIPTION_ID=voolo`
-  - `--dart-define=VOOLO_IOS_YEARLY_SUBSCRIPTION_ID=voolo_y`
+  - `--dart-define=VOOLO_IOS_MONTHLY_SUBSCRIPTION_ID=voolo_month`
+  - `--dart-define=VOOLO_IOS_YEARLY_SUBSCRIPTION_ID=voolo_year`
 - Para o build enviado ao review, habilite:
   - `--dart-define=APP_STORE_REVIEW_MODE=true`
   - isso cria a conta de revisão localmente sem abrir uma sessão automática

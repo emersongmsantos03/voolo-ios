@@ -20,6 +20,8 @@ class BillingService {
 
   static const String paddleMonthlyPriceId = 'pri_01knqmg977ezes0x1nn555g280';
   static const String paddleYearlyPriceId = 'pri_01knqmn1q7gbpjcvm0aws4p1ej';
+  static const String appleMonthlySubscriptionId = 'voolo_month';
+  static const String appleYearlySubscriptionId = 'voolo_year';
   static const String paddleCheckoutHostUrl = 'https://www.voolo.com.br';
   static const String paddlePremiumSuccessUrl =
       'https://www.voolo.com.br/profile?premium=success';
@@ -125,5 +127,22 @@ class BillingService {
 
   static Future<Map<String, dynamic>> cancelPaddleSubscription() {
     return _post('/billing/paddle/cancel-subscription', const {});
+  }
+
+  static Future<Map<String, dynamic>> syncAppStoreSubscription({
+    required String subscriptionId,
+    required String receiptData,
+    String? transactionId,
+    String? originalTransactionId,
+  }) {
+    return _post('/billing/appstore/sync-subscription', {
+      'subscriptionId': subscriptionId,
+      'receiptData': receiptData,
+      if (transactionId != null && transactionId.trim().isNotEmpty)
+        'transactionId': transactionId.trim(),
+      if (originalTransactionId != null &&
+          originalTransactionId.trim().isNotEmpty)
+        'originalTransactionId': originalTransactionId.trim(),
+    });
   }
 }

@@ -113,9 +113,9 @@
               "locale" : "pt_BR"
             }
           ],
-          "productID" : "voolo",
+          "productID" : "voolo_month",
           "recurringSubscriptionPeriod" : "P1M",
-          "referenceName" : "voolo_monthly",
+          "referenceName" : "voolo_month",
           "subscriptionGroupID" : "VooloProGroup",
           "type" : "RecurringSubscription",
           "winbackOffers" : [
@@ -141,9 +141,9 @@
               "locale" : "pt_BR"
             }
           ],
-          "productID" : "voolo_y",
+          "productID" : "voolo_year",
           "recurringSubscriptionPeriod" : "P1Y",
-          "referenceName" : "voolo_yearly",
+          "referenceName" : "voolo_year",
           "subscriptionGroupID" : "VooloProGroup",
           "type" : "RecurringSubscription",
           "winbackOffers" : [

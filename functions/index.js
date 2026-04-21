@@ -3,6 +3,7 @@ const admin = require('firebase-admin');
 const nodemailer = require('nodemailer');
 const crypto = require('crypto');
 const { google } = require('googleapis');
+const { defineSecret } = require('firebase-functions/params');
 const {
   AppStoreServerAPIClient,
   Environment: AppleEnvironment,
@@ -22,9 +23,20 @@ const SUPPORTED_PLAY_SUBSCRIPTION_IDS = new Set([
   'voolo-premium-yearly',
 ]);
 const SUPPORTED_APPLE_SUBSCRIPTION_IDS = new Set([
+  'voolo_month',
+  'voolo_year',
   'voolo',
   'voolo_y',
 ]);
+const PADDLE_API_KEY_SECRET = defineSecret('PADDLE_API_KEY');
+const PADDLE_PREMIUM_PLAN_DAYS = {
+  monthly: 30,
+  yearly: 365,
+};
+const PADDLE_PREMIUM_PRICE_IDS = {
+  monthly: 'pri_01knqmg977ezes0x1nn555g280',
+  yearly: 'pri_01knqmn1q7gbpjcvm0aws4p1ej',
+};
 const ACTIVE_SUBSCRIPTION_STATES = new Set([
   'SUBSCRIPTION_STATE_ACTIVE',
   'SUBSCRIPTION_STATE_IN_GRACE_PERIOD',
@@ -134,6 +146,279 @@ const requireAuth = async (req) => {
     error.code = 'unauthenticated';
     throw error;
   }
+};
+
+const getPaddleApiKey = () => {
+  const fromSecret = String(PADDLE_API_KEY_SECRET.value() || '').trim();
+  if (fromSecret) return fromSecret;
+
+  const fromEnv = String(process.env.PADDLE_API_KEY || '').trim();
+  if (fromEnv) return fromEnv;
+
+  return '';
+};
+
+const paddleFetch = async (path, { method = 'GET', body } = {}) => {
+  const apiKey = getPaddleApiKey();
+  const res = await fetch(`https://api.paddle.com${path}`, {
+    method,
+    headers: {
+      Authorization: `Bearer ${apiKey}`,
+      'Content-Type': 'application/json',
+    },
+    body: body ? JSON.stringify(body) : undefined,
+  });
+
+  const text = await res.text();
+  let json = null;
+  try {
+    json = text ? JSON.parse(text) : null;
+  } catch (_) {
+    json = null;
+  }
+
+  if (!res.ok) {
+    const err = new Error(`Paddle API error (${res.status})`);
+    err.status = res.status;
+    err.details = json?.error || json?.errors || text || null;
+    throw err;
+  }
+
+  return json;
+};
+
+const normalizePaddlePlan = (value) => {
+  const normalized = String(value || '').toLowerCase().trim();
+  if (normalized === 'annual') return 'yearly';
+  if (normalized === 'yearly') return 'yearly';
+  if (normalized === 'monthly') return 'monthly';
+  return '';
+};
+
+const resolvePaddlePlanFromTransaction = (transaction) => {
+  const customPlan = normalizePaddlePlan(
+    transaction?.custom_data?.plan || transaction?.custom_data?.billing_cycle
+  );
+  if (customPlan && PADDLE_PREMIUM_PLAN_DAYS[customPlan]) return customPlan;
+
+  const itemPriceIds = Array.isArray(transaction?.items)
+    ? transaction.items
+        .map((item) => String(item?.price?.id || item?.priceId || '').trim())
+        .filter(Boolean)
+    : [];
+
+  if (itemPriceIds.includes(PADDLE_PREMIUM_PRICE_IDS.yearly)) return 'yearly';
+  if (itemPriceIds.includes(PADDLE_PREMIUM_PRICE_IDS.monthly)) return 'monthly';
+
+  return 'monthly';
+};
+
+const toDateMillis = (value) => {
+  if (!value) return 0;
+  try {
+    if (typeof value?.toDate === 'function') {
+      const date = value.toDate();
+      return Number.isNaN(date.getTime()) ? 0 : date.getTime();
+    }
+    const date = new Date(value);
+    return Number.isNaN(date.getTime()) ? 0 : date.getTime();
+  } catch (_) {
+    return 0;
+  }
+};
+
+const resolvePaddleSubscriptionPeriodEndMs = (subscription) => {
+  const candidates = [
+    subscription?.current_billing_period?.ends_at,
+    subscription?.billing_period?.ends_at,
+    subscription?.next_billed_at,
+    subscription?.current_period_end,
+    subscription?.ends_at,
+  ];
+
+  for (const candidate of candidates) {
+    const ms = toDateMillis(candidate);
+    if (ms) return ms;
+  }
+
+  return 0;
+};
+
+const upsertPremiumFromPaddleTransaction = async ({ uid, transaction, topic }) => {
+  const plan = resolvePaddlePlanFromTransaction(transaction);
+  const premiumDays = PADDLE_PREMIUM_PLAN_DAYS[plan] || 30;
+  const transactionId = String(transaction?.id || '').trim();
+  const customerId = String(
+    transaction?.customer_id ||
+      transaction?.customer?.id ||
+      transaction?.customer ||
+      transaction?.customerId ||
+      ''
+  ).trim();
+  const priceId = Array.isArray(transaction?.items)
+    ? String(
+        transaction.items.find((item) => item?.price?.id || item?.priceId)?.price?.id ||
+          transaction.items.find((item) => item?.priceId)?.priceId ||
+          ''
+      ).trim()
+    : '';
+
+  const db = admin.firestore();
+  const billingDocRef = db.doc(`users/${uid}/billing/paddle`);
+  await billingDocRef.set(
+    {
+      provider: 'paddle',
+      customerId: customerId || null,
+      transactionId: transactionId || null,
+      subscriptionId: transaction?.subscription_id || null,
+      priceId: priceId || null,
+      plan,
+      status: String(transaction?.status || '').trim() || null,
+      eventType: topic || null,
+      customData: transaction?.custom_data || null,
+      updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+    },
+    { merge: true }
+  );
+
+  const userRef = db.doc(`users/${uid}`);
+  const userSnap = await userRef.get();
+  const existingUntil = userSnap.exists ? userSnap.data()?.premiumUntil : null;
+
+  const nowMs = Date.now();
+  let baseMs = nowMs;
+  try {
+    const existingDate =
+      typeof existingUntil?.toDate === 'function'
+        ? existingUntil.toDate()
+        : existingUntil
+          ? new Date(existingUntil)
+          : null;
+    if (existingDate && !Number.isNaN(existingDate.getTime())) {
+      baseMs = Math.max(nowMs, existingDate.getTime());
+    }
+  } catch (_) {
+    baseMs = nowMs;
+  }
+
+  const premiumUntil = new Date(baseMs + premiumDays * 24 * 60 * 60 * 1000);
+
+  await userRef.set(
+    {
+      isPremium: true,
+      premiumAtivo: true,
+      plan: 'premium',
+      premiumUntil: admin.firestore.Timestamp.fromDate(premiumUntil),
+      premiumUpdatedAt: admin.firestore.FieldValue.serverTimestamp(),
+      premiumUpdatedBy: 'paddle',
+    },
+    { merge: true }
+  );
+
+  return {
+    premiumGranted: true,
+    plan,
+    premiumUntil,
+  };
+};
+
+const upsertPremiumFromPaddleSubscription = async ({ uid, subscription, topic }) => {
+  const sub = subscription || {};
+  const subscriptionId = String(sub?.id || '').trim();
+  const status = String(sub?.status || '').toLowerCase().trim() || null;
+  const scheduledChange = sub?.scheduled_change || null;
+  const cancelScheduled =
+    String(scheduledChange?.action || '').toLowerCase().trim() === 'cancel';
+  const periodEndMs = resolvePaddleSubscriptionPeriodEndMs(sub);
+
+  const db = admin.firestore();
+  const billingDocRef = db.doc(`users/${uid}/billing/paddle`);
+  await billingDocRef.set(
+    {
+      provider: 'paddle',
+      subscriptionId: subscriptionId || null,
+      status,
+      scheduledChange,
+      cancelAtPeriodEnd: cancelScheduled,
+      currentBillingPeriod: sub?.current_billing_period || null,
+      nextBilledAt: sub?.next_billed_at || null,
+      lastEvent: topic || null,
+      updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+    },
+    { merge: true }
+  );
+
+  const userRef = db.doc(`users/${uid}`);
+  const userSnap = await userRef.get();
+  const existingUntil = userSnap.exists ? userSnap.data()?.premiumUntil : null;
+  const existingUntilMs = toDateMillis(existingUntil);
+  const premiumUntilMs = periodEndMs || existingUntilMs;
+
+  if (status === 'canceled') {
+    await userRef.set(
+      {
+        isPremium: false,
+        premiumAtivo: false,
+        plan: 'free',
+        premiumUntil: premiumUntilMs
+          ? admin.firestore.Timestamp.fromMillis(premiumUntilMs)
+          : null,
+        premiumCancelScheduled: false,
+        premiumCancelRequestedAt: null,
+        premiumCancelEffectiveAt: null,
+        premiumUpdatedAt: admin.firestore.FieldValue.serverTimestamp(),
+        premiumUpdatedBy: 'paddle',
+      },
+      { merge: true }
+    );
+
+    return {
+      premiumGranted: false,
+      status,
+      cancelScheduled: false,
+      premiumUntil: premiumUntilMs ? new Date(premiumUntilMs) : null,
+    };
+  }
+
+  if (['active', 'trialing'].includes(status)) {
+    await userRef.set(
+      {
+        isPremium: true,
+        premiumAtivo: true,
+        plan: 'premium',
+        premiumUntil: premiumUntilMs
+          ? admin.firestore.Timestamp.fromMillis(premiumUntilMs)
+          : existingUntilMs
+            ? admin.firestore.Timestamp.fromMillis(existingUntilMs)
+            : null,
+        premiumCancelScheduled: cancelScheduled,
+        premiumCancelRequestedAt: cancelScheduled
+          ? admin.firestore.FieldValue.serverTimestamp()
+          : null,
+        premiumCancelEffectiveAt:
+          cancelScheduled && premiumUntilMs
+            ? admin.firestore.Timestamp.fromMillis(premiumUntilMs)
+            : null,
+        premiumUpdatedAt: admin.firestore.FieldValue.serverTimestamp(),
+        premiumUpdatedBy: 'paddle',
+      },
+      { merge: true }
+    );
+
+    return {
+      premiumGranted: true,
+      status,
+      cancelScheduled,
+      premiumUntil: premiumUntilMs ? new Date(premiumUntilMs) : null,
+    };
+  }
+
+  return {
+    premiumGranted: false,
+    status,
+    cancelScheduled,
+    premiumUntil: premiumUntilMs ? new Date(premiumUntilMs) : null,
+  };
 };
 
 const normalizeApiPath = (pathValue) => {
@@ -1848,138 +2133,157 @@ exports.computeInvestmentProfile = functions
     }
   });
 
-// ====== BILLING API (Google Play subscriptions) ======
+// ====== BILLING API (Google Play, App Store and Paddle) ======
 
 const billingApiHttpHandler = async (req, res) => {
-    if (!applyCors(req, res)) return;
+  if (!applyCors(req, res)) return;
 
-    const path = normalizeApiPath(req.path);
-    const isGooglePlay = path === '/billing/googleplay/sync-subscription';
-    const isAppStore = path === '/billing/appstore/sync-subscription';
+  const path = normalizeApiPath(req.path);
+  const isGooglePlay = path === '/billing/googleplay/sync-subscription';
+  const isAppStore = path === '/billing/appstore/sync-subscription';
+  const isPaddleCreatePortal = path === '/billing/paddle/create-portal-session';
+  const isPaddleSyncTransaction = path === '/billing/paddle/sync-transaction';
+  const isPaddleCancelSubscription = path === '/billing/paddle/cancel-subscription';
 
-    if (!isGooglePlay && !isAppStore) {
-      return sendError(res, 404, 'not-found');
+  if (
+    !isGooglePlay &&
+    !isAppStore &&
+    !isPaddleCreatePortal &&
+    !isPaddleSyncTransaction &&
+    !isPaddleCancelSubscription
+  ) {
+    return sendError(res, 404, 'not-found');
+  }
+
+  if (req.method !== 'POST') {
+    return sendError(res, 405, 'method-not-allowed');
+  }
+
+  try {
+    const auth = await requireAuth(req);
+    const uid = String(auth?.uid || '').trim();
+    if (!uid) {
+      return sendError(res, 401, 'unauthenticated');
     }
 
-    if (req.method !== 'POST') {
-      return sendError(res, 405, 'method-not-allowed');
+    const db = admin.firestore();
+    const userRef = db.collection('users').doc(uid);
+    const authEmail = String(auth?.email || '').trim().toLowerCase();
+
+    if (isPaddleCreatePortal || isPaddleSyncTransaction || isPaddleCancelSubscription) {
+      const apiKey = getPaddleApiKey();
+      if (!apiKey) {
+        return sendError(res, 503, 'paddle-api-key-missing');
+      }
     }
 
-    try {
-      const auth = await requireAuth(req);
-      const uid = String(auth?.uid || '').trim();
-      if (!uid) {
-        return sendError(res, 401, 'unauthenticated');
+    if (isGooglePlay) {
+      const purchaseToken = String(req.body?.data?.purchaseToken || '').trim();
+      const requestedSubscriptionId = String(req.body?.data?.subscriptionId || '').trim();
+
+      if (!purchaseToken || !requestedSubscriptionId) {
+        return sendError(res, 400, 'invalid-argument');
+      }
+      if (!SUPPORTED_PLAY_SUBSCRIPTION_IDS.has(requestedSubscriptionId)) {
+        return sendError(res, 400, 'unsupported-subscription-id');
       }
 
-      const db = admin.firestore();
-      const userRef = db.collection('users').doc(uid);
-      const authEmail = String(auth?.email || '').trim().toLowerCase();
+      const packageName = getPlayPackageName();
+      const verification = await verifyGooglePlaySubscription({
+        packageName,
+        purchaseToken,
+        requestedSubscriptionId,
+      });
 
-      if (isGooglePlay) {
-        const purchaseToken = String(req.body?.data?.purchaseToken || '').trim();
-        const requestedSubscriptionId = String(req.body?.data?.subscriptionId || '').trim();
+      const premiumGranted = verification.premiumGranted === true;
+      const premiumUntil =
+        verification.premiumUntil instanceof Date &&
+        !Number.isNaN(verification.premiumUntil.getTime())
+          ? verification.premiumUntil
+          : null;
 
-        if (!purchaseToken || !requestedSubscriptionId) {
-          return sendError(res, 400, 'invalid-argument');
+      const nowIso = new Date().toISOString();
+      const premiumPatch = {
+        isPremium: premiumGranted,
+        premium: premiumGranted,
+        premiumAtivo: premiumGranted,
+        plan: premiumGranted ? 'premium' : 'free',
+        premiumUntil: premiumUntil
+          ? admin.firestore.Timestamp.fromDate(premiumUntil)
+          : null,
+        premiumUpdatedAt: admin.firestore.FieldValue.serverTimestamp(),
+        premiumUpdatedBy: 'billing-googleplay',
+      };
+
+      await userRef.set(premiumPatch, { merge: true });
+
+      if (authEmail) {
+        const legacyRef = db.collection('users').doc(authEmail);
+        const legacySnap = await legacyRef.get();
+        if (legacySnap.exists && legacyRef.id !== uid) {
+          await legacyRef.set(premiumPatch, { merge: true });
         }
-        if (!SUPPORTED_PLAY_SUBSCRIPTION_IDS.has(requestedSubscriptionId)) {
-          return sendError(res, 400, 'unsupported-subscription-id');
-        }
+      }
 
-        const packageName = getPlayPackageName();
-        const verification = await verifyGooglePlaySubscription({
-          packageName,
-          purchaseToken,
-          requestedSubscriptionId,
-        });
+      const purchaseTokenHash = crypto
+        .createHash('sha256')
+        .update(purchaseToken)
+        .digest('hex');
 
-        const premiumGranted = verification.premiumGranted === true;
-        const premiumUntil =
-          verification.premiumUntil instanceof Date &&
-          !Number.isNaN(verification.premiumUntil.getTime())
-            ? verification.premiumUntil
-            : null;
+      await userRef.collection('billingEvents').add({
+        provider: 'google_play',
+        action: 'sync_subscription',
+        source: verification.source,
+        packageName,
+        requestedSubscriptionId,
+        resolvedSubscriptionId: verification.subscriptionId,
+        subscriptionState: verification.subscriptionState,
+        premiumGranted,
+        premiumUntil: premiumUntil
+          ? admin.firestore.Timestamp.fromDate(premiumUntil)
+          : null,
+        purchaseTokenHash,
+        orderId: verification.rawOrderId,
+        createdAt: admin.firestore.FieldValue.serverTimestamp(),
+        createdBy: uid,
+      });
 
-        const nowIso = new Date().toISOString();
-        const premiumPatch = {
-          isPremium: premiumGranted,
-          premium: premiumGranted,
-          premiumAtivo: premiumGranted,
-          plan: premiumGranted ? 'premium' : 'free',
-          premiumUntil: premiumUntil
-            ? admin.firestore.Timestamp.fromDate(premiumUntil)
-            : null,
-          premiumUpdatedAt: admin.firestore.FieldValue.serverTimestamp(),
-          premiumUpdatedBy: 'billing-googleplay',
-        };
-
-        await userRef.set(premiumPatch, { merge: true });
-
-        if (authEmail) {
-          const legacyRef = db.collection('users').doc(authEmail);
-          const legacySnap = await legacyRef.get();
-          if (legacySnap.exists && legacyRef.id !== uid) {
-            await legacyRef.set(premiumPatch, { merge: true });
-          }
-        }
-
-        const purchaseTokenHash = crypto
-          .createHash('sha256')
-          .update(purchaseToken)
-          .digest('hex');
-
-        await userRef.collection('billingEvents').add({
+      await userRef.collection('subscriptions').doc('google_play').set(
+        {
           provider: 'google_play',
-          action: 'sync_subscription',
-          source: verification.source,
           packageName,
+          subscriptionId: verification.subscriptionId,
           requestedSubscriptionId,
-          resolvedSubscriptionId: verification.subscriptionId,
           subscriptionState: verification.subscriptionState,
           premiumGranted,
           premiumUntil: premiumUntil
             ? admin.firestore.Timestamp.fromDate(premiumUntil)
             : null,
           purchaseTokenHash,
-          orderId: verification.rawOrderId,
-          createdAt: admin.firestore.FieldValue.serverTimestamp(),
-          createdBy: uid,
-        });
+          updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+          updatedBy: uid,
+        },
+        { merge: true }
+      );
 
-        await userRef.collection('subscriptions').doc('google_play').set(
-          {
-            provider: 'google_play',
-            packageName,
-            subscriptionId: verification.subscriptionId,
-            requestedSubscriptionId,
-            subscriptionState: verification.subscriptionState,
-            premiumGranted,
-            premiumUntil: premiumUntil
-              ? admin.firestore.Timestamp.fromDate(premiumUntil)
-              : null,
-            purchaseTokenHash,
-            updatedAt: admin.firestore.FieldValue.serverTimestamp(),
-            updatedBy: uid,
-          },
-          { merge: true }
-        );
+      return res.json({
+        premiumGranted,
+        premiumUntil: premiumUntil ? premiumUntil.toISOString() : null,
+        subscriptionId: verification.subscriptionId,
+        subscriptionState: verification.subscriptionState,
+        packageName,
+        source: verification.source,
+        syncedAt: nowIso,
+      });
+    }
 
-        return res.json({
-          premiumGranted,
-          premiumUntil: premiumUntil ? premiumUntil.toISOString() : null,
-          subscriptionId: verification.subscriptionId,
-          subscriptionState: verification.subscriptionState,
-          packageName,
-          source: verification.source,
-          syncedAt: nowIso,
-        });
-      }
-
+    if (isAppStore) {
       const receiptData = String(req.body?.data?.receiptData || '').trim();
       const requestedSubscriptionId = String(req.body?.data?.subscriptionId || '').trim();
       const explicitTransactionId = String(req.body?.data?.transactionId || '').trim();
-      const explicitOriginalTransactionId = String(req.body?.data?.originalTransactionId || '').trim();
+      const explicitOriginalTransactionId = String(
+        req.body?.data?.originalTransactionId || ''
+      ).trim();
 
       if (!receiptData || !requestedSubscriptionId) {
         return sendError(res, 400, 'invalid-argument');
@@ -2098,41 +2402,176 @@ const billingApiHttpHandler = async (req, res) => {
         source: 'appstore-server-api',
         syncedAt: nowIso,
       });
-    } catch (error) {
-      const code = error?.code || error?.message || 'unknown';
-      if (code === 'unauthenticated') {
-        return sendError(res, 401, 'unauthenticated');
-      }
-      if (code === 'apple-not-configured') {
-        return sendError(res, 500, code);
-      }
-      if (code === 'invalid-argument' || code === 'unsupported-subscription-id') {
-        return sendError(res, 400, code);
-      }
-      if (
-        code === 'play-permission-denied' ||
-        code === 'play-subscription-not-found' ||
-        code === 'play-rate-limited' ||
-        code === 'play-api-unavailable' ||
-        code === 'play-verification-failed'
-      ) {
-        return sendError(res, 502, code);
-      }
-      if (code === 'appstore-verification-failed' || code === 'appstore-api-unavailable') {
-        return sendError(res, 502, code);
-      }
-      return sendError(res, 500, 'unknown');
     }
-  };
+
+    if (isPaddleCreatePortal) {
+      const returnUrl = String(
+        req.body?.data?.returnUrl || req.body?.returnUrl || 'https://www.voolo.com.br/profile'
+      ).trim();
+
+      const snap = await db.doc(`users/${uid}/billing/paddle`).get();
+      const customerId = snap.exists ? String(snap.data()?.customerId || '').trim() : '';
+      const subscriptionId = snap.exists ? String(snap.data()?.subscriptionId || '').trim() : '';
+      if (!customerId) {
+        return sendError(res, 400, 'missing-paddle-customer');
+      }
+
+      const payload = subscriptionId ? { subscription_ids: [subscriptionId] } : {};
+      const portal = await paddleFetch(`/customers/${encodeURIComponent(customerId)}/portal-sessions`, {
+        method: 'POST',
+        body: payload,
+      });
+
+      const portalData = portal?.data || portal || {};
+      const urls = portalData?.urls || {};
+      const subscriptionLinks = Array.isArray(urls?.subscriptions) ? urls.subscriptions : [];
+      const subscriptionUrl =
+        subscriptionLinks.find((item) => String(item?.url || item || '').trim())?.url ||
+        subscriptionLinks.find((item) => String(item || '').trim()) ||
+        '';
+      const generalUrls = urls?.general || {};
+      const portalUrl =
+        String(
+          subscriptionUrl ||
+            generalUrls?.overview ||
+            generalUrls?.portal ||
+            generalUrls?.url ||
+            ''
+        ).trim() || returnUrl;
+
+      return res.json({
+        ok: true,
+        url: portalUrl,
+        portal: portalData?.id || null,
+      });
+    }
+
+    if (isPaddleSyncTransaction) {
+      const transactionId = String(
+        req.body?.data?.transactionId || req.body?.transactionId || req.body?.transaction_id || ''
+      ).trim();
+      if (!transactionId) {
+        return sendError(res, 400, 'invalid-argument');
+      }
+
+      const transactionResp = await paddleFetch(`/transactions/${encodeURIComponent(transactionId)}`);
+      const transaction = transactionResp?.data || transactionResp || null;
+      if (!transaction?.id) {
+        return sendError(res, 404, 'transaction-not-found');
+      }
+
+      const txUid = String(
+        transaction?.custom_data?.uid || transaction?.custom_data?.user_id || ''
+      ).trim();
+      if (txUid && txUid !== uid) {
+        return sendError(res, 403, 'forbidden');
+      }
+
+      const status = String(transaction?.status || '').toLowerCase().trim();
+      if (!['completed', 'paid'].includes(status)) {
+        return res.json({ ok: true, premiumGranted: false, status: status || null });
+      }
+
+      const updated = await upsertPremiumFromPaddleTransaction({
+        uid,
+        transaction,
+        topic: 'sync-transaction',
+      });
+
+      return res.json({
+        ok: true,
+        premiumGranted: updated.premiumGranted,
+        status,
+      });
+    }
+
+    if (isPaddleCancelSubscription) {
+      const snap = await db.doc(`users/${uid}/billing/paddle`).get();
+      const subscriptionId = snap.exists ? String(snap.data()?.subscriptionId || '').trim() : '';
+      if (!subscriptionId) {
+        return sendError(res, 400, 'missing-paddle-subscription');
+      }
+
+      const existingStatus = String(snap.exists ? snap.data()?.status || '' : '')
+        .toLowerCase()
+        .trim();
+      const alreadyScheduled = snap.exists ? snap.data()?.cancelAtPeriodEnd === true : false;
+      if (existingStatus === 'canceled' || alreadyScheduled) {
+        return res.json({
+          ok: true,
+          status: existingStatus || 'active',
+          cancelScheduled: alreadyScheduled,
+          alreadyScheduled: true,
+        });
+      }
+
+      const response = await paddleFetch(
+        `/subscriptions/${encodeURIComponent(subscriptionId)}/cancel`,
+        {
+          method: 'POST',
+        }
+      );
+      const subscription = response?.data || response || null;
+      if (!subscription?.id) {
+        return sendError(res, 502, 'paddle-cancel-failed');
+      }
+
+      const updated = await upsertPremiumFromPaddleSubscription({
+        uid,
+        subscription,
+        topic: 'subscription.updated',
+      });
+
+      return res.json({
+        ok: true,
+        status: updated.status || subscription.status || null,
+        cancelScheduled: updated.cancelScheduled === true,
+        premiumGranted: updated.premiumGranted,
+      });
+    }
+
+    return sendError(res, 404, 'not-found');
+  } catch (error) {
+    const code = error?.code || error?.message || 'unknown';
+    if (code === 'unauthenticated') {
+      return sendError(res, 401, 'unauthenticated');
+    }
+    if (
+      code === 'invalid-argument' ||
+      code === 'unsupported-subscription-id' ||
+      code === 'missing-paddle-customer' ||
+      code === 'missing-paddle-subscription'
+    ) {
+      return sendError(res, 400, code);
+    }
+    if (
+      code === 'appstore-verification-failed' ||
+      code === 'appstore-api-unavailable' ||
+      code === 'play-permission-denied' ||
+      code === 'play-subscription-not-found' ||
+      code === 'play-rate-limited' ||
+      code === 'play-api-unavailable' ||
+      code === 'play-verification-failed' ||
+      code === 'paddle-api-key-missing' ||
+      code === 'paddle-cancel-failed'
+    ) {
+      return sendError(res, 502, code);
+    }
+    return sendError(res, 500, 'unknown');
+  }
+};
 
 exports.api = functions
   .region(REGION)
+  .runWith({ secrets: [PADDLE_API_KEY_SECRET] })
   .https.onRequest(billingApiHttpHandler);
 
 exports.billingApi = functions
   .region(REGION)
+  .runWith({ secrets: [PADDLE_API_KEY_SECRET] })
   .https.onRequest(billingApiHttpHandler);
 
 exports.billingApiUs = functions
   .region('us-central1')
+  .runWith({ secrets: [PADDLE_API_KEY_SECRET] })
   .https.onRequest(billingApiHttpHandler);

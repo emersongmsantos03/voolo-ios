@@ -1,5 +1,6 @@
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:sign_in_with_apple/sign_in_with_apple.dart';
 
 import 'package:jetx/core/localization/app_strings.dart';
 import 'package:jetx/models/user_profile.dart';
@@ -133,11 +134,50 @@ class _LoginPageState extends State<LoginPage> {
     );
   }
 
+  Future<void> _loginWithApple() async {
+    setState(() => _loading = true);
+    UserProfile? user;
+    try {
+      user = await LocalStorageService.loginWithApple();
+    } catch (_) {
+      if (!mounted) return;
+      _snack(AppStrings.t(context, 'login_failed_try_again'));
+      setState(() => _loading = false);
+      return;
+    }
+    if (!mounted) return;
+    if (user == null) {
+      final loginError = LocalStorageService.lastLoginError;
+      final loginErrorCode = LocalStorageService.lastLoginErrorCode;
+      if (loginError != null) {
+        final baseMessage = AppStrings.t(context, loginError);
+        final message =
+            !kDebugMode || loginErrorCode == null || loginErrorCode.isEmpty
+                ? baseMessage
+                : '$baseMessage (code: $loginErrorCode)';
+        _snack(message);
+      } else {
+        _snack(AppStrings.t(context, 'login_failed_try_again'));
+      }
+      setState(() => _loading = false);
+      return;
+    }
+
+    setState(() => _loading = false);
+    Navigator.pushReplacement(
+      context,
+      MaterialPageRoute(builder: (_) => const LoginSuccessSplash()),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final scheme = theme.colorScheme;
     final isDark = theme.brightness == Brightness.dark;
+    final supportsAppleLogin = !kIsWeb &&
+        (defaultTargetPlatform == TargetPlatform.iOS ||
+            defaultTargetPlatform == TargetPlatform.macOS);
 
     return Scaffold(
       body: Container(
@@ -285,6 +325,16 @@ class _LoginPageState extends State<LoginPage> {
                               ],
                             ),
                             const SizedBox(height: 14),
+                            if (supportsAppleLogin) ...[
+                              SizedBox(
+                                width: double.infinity,
+                                height: 52,
+                                child: SignInWithAppleButton(
+                                  onPressed: _loginWithApple,
+                                ),
+                              ),
+                              const SizedBox(height: 8),
+                            ],
                             SizedBox(
                               width: double.infinity,
                               height: 52,
