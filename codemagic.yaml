@@ -92,6 +92,11 @@ workflows:
       - name: Set up iOS code signing
         script: |
           set -e
+          keychain initialize
+          app-store-connect fetch-signing-files "$BUNDLE_ID" \
+            --type IOS_APP_STORE \
+            --create
+          keychain add-certificates
           xcode-project use-profiles --project ios/Runner.xcodeproj
 
       - name: Verify signing settings
@@ -111,9 +116,18 @@ workflows:
       - name: Build signed IPA
         script: |
           set -e
-          flutter build ipa --release \
+          if ! flutter build ipa --release \
             --build-number="$CM_FLUTTER_BUILD_NUMBER" \
-            --export-options-plist=/Users/builder/export_options.plist
+            --export-options-plist=/Users/builder/export_options.plist; then
+            echo "=== iOS build log tail ==="
+            if [ -d /tmp/xcodebuild_logs ]; then
+              find /tmp/xcodebuild_logs -type f -name "*.log" | while read -r log; do
+                echo "FILE: $log"
+                tail -n 120 "$log" || true
+              done
+            fi
+            exit 1
+          fi
 
       - name: Validate and collect IPA
         script: |
