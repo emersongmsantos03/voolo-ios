@@ -113,7 +113,6 @@ workflows:
       - name: Build signed IPA
         script: |
           set -e
-          cd ios
           if ! xcode-project build-ipa \
             --workspace "$CM_BUILD_DIR/ios/$XCODE_WORKSPACE" \
             --scheme "$XCODE_SCHEME" \
