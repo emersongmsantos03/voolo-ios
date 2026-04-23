@@ -35,6 +35,16 @@ We fixed the issues related to App Completeness and Metadata Accuracy:
 3. Metadata Accuracy (2.3.8): metadata and app visuals were aligned and reviewed to ensure they are appropriate for all audiences and consistent with the app name/icons/features.
 4. Account & Privacy: the app includes in-app account deletion for authenticated users, privacy links in the subscription flow, and an updated iOS privacy manifest.
 
-Additionally, the subscription screen now uses store-fetched pricing (no hardcoded pricing fallback) and includes direct links to Terms of Use and Privacy Policy.
+Additionally, the subscription screen now shows the subscription name, duration, store-fetched price where available, and direct links to Terms of Use and Privacy Policy.
 
 Thank you.
+
+## 6) App Store Connect metadata to fill manually
+- `Privacy Policy` URL: `https://voolo.app/privacy`
+- `Terms of Use (EULA)`: `https://www.apple.com/legal/internet-services/itunes/dev/stdeula/`
+- Make sure both links are also visible inside the iOS subscription paywall.
+
+## 7) App Description snippet
+If you want to mention the subscription terms directly in the App Description, use:
+
+`Voolo Premium is an auto-renewable subscription. Subscription options: Voolo Monthly (1 month) and Voolo Yearly (1 year). Payment is charged to your Apple ID, and the subscription renews automatically unless canceled at least 24 hours before the end of the current period. Terms of Use (EULA): https://www.apple.com/legal/internet-services/itunes/dev/stdeula/ Privacy Policy: https://voolo.app/privacy`

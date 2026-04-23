@@ -347,12 +347,12 @@ class AppStrings {
           'Assinatura cancelada. O acesso continua até o fim do periodo pago.',
       'profile_subscription_action_error':
           'Não foi possível concluir a solicitação agora.',
-      'premium_plan_monthly_title': 'Plano mensal - R\$ 29,90/mês',
+      'premium_plan_monthly_title': 'Voolo Monthly - R\$ 29,90/mês',
       'premium_plan_monthly_subtitle':
-          'Renovação automática. Cancele quando quiser.',
-      'premium_plan_yearly_title': 'Plano anual - R\$ 299,90/ano',
+          'Acesso ao Premium com relatórios, missões, insights e calculadora enquanto ativo. Renovação automática.',
+      'premium_plan_yearly_title': 'Voolo Yearly - R\$ 299,90/ano',
       'premium_plan_yearly_subtitle':
-          'Pagamento anual com acesso premium durante todos os meses do período.',
+          'Acesso anual ao Premium com relatórios, missões, insights e calculadora durante todo o período. Renovação automática.',
       'premium_dialog_body':
           'Desbloqueie missões, relatórios inteligentes, calculadora de investimentos e alertas de pagamentos.\n\nEntre em contato para ativar o Premium.',
       'premium_upsell_title': 'Mais controle, mais clareza, mais resultado',
@@ -1102,11 +1102,12 @@ class AppStrings {
           'Subscription cancelled. Access continues until the end of the paid period.',
       'profile_subscription_action_error':
           'Could not complete the request right now.',
-      'premium_plan_monthly_title': 'Monthly plan - R\$ 29.90/month',
-      'premium_plan_monthly_subtitle': 'Automatic renewal. Cancel anytime.',
-      'premium_plan_yearly_title': 'Yearly plan - R\$ 299.90/year',
+      'premium_plan_monthly_title': 'Voolo Monthly - R\$ 29.90/month',
+      'premium_plan_monthly_subtitle':
+          'Premium access to reports, missions, insights, and the calculator while active. Automatic renewal.',
+      'premium_plan_yearly_title': 'Voolo Yearly - R\$ 299.90/year',
       'premium_plan_yearly_subtitle':
-          'Annual payment with premium access for every month of the period.',
+          'Annual Premium access to reports, missions, insights, and the calculator for the full period. Automatic renewal.',
       'premium_dialog_body':
           'Unlock missions, smart reports, investment calculator, and payment alerts.\n\nContact us to activate Premium.',
       'premium_upsell_title': 'More control, more clarity, more results',
@@ -1850,12 +1851,12 @@ class AppStrings {
           'Suscripción cancelada. El acceso continúa hasta el final del periodo pagado.',
       'profile_subscription_action_error':
           'No se pudo completar la solicitud ahora.',
-      'premium_plan_monthly_title': 'Plan mensual - R\$ 29,90/mes',
+      'premium_plan_monthly_title': 'Voolo Monthly - R\$ 29,90/mes',
       'premium_plan_monthly_subtitle':
-          'Renovación automática. Cancela cuando quieras.',
-      'premium_plan_yearly_title': 'Plan anual - R\$ 299,90/año',
+          'Acceso Premium a informes, misiones, insights y la calculadora mientras esté activo. Renovación automática.',
+      'premium_plan_yearly_title': 'Voolo Yearly - R\$ 299,90/año',
       'premium_plan_yearly_subtitle':
-          'Pago anual con acceso premium durante todos los meses del período.',
+          'Acceso anual a Premium con informes, misiones, insights y la calculadora durante todo el período. Renovación automática.',
       'premium_dialog_body':
           'Desbloquea misiones, informes inteligentes, calculadora de inversiones y alertas de pagos.\n\nContáctanos para activar Premium.',
       'premium_upsell_title': 'Más control, más claridad, más resultados',

@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
+import 'package:url_launcher/url_launcher.dart';
 
+import '../core/constants/legal_links.dart';
 import '../core/localization/app_strings.dart';
 import '../core/theme/app_theme.dart';
 import '../core/ui/responsive.dart';
@@ -454,6 +456,47 @@ void showPremiumDialog(BuildContext context) {
                     onTap: () => setDialogState(() => selectedPlan = 'yearly'),
                   ),
                   const SizedBox(height: 16),
+                  Container(
+                    width: double.infinity,
+                    padding: const EdgeInsets.all(14),
+                    decoration: BoxDecoration(
+                      color: scheme.surfaceContainerHighest
+                          .withValues(alpha: 0.45),
+                      borderRadius: BorderRadius.circular(14),
+                      border: Border.all(color: scheme.outlineVariant),
+                    ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          'By subscribing, you agree to our Terms of Use (EULA) and Privacy Policy.',
+                          style: TextStyle(
+                            color: scheme.onSurface,
+                            fontWeight: FontWeight.w700,
+                            height: 1.35,
+                          ),
+                        ),
+                        const SizedBox(height: 10),
+                        Wrap(
+                          spacing: 10,
+                          runSpacing: 10,
+                          children: [
+                            TextButton(
+                              onPressed: () =>
+                                  _openLegalLink(LegalLinks.termsOfUseUrl),
+                              child: const Text('Terms of Use (EULA)'),
+                            ),
+                            TextButton(
+                              onPressed: () =>
+                                  _openLegalLink(LegalLinks.privacyPolicyUrl),
+                              child: const Text('Privacy Policy'),
+                            ),
+                          ],
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: 16),
                   SizedBox(
                     width: double.infinity,
                     child: ElevatedButton(
@@ -539,4 +582,11 @@ class _DialogPlanTile extends StatelessWidget {
       ),
     );
   }
+}
+
+Future<void> _openLegalLink(String url) async {
+  await launchUrl(
+    Uri.parse(url),
+    mode: LaunchMode.externalApplication,
+  );
 }

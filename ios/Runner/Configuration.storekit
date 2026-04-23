@@ -1,11 +1,11 @@
 {
   "appPolicies" : {
-    "eula" : "",
+    "eula" : "https://www.apple.com/legal/internet-services/itunes/dev/stdeula/",
     "policies" : [
       {
         "locale" : "en_US",
         "policyText" : "",
-        "policyURL" : ""
+        "policyURL" : "https://voolo.app/privacy"
       }
     ]
   },

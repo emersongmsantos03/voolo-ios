@@ -6,6 +6,7 @@ import 'package:flutter/material.dart';
 import 'package:in_app_purchase/in_app_purchase.dart';
 import 'package:url_launcher/url_launcher.dart';
 
+import '../../core/constants/legal_links.dart';
 import '../../core/localization/app_strings.dart';
 import '../../services/billing_service.dart';
 import '../../services/local_storage_service.dart';
@@ -34,6 +35,26 @@ class _PremiumPageState extends State<PremiumPage> {
 
   bool get _usesAppleIap =>
       !kIsWeb && defaultTargetPlatform == TargetPlatform.iOS;
+
+  static const _SubscriptionPlanInfo _monthlyPlan = _SubscriptionPlanInfo(
+    key: 'monthly',
+    title: 'Voolo Monthly',
+    durationLabel: '1 month',
+    priceSuffix: '/month',
+    fallbackPrice: 'R\$ 29,90/month',
+    subtitle:
+        'Includes premium reports, missions, insights, and the investment calculator while active. Auto-renews until canceled.',
+  );
+
+  static const _SubscriptionPlanInfo _yearlyPlan = _SubscriptionPlanInfo(
+    key: 'yearly',
+    title: 'Voolo Yearly',
+    durationLabel: '1 year',
+    priceSuffix: '/year',
+    fallbackPrice: 'R\$ 299,90/year',
+    subtitle:
+        'Includes premium reports, missions, insights, and the investment calculator for the full subscription period. Auto-renews until canceled.',
+  );
 
   String _t(String key, String fallback) {
     final value = AppStrings.t(context, key);
@@ -120,10 +141,10 @@ class _PremiumPageState extends State<PremiumPage> {
     }
   }
 
-  String _planPriceLabel(String plan, String fallback) {
-    final product = _appleProductForPlan(plan);
-    if (product != null) return product.price;
-    return fallback;
+  String _planPriceLabel(_SubscriptionPlanInfo plan) {
+    final product = _appleProductForPlan(plan.key);
+    if (product != null) return '${product.price}${plan.priceSuffix}';
+    return plan.fallbackPrice;
   }
 
   Future<void> _handlePurchaseUpdates(
@@ -444,17 +465,28 @@ class _PremiumPageState extends State<PremiumPage> {
     }
   }
 
-  Widget _planTile({
-    required String planKey,
-    required String title,
-    required String price,
-    required String subtitle,
-  }) {
+  Future<void> _openExternalLink(String url) async {
+    final launched = await launchUrl(
+      Uri.parse(url),
+      mode: LaunchMode.externalApplication,
+    );
+    if (!launched && mounted) {
+      setState(() {
+        _error = _t(
+          'premium_checkout_open_error',
+          'Nao foi possivel abrir a assinatura agora.',
+        );
+      });
+    }
+  }
+
+  Widget _planTile(_SubscriptionPlanInfo plan) {
     final scheme = Theme.of(context).colorScheme;
-    final selected = _selectedPlan == planKey;
+    final selected = _selectedPlan == plan.key;
+    final price = _planPriceLabel(plan);
 
     return InkWell(
-      onTap: () => setState(() => _selectedPlan = planKey),
+      onTap: () => setState(() => _selectedPlan = plan.key),
       borderRadius: BorderRadius.circular(16),
       child: AnimatedContainer(
         duration: const Duration(milliseconds: 180),
@@ -483,12 +515,20 @@ class _PremiumPageState extends State<PremiumPage> {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
-                    title,
+                    plan.title,
                     style: const TextStyle(fontWeight: FontWeight.w700),
                   ),
                   const SizedBox(height: 4),
                   Text(
-                    price,
+                    'Duration: ${plan.durationLabel}',
+                    style: TextStyle(
+                      color: scheme.onSurfaceVariant,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    'Price: $price',
                     style: TextStyle(
                       color: scheme.primary,
                       fontWeight: FontWeight.w800,
@@ -497,7 +537,7 @@ class _PremiumPageState extends State<PremiumPage> {
                   ),
                   const SizedBox(height: 4),
                   Text(
-                    subtitle,
+                    plan.subtitle,
                     style: TextStyle(color: scheme.onSurfaceVariant),
                   ),
                 ],
@@ -505,6 +545,49 @@ class _PremiumPageState extends State<PremiumPage> {
             ),
           ],
         ),
+      ),
+    );
+  }
+
+  Widget _legalLinksCard() {
+    final scheme = Theme.of(context).colorScheme;
+
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(18),
+        color: scheme.surfaceContainerHighest.withValues(alpha: 0.5),
+        border: Border.all(color: scheme.outlineVariant),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            'By subscribing, you agree to our Terms of Use (EULA) and Privacy Policy.',
+            style: TextStyle(
+              color: scheme.onSurface,
+              fontWeight: FontWeight.w700,
+              height: 1.35,
+            ),
+          ),
+          const SizedBox(height: 12),
+          Wrap(
+            spacing: 10,
+            runSpacing: 10,
+            children: [
+              OutlinedButton.icon(
+                onPressed: () => _openExternalLink(LegalLinks.termsOfUseUrl),
+                icon: const Icon(Icons.description_outlined, size: 18),
+                label: const Text('Terms of Use (EULA)'),
+              ),
+              OutlinedButton.icon(
+                onPressed: () => _openExternalLink(LegalLinks.privacyPolicyUrl),
+                icon: const Icon(Icons.privacy_tip_outlined, size: 18),
+                label: const Text('Privacy Policy'),
+              ),
+            ],
+          ),
+        ],
       ),
     );
   }
@@ -605,31 +688,11 @@ class _PremiumPageState extends State<PremiumPage> {
               ),
             ),
             const SizedBox(height: 16),
-            _planTile(
-              planKey: 'monthly',
-              title: _t(
-                'premium_checkout_monthly_title',
-                'Plano mensal',
-              ),
-              price: _planPriceLabel('monthly', 'R\$ 29,99 / mes'),
-              subtitle: _t(
-                'premium_checkout_monthly_subtitle',
-                '7 dias de teste. Cancele quando quiser.',
-              ),
-            ),
+            _planTile(_monthlyPlan),
             const SizedBox(height: 10),
-            _planTile(
-              planKey: 'yearly',
-              title: _t(
-                'premium_checkout_yearly_title',
-                'Plano anual',
-              ),
-              price: _planPriceLabel('yearly', 'R\$ 299,99 / ano'),
-              subtitle: _t(
-                'premium_checkout_yearly_subtitle',
-                '7 dias de teste. Melhor custo-beneficio para manter o Premium.',
-              ),
-            ),
+            _planTile(_yearlyPlan),
+            const SizedBox(height: 18),
+            _legalLinksCard(),
             const SizedBox(height: 18),
             Container(
               padding: const EdgeInsets.all(16),
@@ -737,4 +800,22 @@ class _PremiumPageState extends State<PremiumPage> {
       ),
     );
   }
+}
+
+class _SubscriptionPlanInfo {
+  const _SubscriptionPlanInfo({
+    required this.key,
+    required this.title,
+    required this.durationLabel,
+    required this.priceSuffix,
+    required this.fallbackPrice,
+    required this.subtitle,
+  });
+
+  final String key;
+  final String title;
+  final String durationLabel;
+  final String priceSuffix;
+  final String fallbackPrice;
+  final String subtitle;
 }
